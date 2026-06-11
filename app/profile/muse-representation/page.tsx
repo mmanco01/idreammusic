@@ -19,7 +19,7 @@ export default async function MuseRepresentationPage() {
 
           <MuseRepresentationForm
             initialTheme={theme}
-            onSubmitAction={saveMuseRepresentationTheme}
+            action={saveMuseRepresentationTheme}
           />
         </div>
       </div>

@@ -11,60 +11,49 @@ import {
 
 type Props = {
   initialTheme: MuseRepresentationTheme;
-  onSubmitAction: (formData: FormData) => void;
+  action: (formData: FormData) => void;
 };
 
-export function MuseRepresentationForm({
-  initialTheme,
-  onSubmitAction,
-}: Props) {
+export function MuseRepresentationForm({ initialTheme, action }: Props) {
   const [theme, setTheme] = useState<MuseRepresentationTheme>(initialTheme);
 
-  const hasChanged = theme !== initialTheme;
-
   return (
-    <form action={onSubmitAction}>
-      <div className="section-tight" />
+    <form action={action}>
+      <input type="hidden" name="theme" value={theme} />
 
       <div className="card-grid">
         {museRepresentationOptions.map((option) => {
           const checked = theme === option.value;
 
           return (
-            <label
+            <button
               key={option.value}
+              type="button"
               className="card"
+              onClick={() => setTheme(option.value)}
               style={{
                 cursor: 'pointer',
+                textAlign: 'left',
                 border: checked
                   ? '1px solid rgba(214, 176, 72, 0.45)'
-                  : undefined,
+                  : '1px solid rgba(255,255,255,0.12)',
               }}
             >
               <div className="pillRow" style={{ marginBottom: '0.8rem' }}>
-                <input
-                  type="radio"
-                  name="theme"
-                  value={option.value}
-                  checked={checked}
-                  onChange={() => setTheme(option.value)}
-                />
+                <span className="pill">{checked ? 'Selected' : 'Select'}</span>
                 <span className="pill">{option.label}</span>
               </div>
 
               <h3 className="h3">{option.label}</h3>
               <p className="copy">{option.description}</p>
-            </label>
+            </button>
           );
         })}
       </div>
 
-      <div
-        className="button-row"
-        style={{ marginTop: '1rem', marginBottom: '1rem' }}
-      >
+      <div className="button-row" style={{ marginTop: '1rem', marginBottom: '1rem' }}>
         <button type="submit" className="button primary">
-          {hasChanged ? 'Save changes' : 'Save current selection'}
+          Save changes
         </button>
       </div>
 
