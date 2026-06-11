@@ -25,6 +25,7 @@ export type SongSummary = {
   summary: string | null;
   current_stage: SongStage;
   muse_slug: string | null;
+  song_origin?: SongOrigin | null;
   current_labels: string[];
   audio_url?: string | null;
   audio_title?: string | null;

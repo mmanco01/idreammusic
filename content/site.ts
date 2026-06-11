@@ -6,6 +6,7 @@ export type ExampleSong = {
 
 export const siteMeta = {
   title: 'iDreamMusic',
+  tagline: 'Songs are caught, not written.',
   description:
     'Songs are caught, not written. A shared creative home for songcatchers following the Nine Muses.',
 };

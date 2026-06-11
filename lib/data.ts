@@ -2,27 +2,27 @@ import { cache } from 'react';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { buildPublicAssetUrl } from '@/lib/storage';
 import { sampleSongDetail, sampleSongs } from '@/lib/sample-data';
-import type { PendingBlogPost, SongDetail, SongSummary } from '@/lib/types';
+import type { PendingBlogPost, SongDetail, SongOrigin, SongSummary } from '@/lib/types';
 
 function attachSongMetadataToSongs(
   songs: SongSummary[],
   attachmentRows: any[] | null | undefined,
   originRows: any[] | null | undefined
-) {
+): SongSummary[] {
   const audioMap = new Map<string, { audio_url: string | null; audio_title: string | null }>();
-  const originMap = new Map<string, string | null>();
+  const originMap = new Map<string, SongOrigin | null>();
 
   for (const row of attachmentRows ?? []) {
     if (!audioMap.has(row.song_id)) {
       audioMap.set(row.song_id, {
         audio_url: buildPublicAssetUrl(row.storage_path, row.bucket),
-        audio_title: row.title ?? null
+        audio_title: row.title ?? null,
       });
     }
   }
 
   for (const row of originRows ?? []) {
-    originMap.set(row.id, row.song_origin ?? null);
+    originMap.set(row.id, (row.song_origin as SongOrigin | null) ?? null);
   }
 
   return songs.map((song) => ({
@@ -52,8 +52,8 @@ export const getSongs = cache(async (): Promise<SongSummary[]> => {
     summary: row.summary,
     current_stage: row.current_stage,
     muse_slug: row.muse_slug,
-    song_origin: row.song_origin ?? null,
-    current_labels: row.current_labels ?? []
+    song_origin: (row.song_origin as SongOrigin | null) ?? null,
+    current_labels: row.current_labels ?? [],
   }));
 
   const ids = songs.map((song) => song.id);
@@ -70,7 +70,7 @@ export const getSongs = cache(async (): Promise<SongSummary[]> => {
     supabase
       .from('songs')
       .select('id, song_origin')
-      .in('id', ids)
+      .in('id', ids),
   ]);
 
   return attachSongMetadataToSongs(songs, attachments, origins);
@@ -97,8 +97,8 @@ export const getPublicSongsByMuse = cache(async (museSlug: string): Promise<Song
     summary: row.summary,
     current_stage: row.current_stage,
     muse_slug: row.muse_slug,
-    song_origin: row.song_origin ?? null,
-    current_labels: row.current_labels ?? []
+    song_origin: (row.song_origin as SongOrigin | null) ?? null,
+    current_labels: row.current_labels ?? [],
   }));
 
   const ids = songs.map((song) => song.id);
@@ -115,7 +115,7 @@ export const getPublicSongsByMuse = cache(async (museSlug: string): Promise<Song
     supabase
       .from('songs')
       .select('id, song_origin')
-      .in('id', ids)
+      .in('id', ids),
   ]);
 
   return attachSongMetadataToSongs(songs, attachments, origins);
@@ -139,7 +139,7 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
     { data: notes },
     { data: posts },
     { data: attachments },
-    { data: songMeta }
+    { data: songMeta },
   ] = await Promise.all([
     supabase
       .from('song_versions')
@@ -185,7 +185,7 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
     bucket: row.bucket,
     storage_path: row.storage_path,
     public_url: buildPublicAssetUrl(row.storage_path, row.bucket),
-    created_at: row.created_at
+    created_at: row.created_at,
   }));
 
   const versionsWithAttachments = (versions ?? []).map((version: any) => {
@@ -203,7 +203,7 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
       attachments: versionAttachments,
       audio_url: audioAttachment?.public_url ?? null,
       audio_mime_type: audioAttachment?.mime_type ?? null,
-      audio_title: audioAttachment?.title ?? null
+      audio_title: audioAttachment?.title ?? null,
     };
   });
 
@@ -227,14 +227,14 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
     summary: song.summary,
     current_stage: song.current_stage,
     muse_slug: song.muse_slug,
-    song_origin: songMeta?.song_origin ?? song.song_origin ?? null,
+    song_origin: (songMeta?.song_origin as SongOrigin | null) ?? (song.song_origin as SongOrigin | null) ?? null,
     current_labels: song.current_labels ?? [],
     audio_url: topLevelAudio,
     audio_title: topLevelAudioTitle,
     versions: versionsWithAttachments,
     notes: notes ?? [],
     posts: posts ?? [],
-    attachments: attachmentsWithUrls
+    attachments: attachmentsWithUrls,
   } as SongDetail;
 });
 
@@ -273,8 +273,8 @@ export const getMySongs = cache(async (userId: string): Promise<SongSummary[]> =
     summary: row.summary,
     current_stage: row.current_stage,
     muse_slug: row.muse_id ? museMap.get(row.muse_id) ?? null : null,
-    song_origin: row.song_origin ?? null,
-    current_labels: []
+    song_origin: (row.song_origin as SongOrigin | null) ?? null,
+    current_labels: [],
   }));
 
   const ids = songs.map((song) => song.id);
@@ -310,7 +310,7 @@ export const getPendingBlogPosts = cache(async (): Promise<PendingBlogPost[]> =>
       : Promise.resolve({ data: [] as any[] }),
     songIds.length
       ? supabase.from('songs').select('id, title_working, title_final').in('id', songIds)
-      : Promise.resolve({ data: [] as any[] })
+      : Promise.resolve({ data: [] as any[] }),
   ]);
 
   const authorMap = new Map<string, string | null>();
@@ -331,6 +331,6 @@ export const getPendingBlogPosts = cache(async (): Promise<PendingBlogPost[]> =>
     created_at: row.created_at,
     approval_status: row.approval_status,
     song_title: row.song_id ? songMap.get(row.song_id) ?? null : null,
-    author_name: row.author_user_id ? authorMap.get(row.author_user_id) ?? null : null
+    author_name: row.author_user_id ? authorMap.get(row.author_user_id) ?? null : null,
   }));
 });

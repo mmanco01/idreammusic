@@ -145,7 +145,7 @@ export function SongUploadForm({
     });
 
     const {
-      data: { subscription }
+      data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsSignedIn(Boolean(session?.user));
     });
@@ -176,7 +176,7 @@ export function SongUploadForm({
 
       const supabase = createClient();
       const {
-        data: { user }
+        data: { user },
       } = await supabase.auth.getUser();
 
       if (!user) {
@@ -192,16 +192,7 @@ export function SongUploadForm({
       if (existingSongId) {
         const { data: existingSong, error: existingSongError } = await supabase
           .from('songs')
-          .select(`
-            id,
-            slug,
-            muse_id,
-            muses (
-              id,
-              slug,
-              name
-            )
-          `)
+          .select('id, slug, muse_id')
           .eq('id', existingSongId)
           .single();
 
@@ -210,17 +201,23 @@ export function SongUploadForm({
         }
 
         songSlug = existingSong.slug;
-        museName =
-          Array.isArray(existingSong.muses)
-            ? existingSong.muses[0]?.name || museName
-            : existingSong.muses?.name || museName;
 
-        const museSlugFromSong =
-          Array.isArray(existingSong.muses)
-            ? existingSong.muses[0]?.slug
-            : existingSong.muses?.slug;
+        let storageMuseSlug = museSlug;
 
-        const storageMuseSlug = museSlugFromSong || museSlug;
+        if (existingSong.muse_id) {
+          const { data: existingMuse, error: existingMuseError } = await supabase
+            .from('muses')
+            .select('slug, name')
+            .eq('id', existingSong.muse_id)
+            .maybeSingle();
+
+          if (existingMuseError) {
+            throw existingMuseError;
+          }
+
+          museName = existingMuse?.name ?? museName;
+          storageMuseSlug = existingMuse?.slug ?? museSlug;
+        }
 
         const { data: currentVersions, error: versionsError } = await supabase
           .from('song_versions')
@@ -252,7 +249,7 @@ export function SongUploadForm({
             visibility: sharePublicly ? 'public' : 'private',
             is_stage_primary: true,
             arrangement_notes: `Added as a ${stage} version from the song page.`,
-            created_by: user.id
+            created_by: user.id,
           })
           .select('id')
           .single();
@@ -263,11 +260,13 @@ export function SongUploadForm({
 
         const storagePath = `${storageMuseSlug}/${user.id}/${existingSongId}/${Date.now()}-${sanitizeFileName(file.name)}`;
 
-        const { error: uploadError } = await supabase.storage.from('song-assets').upload(storagePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type || 'audio/mpeg'
-        });
+        const { error: uploadError } = await supabase.storage
+          .from('song-assets')
+          .upload(storagePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type || 'audio/mpeg',
+          });
 
         if (uploadError) throw uploadError;
 
@@ -279,7 +278,7 @@ export function SongUploadForm({
           bucket: 'song-assets',
           storage_path: storagePath,
           mime_type: file.type || 'audio/mpeg',
-          title: title
+          title,
         });
 
         if (attachmentError) throw attachmentError;
@@ -291,7 +290,7 @@ export function SongUploadForm({
             author_user_id: user.id,
             title: `${title} note`,
             body: writerNote.trim(),
-            visibility: noteVisibility
+            visibility: noteVisibility,
           });
 
           if (noteError) throw noteError;
@@ -305,7 +304,7 @@ export function SongUploadForm({
             summary: summary || undefined,
             hook_line: hookLine || undefined,
             status: sharePublicly ? 'published' : 'private',
-            published_at: sharePublicly ? new Date().toISOString() : undefined
+            published_at: sharePublicly ? new Date().toISOString() : undefined,
           })
           .eq('id', existingSongId);
 
@@ -340,7 +339,7 @@ export function SongUploadForm({
             song_origin: songOrigin,
             summary: summary || null,
             hook_line: hookLine || null,
-            published_at: sharePublicly ? now : null
+            published_at: sharePublicly ? now : null,
           })
           .select('id, slug')
           .single();
@@ -355,7 +354,7 @@ export function SongUploadForm({
         const { error: stageError } = await supabase.from('song_stages').insert({
           song_id: songId,
           stage,
-          is_current: true
+          is_current: true,
         });
 
         if (stageError) throw stageError;
@@ -370,7 +369,7 @@ export function SongUploadForm({
             visibility: sharePublicly ? 'public' : 'private',
             is_stage_primary: true,
             arrangement_notes: `Uploaded from the ${muse.name} Muse page.`,
-            created_by: user.id
+            created_by: user.id,
           })
           .select('id')
           .single();
@@ -381,11 +380,13 @@ export function SongUploadForm({
 
         const storagePath = `${museSlug}/${user.id}/${songId}/${Date.now()}-${sanitizeFileName(file.name)}`;
 
-        const { error: uploadError } = await supabase.storage.from('song-assets').upload(storagePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type || 'audio/mpeg'
-        });
+        const { error: uploadError } = await supabase.storage
+          .from('song-assets')
+          .upload(storagePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type || 'audio/mpeg',
+          });
 
         if (uploadError) throw uploadError;
 
@@ -397,7 +398,7 @@ export function SongUploadForm({
           bucket: 'song-assets',
           storage_path: storagePath,
           mime_type: file.type || 'audio/mpeg',
-          title: title
+          title,
         });
 
         if (attachmentError) throw attachmentError;
@@ -409,7 +410,7 @@ export function SongUploadForm({
             author_user_id: user.id,
             title: `${title} note`,
             body: writerNote.trim(),
-            visibility: noteVisibility
+            visibility: noteVisibility,
           });
 
           if (noteError) throw noteError;
@@ -417,7 +418,11 @@ export function SongUploadForm({
       }
 
       setStatus('success');
-      setMessage(existingSongId ? 'Version added. Opening the song page now…' : 'Upload complete. Opening the song page now…');
+      setMessage(
+        existingSongId
+          ? 'Version added. Opening the song page now…'
+          : 'Upload complete. Opening the song page now…'
+      );
       router.push(`/songs/${songSlug}`);
       router.refresh();
     } catch (error) {
@@ -445,7 +450,9 @@ export function SongUploadForm({
       </p>
 
       {!hasSupabaseEnv() ? (
-        <div className="statusMessage statusError">Add your Supabase URL and anon key to turn uploads on in this build.</div>
+        <div className="statusMessage statusError">
+          Add your Supabase URL and anon key to turn uploads on in this build.
+        </div>
       ) : null}
 
       {hasSupabaseEnv() && !isSignedIn ? (
@@ -572,14 +579,21 @@ export function SongUploadForm({
 
         <label>
           <span className="fieldLabel">Writer note visibility</span>
-          <select value={noteVisibility} onChange={(event) => setNoteVisibility(event.target.value as Visibility)}>
+          <select
+            value={noteVisibility}
+            onChange={(event) => setNoteVisibility(event.target.value as Visibility)}
+          >
             <option value="private">Private</option>
             <option value="public">Public</option>
           </select>
         </label>
 
         <label className="checkboxRow">
-          <input type="checkbox" checked={sharePublicly} onChange={(event) => setSharePublicly(event.target.checked)} />
+          <input
+            type="checkbox"
+            checked={sharePublicly}
+            onChange={(event) => setSharePublicly(event.target.checked)}
+          />
           <span>
             {isExistingSongFlow
               ? 'Show this version publicly right away'
@@ -588,7 +602,11 @@ export function SongUploadForm({
         </label>
 
         <div className="full button-row">
-          <button className="button primary" type="submit" disabled={status === 'saving' || !isSignedIn}>
+          <button
+            className="button primary"
+            type="submit"
+            disabled={status === 'saving' || !isSignedIn}
+          >
             {status === 'saving'
               ? 'Uploading…'
               : isExistingSongFlow
@@ -602,7 +620,9 @@ export function SongUploadForm({
       </form>
 
       {message ? (
-        <div className={`statusMessage ${status === 'error' ? 'statusError' : 'statusSuccess'}`}>{message}</div>
+        <div className={`statusMessage ${status === 'error' ? 'statusError' : 'statusSuccess'}`}>
+          {message}
+        </div>
       ) : null}
     </div>
   );
