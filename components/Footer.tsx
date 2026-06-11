@@ -1,0 +1,1 @@
+export function Footer(){return <footer className="footer"><div className="container"><div className="divider" /><p>Songs are caught, not written.</p><p style={{color:'var(--muted)'}}>Explore the currents. Honor the process. Share what you catch.</p></div></footer>}

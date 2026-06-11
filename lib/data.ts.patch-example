@@ -1,0 +1,45 @@
+// Merge these changes into your existing lib/data.ts
+
+export type PendingBlogPost = {
+  id: string;
+  title: string;
+  excerpt: string | null;
+  post_type: string;
+  created_at: string;
+  approval_status: string;
+  song_title: string | null;
+  author_name: string | null;
+};
+
+// 1) Expand the post selection inside getSongBySlug()
+// Replace this:
+// .select('id, title, excerpt, approval_status, published_at')
+// With this:
+// .select('id, title, excerpt, body, approval_status, published_at, author_name')
+
+// 2) Expand the returned posts shape inside getSongBySlug()
+// Example mapping:
+posts: (posts ?? []).map((row: any) => ({
+  id: row.id,
+  title: row.title,
+  excerpt: row.body ?? row.excerpt ?? null,
+  approval_status: row.approval_status,
+  published_at: row.published_at,
+  author_name: row.author_name ?? null
+})),
+
+// 3) Expand getPendingBlogPosts() select so moderation can show richer metadata
+// Example select:
+// .select('id, title, excerpt, body, post_type, created_at, approval_status, author_user_id, song_id, author_name')
+
+// 4) Example final mapper shape for pending posts:
+return data.map((row: any) => ({
+  id: row.id,
+  title: row.title,
+  excerpt: row.body ?? row.excerpt ?? null,
+  post_type: row.post_type,
+  created_at: row.created_at,
+  approval_status: row.approval_status,
+  song_title: row.song_id ? songMap.get(row.song_id) ?? null : null,
+  author_name: row.author_name ?? authorMap.get(row.author_user_id) ?? null
+}));

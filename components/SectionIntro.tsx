@@ -1,0 +1,1 @@
+export function SectionIntro({ eyebrow, title, text }: { eyebrow?: string; title: string; text: string }){return <div style={{marginBottom:'1.6rem'}}>{eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}<h2 className="h2">{title}</h2><p className="copy" style={{maxWidth:760}}>{text}</p></div>}

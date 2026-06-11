@@ -1,0 +1,84 @@
+import { notFound } from 'next/navigation';
+import { getSongBySlug } from '@/lib/data';
+import ListenerResponseForm from './ListenerResponseForm';
+
+export default async function SongDetailPage({
+  params
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
+  const song = await getSongBySlug(slug);
+
+  if (!song) notFound();
+
+  const primaryVersion = song.versions?.find((v) => v.is_stage_primary) ?? song.versions?.[0];
+
+  return (
+    <div className="mx-auto max-w-4xl px-6 py-10 space-y-10">
+      <header className="space-y-3">
+        <div className="text-sm uppercase tracking-wide opacity-70">
+          {song.muse_slug ?? 'Unassigned muse'} • {song.current_stage ?? 'unknown stage'}
+        </div>
+        <h1 className="text-3xl font-bold">{song.title || 'Untitled song'}</h1>
+        <p className="text-base opacity-80">{song.summary || 'A fresh spark in progress.'}</p>
+      </header>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Audio</h2>
+        {song.audio_url ? (
+          <audio controls className="w-full">
+            <source src={song.audio_url} type={song.attachments?.[0]?.mime_type || 'audio/mpeg'} />
+            Your browser does not support this audio file.
+          </audio>
+        ) : (
+          <p className="text-sm opacity-70">No audio uploaded yet.</p>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Current version</h2>
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-4">
+          <div className="text-sm opacity-70">
+            Version {primaryVersion?.version_number ?? 1} • {primaryVersion?.stage ?? song.current_stage}
+          </div>
+
+          <div>
+            <div className="font-medium">Arrangement notes</div>
+            <p className="text-sm whitespace-pre-wrap">{primaryVersion?.arrangement_notes || 'No arrangement notes yet.'}</p>
+          </div>
+
+          <div>
+            <div className="font-medium">Lyrics</div>
+            <p className="text-sm whitespace-pre-wrap">{primaryVersion?.lyrics || 'No lyrics yet.'}</p>
+          </div>
+        </div>
+      </section>
+
+      <ListenerResponseForm songId={song.id} songSlug={song.slug} songTitle={song.title} />
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-xl font-semibold">Listener responses</h2>
+          <p className="text-sm opacity-70">Published after review</p>
+        </div>
+
+        {song.posts?.length ? (
+          <div className="space-y-4">
+            {song.posts.map((post) => (
+              <article key={post.id} className="rounded-2xl border border-white/10 bg-white/5 p-5 space-y-2">
+                <h3 className="text-lg font-semibold">{post.title}</h3>
+                {post.excerpt ? <p className="text-sm opacity-90 whitespace-pre-wrap">{post.excerpt}</p> : null}
+                <p className="text-xs opacity-60">
+                  {post.published_at ? new Date(post.published_at).toLocaleDateString() : 'Published'}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm opacity-70">No listener responses have been published yet.</p>
+        )}
+      </section>
+    </div>
+  );
+}
