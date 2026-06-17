@@ -230,11 +230,11 @@ export function SongUploadForm({
 
         const nextVersionNumber = (currentVersions?.[0]?.version_number ?? 0) + 1;
 
-        const { error: clearPrimaryError } = await supabase
-          .from('song_versions')
-          .update({ is_stage_primary: false })
-          .eq('song_id', existingSongId)
-          .eq('stage', stage);
+const { error: clearPrimaryError } = await supabase
+  .from('song_versions')
+  .update({ is_stage_primary: false })
+  .eq('song_id', existingSongId);
+
 
         if (clearPrimaryError) throw clearPrimaryError;
 

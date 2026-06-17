@@ -215,6 +215,168 @@ function getVersionAudio(version: any) {
   };
 }
 
+
+const SONG_LINK_LABELS: Record<string, string> = {
+  official_video: 'Official video',
+  lyric_video: 'Lyric video',
+  live_clip: 'Live clip',
+  behind_the_song: 'Behind the song',
+  youtube: 'YouTube',
+  other: 'Related link',
+};
+
+function RelatedVideos({
+  links,
+}: {
+  links: Array<{
+    id: string;
+    title?: string | null;
+    url?: string | null;
+    link_type?: string | null;
+    provider?: string | null;
+    description?: string | null;
+  }>;
+}) {
+  if (!links?.length) return null;
+
+  return (
+    <div className="card">
+      <div className="eyebrow">Watch</div>
+      <h2 className="h2">Related videos</h2>
+      <p className="copy" style={{ maxWidth: 760 }}>
+        Official videos, lyric videos, live clips, and behind-the-song pieces connected to this song.
+      </p>
+
+      <div className="song-grid" style={{ marginTop: '1rem' }}>
+        {links.map((link) => {
+          const label = link.link_type
+            ? SONG_LINK_LABELS[link.link_type] ?? link.link_type.replaceAll('_', ' ')
+            : 'Related link';
+
+          return (
+            <article key={link.id} className="subsection">
+              <div className="pillRow" style={{ marginBottom: '0.8rem' }}>
+                <span className="pill">{label}</span>
+                {link.provider ? <span className="pill">{link.provider}</span> : null}
+              </div>
+
+              <h3 className="h3">{link.title || label}</h3>
+
+              {link.description ? (
+                <p className="copy" style={{ whiteSpace: 'pre-wrap' }}>
+                  {link.description}
+                </p>
+              ) : null}
+
+              {link.url ? (
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: '0.9rem',
+                    padding: '0.8rem 1rem',
+                    borderRadius: '999px',
+                    border: '1px solid rgba(214, 176, 72, 0.35)',
+                    background: 'rgba(214, 176, 72, 0.12)',
+                    color: '#f7e6b0',
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Open video
+                </a>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VersionHistory({
+  versions,
+  songTitle,
+}: {
+  versions: any[];
+  songTitle?: string | null;
+}) {
+  return (
+    <div className="card">
+      <div className="eyebrow">Path through the current</div>
+      <h2 className="h2">Version history</h2>
+
+      {versions.length ? (
+        <div className="song-grid">
+          {versions.map((version: any) => {
+            const versionAudio = getVersionAudio(version);
+
+            return (
+              <article key={version.id} className="subsection">
+                <div className="pillRow" style={{ marginBottom: '0.8rem' }}>
+                  <span className="pill">Version {version.version_number}</span>
+                  <span className="pill">{version.stage}</span>
+                  {version.is_stage_primary ? <span className="pill">primary</span> : null}
+                </div>
+
+                <h3 className="h3">
+                  {version.title || songTitle || 'Untitled version'}
+                </h3>
+
+                {versionAudio?.url ? (
+                  <audio
+                    controls
+                    preload="none"
+                    className="audioPlayer"
+                    style={{ marginTop: '0.8rem', marginBottom: '1rem' }}
+                  >
+                    <source src={versionAudio.url} type={versionAudio.mimeType} />
+                    Your browser does not support this audio file.
+                  </audio>
+                ) : (
+                  <p className="copy" style={{ marginTop: '0.8rem' }}>
+                    No audio attached to this version.
+                  </p>
+                )}
+
+                {version.arrangement_notes ? (
+                  <>
+                    <div className="divider" />
+                    <h4 className="h3" style={{ fontSize: '1rem' }}>
+                      Arrangement notes
+                    </h4>
+                    <p className="copy" style={{ whiteSpace: 'pre-wrap' }}>
+                      {version.arrangement_notes}
+                    </p>
+                  </>
+                ) : null}
+
+                {version.story_behind_song ? (
+                  <>
+                    <div className="divider" />
+                    <h4 className="h3" style={{ fontSize: '1rem' }}>
+                      Story
+                    </h4>
+                    <p className="copy" style={{ whiteSpace: 'pre-wrap' }}>
+                      {version.story_behind_song}
+                    </p>
+                  </>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="copy">No versions yet.</p>
+      )}
+    </div>
+  );
+}
+
 export default async function SongDetailPage({
   params,
 }: {
@@ -374,72 +536,11 @@ export default async function SongDetailPage({
 
         <div className="section-tight" />
 
-        <div className="card">
-          <div className="eyebrow">Path through the current</div>
-          <h2 className="h2">Version history</h2>
+        <RelatedVideos links={(song as any).links ?? []} />
 
-          {versions.length ? (
-            <div className="song-grid">
-              {versions.map((version: any) => {
-                const versionAudio = getVersionAudio(version);
+        {(song as any).links?.length ? <div className="section-tight" /> : null}
 
-                return (
-                  <article key={version.id} className="subsection">
-                    <div className="pillRow" style={{ marginBottom: '0.8rem' }}>
-                      <span className="pill">Version {version.version_number}</span>
-                      <span className="pill">{version.stage}</span>
-                      {version.is_stage_primary ? (
-                        <span className="pill">primary</span>
-                      ) : null}
-                    </div>
-
-                    <h3 className="h3">
-                      {version.title || song.title || 'Untitled version'}
-                    </h3>
-
-                    {versionAudio?.url ? (
-                      <audio
-                        controls
-                        preload="none"
-                        className="audioPlayer"
-                        style={{ marginTop: '0.8rem', marginBottom: '1rem' }}
-                      >
-                        <source src={versionAudio.url} type={versionAudio.mimeType} />
-                        Your browser does not support this audio file.
-                      </audio>
-                    ) : (
-                      <p className="copy" style={{ marginTop: '0.8rem' }}>
-                        No audio attached to this version.
-                      </p>
-                    )}
-
-                    {version.arrangement_notes ? (
-                      <>
-                        <div className="divider" />
-                        <h4 className="h3" style={{ fontSize: '1rem' }}>Arrangement notes</h4>
-                        <p className="copy" style={{ whiteSpace: 'pre-wrap' }}>
-                          {version.arrangement_notes}
-                        </p>
-                      </>
-                    ) : null}
-
-                    {version.story_behind_song ? (
-                      <>
-                        <div className="divider" />
-                        <h4 className="h3" style={{ fontSize: '1rem' }}>Story</h4>
-                        <p className="copy" style={{ whiteSpace: 'pre-wrap' }}>
-                          {version.story_behind_song}
-                        </p>
-                      </>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="copy">No versions yet.</p>
-          )}
-        </div>
+        <VersionHistory versions={versions} songTitle={song.title} />
 
         <div className="section-tight" />
 

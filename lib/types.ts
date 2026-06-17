@@ -29,6 +29,12 @@ export type SongSummary = {
   current_labels: string[];
   audio_url?: string | null;
   audio_title?: string | null;
+ song_version_id?: string | null;
+ version_number?: number | null;
+ version_stage?: string | null;
+ latest_public_activity_at?: string | null;
+ primary_bucket?: 'featured' | 'finished' | 'crafting' | 'sparks';
+ bucket_rank?: number | null;
 };
 
 export type SongAttachment = {
@@ -40,6 +46,15 @@ export type SongAttachment = {
   created_at: string;
 };
 
+export type SongLink = {
+  id: string;
+  song_version_id?: string | null;
+  title?: string | null;
+  url: string;
+  link_type: 'official_video' | 'lyric_video' | 'live_clip' | 'behind_the_song' | 'youtube' | 'other';
+  created_at?: string | null;
+};
+
 export type SongDetail = SongSummary & {
   notes: Array<{
     id: string;
@@ -47,6 +62,7 @@ export type SongDetail = SongSummary & {
     body: string;
     visibility: Visibility;
     created_at: string;
+    links?: SongLink[];
   }>;
   versions: Array<{
     id: string;

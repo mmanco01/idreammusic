@@ -33,93 +33,83 @@ function attachSongMetadataToSongs(
   }));
 }
 
-export const getSongs = cache(async (): Promise<SongSummary[]> => {
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) return sampleSongs;
+type PublicListenSongRow = {
+  song_id: string;
+  slug: string;
+  title: string | null;
+  hook_line: string | null;
+  summary: string | null;
+  current_stage: string | null;
+  muse_slug: string | null;
+  muse_name: string | null;
+  muse_label: string | null;
+  song_version_id: string;
+  version_number: number | null;
+  version_stage: string | null;
+  latest_public_activity_at: string | null;
+  primary_bucket: 'featured' | 'finished' | 'crafting' | 'sparks';
+  bucket_rank: number;
+  audio_bucket: string | null;
+  audio_storage_path: string | null;
+  audio_title: string | null;
+};
 
-  const { data, error } = await supabase
-    .from('public_song_cards')
-    .select('*')
-    .order('updated_at', { ascending: false });
-
-  if (error || !data) return sampleSongs;
-
-  const songs: SongSummary[] = data.map((row: any) => ({
-    id: row.id,
+function mapPublicListenSong(row: PublicListenSongRow): SongSummary {
+  return {
+    id: row.song_id,
     slug: row.slug,
-    title: row.title,
+    title: row.title ?? 'Untitled song',
     hook_line: row.hook_line,
     summary: row.summary,
     current_stage: row.current_stage,
     muse_slug: row.muse_slug,
-    song_origin: (row.song_origin as SongOrigin | null) ?? null,
-    current_labels: row.current_labels ?? [],
-  }));
+    song_origin: null,
+    current_labels: [],
+    audio_url: row.audio_storage_path
+      ? buildPublicAssetUrl(row.audio_storage_path, row.audio_bucket ?? 'song-assets')
+      : null,
+    audio_title: row.audio_title,
+    song_version_id: row.song_version_id,
+    version_number: row.version_number,
+    version_stage: row.version_stage,
+    latest_public_activity_at: row.latest_public_activity_at,
+    primary_bucket: row.primary_bucket,
+    bucket_rank: row.bucket_rank,
+  } as SongSummary;
+}
 
-  const ids = songs.map((song) => song.id);
-  if (!ids.length) return songs;
+export const getSongs = cache(async (): Promise<SongSummary[]> => {
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return sampleSongs;
 
-  const [{ data: attachments }, { data: origins }] = await Promise.all([
-    supabase
-      .from('attachments')
-      .select('song_id, bucket, storage_path, title, created_at')
-      .eq('file_type', 'audio')
-      .in('song_id', ids)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('songs')
-      .select('id, song_origin')
-      .in('id', ids),
-  ]);
+  const { data, error } = await (supabase as any)
+    .from('public_listen_song_cards')
+    .select('*')
+    .order('bucket_rank', { ascending: true })
+    .order('latest_public_activity_at', { ascending: false });
 
-  return attachSongMetadataToSongs(songs, attachments, origins);
+  if (error || !data) return sampleSongs;
+
+  return (data as PublicListenSongRow[]).map(mapPublicListenSong);
 });
 
 export const getPublicSongsByMuse = cache(async (museSlug: string): Promise<SongSummary[]> => {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return sampleSongs.filter((song) => song.muse_slug === museSlug);
 
-  const { data, error } = await supabase
-    .from('public_song_cards')
+  const { data, error } = await (supabase as any)
+    .from('public_listen_song_cards')
     .select('*')
     .eq('muse_slug', museSlug)
-    .order('updated_at', { ascending: false })
-    .limit(6);
+    .order('bucket_rank', { ascending: true })
+    .order('latest_public_activity_at', { ascending: false })
+    .limit(12);
 
   if (error || !data) return [];
 
-  const songs: SongSummary[] = data.map((row: any) => ({
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    hook_line: row.hook_line,
-    summary: row.summary,
-    current_stage: row.current_stage,
-    muse_slug: row.muse_slug,
-    song_origin: (row.song_origin as SongOrigin | null) ?? null,
-    current_labels: row.current_labels ?? [],
-  }));
-
-  const ids = songs.map((song) => song.id);
-  if (!ids.length) return songs;
-
-  const [{ data: attachments }, { data: origins }] = await Promise.all([
-    supabase
-      .from('attachments')
-      .select('song_id, bucket, storage_path, title, created_at')
-      .eq('file_type', 'audio')
-      .in('song_id', ids)
-      .order('sort_order', { ascending: true })
-      .order('created_at', { ascending: true }),
-    supabase
-      .from('songs')
-      .select('id, song_origin')
-      .in('id', ids),
-  ]);
-
-  return attachSongMetadataToSongs(songs, attachments, origins);
+  return (data as PublicListenSongRow[]).map(mapPublicListenSong);
 });
+
 
 export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | null> => {
   const supabase = await createServerSupabaseClient();
@@ -140,13 +130,15 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
     { data: posts },
     { data: attachments },
     { data: songMeta },
+    { data: links },
   ] = await Promise.all([
     supabase
       .from('song_versions')
       .select(
-        'id, version_number, stage, title, lyrics, arrangement_notes, story_behind_song, is_stage_primary, created_at'
+        'id, version_number, stage, title, lyrics, arrangement_notes, story_behind_song, visibility, is_stage_primary, created_at'
       )
       .eq('song_id', song.id)
+      .eq('visibility', 'public')
       .order('version_number', { ascending: true }),
     supabase
       .from('writer_notes')
@@ -171,9 +163,19 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
       .select('id, song_origin')
       .eq('id', song.id)
       .maybeSingle(),
+    (supabase as any)
+      .from('public_song_video_links')
+      .select('id, song_version_id, title, url, link_type, sort_order, created_at')
+      .eq('song_id', song.id)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false }),
   ]);
 
-  const attachmentRows = attachments ?? [];
+  const publicVersionIds = new Set((versions ?? []).map((version: any) => version.id));
+
+  const attachmentRows = (attachments ?? []).filter(
+    (row: any) => !row.song_version_id || publicVersionIds.has(row.song_version_id)
+  );
 
   const attachmentsWithUrls = attachmentRows.map((row: any) => ({
     id: row.id,
@@ -235,6 +237,14 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
     notes: notes ?? [],
     posts: posts ?? [],
     attachments: attachmentsWithUrls,
+    links: (links ?? []).map((row: any) => ({
+      id: row.id,
+      song_version_id: row.song_version_id ?? null,
+      title: row.title ?? null,
+      url: row.url,
+      link_type: row.link_type,
+      created_at: row.created_at,
+    })),
   } as SongDetail;
 });
 
