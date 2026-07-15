@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { saveSongEdits } from './actions';
+import { SongIntelligencePanel } from '@/components/studio/SongIntelligencePanel';
 
 export default async function EditSongPage({
   params,
@@ -42,6 +43,23 @@ export default async function EditSongPage({
         story_behind_song,
         is_stage_primary,
         created_at
+      ),
+      attachments (
+        id,
+        title,
+        storage_path,
+        mime_type,
+        song_version_id,
+        file_type,
+        created_at
+      ),
+      song_transcripts (
+        id,
+        attachment_id,
+        song_version_id,
+        transcript_text,
+        is_reviewed,
+        updated_at
       ),
       writer_notes (
         id,
@@ -232,6 +250,15 @@ export default async function EditSongPage({
                 <p className="copy">No version found for this song yet.</p>
               )}
             </div>
+
+            <SongIntelligencePanel
+              songId={song.id}
+              slug={slug}
+              audioAttachments={(song.attachments ?? []).filter(
+                (attachment: any) => attachment.file_type === 'audio'
+              )}
+              transcripts={song.song_transcripts ?? []}
+            />
 
             <div className="card" style={{ gridColumn: '1 / -1' }}>
               <div className="eyebrow">Writer note</div>
