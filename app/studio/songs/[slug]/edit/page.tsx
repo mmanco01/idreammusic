@@ -251,15 +251,6 @@ export default async function EditSongPage({
               )}
             </div>
 
-            <SongIntelligencePanel
-              songId={song.id}
-              slug={slug}
-              audioAttachments={(song.attachments ?? []).filter(
-                (attachment: any) => attachment.file_type === 'audio'
-              )}
-              transcripts={song.song_transcripts ?? []}
-            />
-
             <div className="card" style={{ gridColumn: '1 / -1' }}>
               <div className="eyebrow">Writer note</div>
               <h2 className="h2">Comments / process notes</h2>
@@ -301,6 +292,17 @@ export default async function EditSongPage({
               </div>
             </div>
           </form>
+
+          <div style={{ marginTop: '1.25rem' }}>
+            <SongIntelligencePanel
+              songId={song.id}
+              slug={slug}
+              audioAttachments={(song.attachments ?? []).filter(
+                (attachment: any) => attachment.file_type === 'audio'
+              )}
+              transcripts={song.song_transcripts ?? []}
+            />
+          </div>
         </div>
       </div>
     </section>
