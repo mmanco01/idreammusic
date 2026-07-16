@@ -1,4 +1,4 @@
-export type EngagementEventType = "audio_play" | "video_click";
+export type EngagementEventType = "audio_play" | "video_click"; 
 
 type TrackEngagementInput = {
   songId: string;
