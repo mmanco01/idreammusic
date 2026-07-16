@@ -233,7 +233,7 @@ export default async function StudioPage() {
         <div className="page-intro">
           <div>
             <div className="eyebrow">Creator Studio</div>
-            <h1 className="h2">Song Portfolio Command Center</h1>
+            <h1 className="h2">Songcatcher Studio</h1>
             <p className="copy" style={{ maxWidth: 820 }}>
               Capture ideas, prioritize the songs that matter now, work AI
               recommendations into tasks, track versions, and move completed
