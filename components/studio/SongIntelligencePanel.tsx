@@ -4,7 +4,9 @@ import { useActionState, useEffect, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
+  generateSongTranscript,
   saveSongTranscript,
+  type TranscriptGenerateState,
   type TranscriptSaveState,
 } from '@/app/studio/songs/[slug]/edit/actions';
 
@@ -12,6 +14,7 @@ type AudioAttachment = {
   id: string;
   title: string | null;
   storage_path: string;
+  bucket: string;
   mime_type: string | null;
   song_version_id: string | null;
   created_at: string;
@@ -33,7 +36,12 @@ type Props = {
   transcripts: Transcript[];
 };
 
-const initialState: TranscriptSaveState = {
+const initialSaveState: TranscriptSaveState = {
+  status: 'idle',
+  message: '',
+};
+
+const initialGenerateState: TranscriptGenerateState = {
   status: 'idle',
   message: '',
 };
@@ -53,6 +61,22 @@ function SaveTranscriptButton() {
   );
 }
 
+
+function GenerateTranscriptButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      className="button"
+      disabled={pending}
+      style={{ cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.7 : 1 }}
+    >
+      {pending ? 'Generating…' : 'Generate Transcript'}
+    </button>
+  );
+}
+
 export function SongIntelligencePanel({
   songId,
   slug,
@@ -60,7 +84,11 @@ export function SongIntelligencePanel({
   transcripts,
 }: Props) {
   const router = useRouter();
-  const [state, formAction] = useActionState(saveSongTranscript, initialState);
+  const [saveState, saveFormAction] = useActionState(saveSongTranscript, initialSaveState);
+  const [generateState, generateFormAction] = useActionState(
+    generateSongTranscript,
+    initialGenerateState
+  );
   const [selectedAttachmentId, setSelectedAttachmentId] = useState(
     audioAttachments[0]?.id ?? ''
   );
@@ -76,10 +104,10 @@ export function SongIntelligencePanel({
   );
 
   useEffect(() => {
-    if (state.status === 'success') {
+    if (saveState.status === 'success' || generateState.status === 'success') {
       router.refresh();
     }
-  }, [router, state.status]);
+  }, [router, saveState.status, generateState.status]);
 
   if (audioAttachments.length === 0) {
     return (
@@ -130,7 +158,7 @@ export function SongIntelligencePanel({
         )}
       </div>
 
-      <form action={formAction} key={selectedAttachmentId}>
+      <form action={saveFormAction} key={`save-${selectedAttachmentId}`}>
         <input type="hidden" name="song_id" value={songId} />
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="attachment_id" value={selectedAttachmentId} />
@@ -165,7 +193,7 @@ export function SongIntelligencePanel({
           <span>I reviewed this transcript against the recording.</span>
         </label>
 
-        {state.message ? (
+        {saveState.message ? (
           <div
             role="status"
             style={{
@@ -173,26 +201,49 @@ export function SongIntelligencePanel({
               padding: '0.85rem 1rem',
               borderRadius: 14,
               border: '1px solid var(--line)',
-              color: state.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+              color: saveState.status === 'error' ? '#ffb4b4' : '#d9f7d6',
               background:
-                state.status === 'error'
+                saveState.status === 'error'
                   ? 'rgba(160, 40, 40, 0.18)'
                   : 'rgba(40, 130, 60, 0.18)',
             }}
           >
-            {state.message}
+            {saveState.message}
           </div>
         ) : null}
 
         <div className="button-row" style={{ marginTop: '1rem' }}>
           <SaveTranscriptButton />
-          <button type="button" className="button" disabled title="Coming in the next phase">
-            Generate Transcript
-          </button>
           <button type="button" className="button" disabled title="Requires a saved transcript">
             Run AI Analytics
           </button>
         </div>
+      </form>
+
+      <form action={generateFormAction} key={`generate-${selectedAttachmentId}`} style={{ marginTop: '1rem' }}>
+        <input type="hidden" name="song_id" value={songId} />
+        <input type="hidden" name="slug" value={slug} />
+        <input type="hidden" name="attachment_id" value={selectedAttachmentId} />
+        <GenerateTranscriptButton />
+
+        {generateState.message ? (
+          <div
+            role="status"
+            style={{
+              marginTop: '1rem',
+              padding: '0.85rem 1rem',
+              borderRadius: 14,
+              border: '1px solid var(--line)',
+              color: generateState.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+              background:
+                generateState.status === 'error'
+                  ? 'rgba(160, 40, 40, 0.18)'
+                  : 'rgba(40, 130, 60, 0.18)',
+            }}
+          >
+            {generateState.message}
+          </div>
+        ) : null}
       </form>
     </div>
   );
