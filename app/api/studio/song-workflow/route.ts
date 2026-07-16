@@ -1,22 +1,16 @@
-import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { NextResponse } from "next/server";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 
-const PRIORITY_TIERS = [
-  'now',
-  'next',
-  'later',
-  'someday',
-  'archive',
-] as const;
+const PRIORITY_TIERS = ["now", "next", "later", "someday", "archive"] as const;
 
 const WORKFLOW_STATUSES = [
-  'unreviewed',
-  'active',
-  'waiting',
-  'completed',
-  'archived',
+  "unreviewed",
+  "active",
+  "waiting",
+  "completed",
+  "archived",
 ] as const;
 
 type PriorityTier = (typeof PRIORITY_TIERS)[number];
@@ -36,8 +30,8 @@ export async function PATCH(request: Request) {
 
     if (!supabase) {
       return NextResponse.json(
-        { status: 'error', message: 'Supabase is not available.' },
-        { status: 500 }
+        { status: "error", message: "Supabase is not available." },
+        { status: 500 },
       );
     }
 
@@ -47,39 +41,40 @@ export async function PATCH(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { status: 'error', message: 'You must be signed in.' },
-        { status: 401 }
+        { status: "error", message: "You must be signed in." },
+        { status: 401 },
       );
     }
 
     const formData = await request.formData();
-    const songId = String(formData.get('song_id') || '');
-    const priorityTierValue = String(
-      formData.get('priority_tier') || 'later'
-    );
+    const songId = String(formData.get("song_id") || "");
+    const priorityTierValue = String(formData.get("priority_tier") || "later");
     const workflowStatusValue = String(
-      formData.get('workflow_status') || 'active'
+      formData.get("workflow_status") || "active",
     );
-    const priorityRankText = String(formData.get('priority_rank') || '').trim();
+    const priorityRankText = String(formData.get("priority_rank") || "").trim();
+    const personalRatingText = String(
+      formData.get("personal_rating") || "",
+    ).trim();
 
     if (!songId) {
       return NextResponse.json(
-        { status: 'error', message: 'A song is required.' },
-        { status: 400 }
+        { status: "error", message: "A song is required." },
+        { status: 400 },
       );
     }
 
     if (!isPriorityTier(priorityTierValue)) {
       return NextResponse.json(
-        { status: 'error', message: 'The selected priority is invalid.' },
-        { status: 400 }
+        { status: "error", message: "The selected priority is invalid." },
+        { status: 400 },
       );
     }
 
     if (!isWorkflowStatus(workflowStatusValue)) {
       return NextResponse.json(
-        { status: 'error', message: 'The workflow status is invalid.' },
-        { status: 400 }
+        { status: "error", message: "The workflow status is invalid." },
+        { status: 400 },
       );
     }
 
@@ -90,35 +85,54 @@ export async function PATCH(request: Request) {
     ) {
       return NextResponse.json(
         {
-          status: 'error',
-          message: 'Priority rank must be a whole number greater than zero.',
+          status: "error",
+          message: "Priority rank must be a whole number greater than zero.",
         },
-        { status: 400 }
+        { status: 400 },
+      );
+    }
+
+    const parsedPersonalRating = personalRatingText
+      ? Number(personalRatingText)
+      : null;
+
+    if (
+      parsedPersonalRating !== null &&
+      (!Number.isFinite(parsedPersonalRating) ||
+        parsedPersonalRating < 0 ||
+        parsedPersonalRating > 100)
+    ) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message: "My rating must be between 0 and 100.",
+        },
+        { status: 400 },
       );
     }
 
     const { data: ownedSong, error: ownedSongError } = await supabase
-      .from('songs')
-      .select('id')
-      .eq('id', songId)
-      .eq('owner_user_id', user.id)
+      .from("songs")
+      .select("id")
+      .eq("id", songId)
+      .eq("owner_user_id", user.id)
       .maybeSingle();
 
     if (ownedSongError || !ownedSong) {
       return NextResponse.json(
         {
-          status: 'error',
+          status: "error",
           message:
-            ownedSongError?.message || 'Song not found or not owned by you.',
+            ownedSongError?.message || "Song not found or not owned by you.",
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     const now = new Date().toISOString();
 
     const { data: workflow, error: workflowError } = await supabase
-      .from('song_workflow')
+      .from("song_workflow")
       .upsert(
         {
           song_id: songId,
@@ -126,40 +140,41 @@ export async function PATCH(request: Request) {
           priority_tier: priorityTierValue,
           priority_rank: parsedRank,
           workflow_status: workflowStatusValue,
+          personal_rating: parsedPersonalRating,
           updated_at: now,
         },
         {
-          onConflict: 'song_id,user_id',
-        }
+          onConflict: "song_id,user_id",
+        },
       )
-      .select('priority_tier, priority_rank, workflow_status')
+      .select("priority_tier, priority_rank, workflow_status, personal_rating")
       .single();
 
     if (workflowError || !workflow) {
       return NextResponse.json(
         {
-          status: 'error',
+          status: "error",
           message: `Workflow save failed: ${
-            workflowError?.message || 'No workflow row was returned.'
+            workflowError?.message || "No workflow row was returned."
           }`,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     return NextResponse.json({
-      status: 'success',
-      message: 'Song priority saved.',
+      status: "success",
+      message: "Song workflow saved.",
       workflow,
     });
   } catch (error) {
     return NextResponse.json(
       {
-        status: 'error',
+        status: "error",
         message:
-          error instanceof Error ? error.message : 'Song workflow save failed.',
+          error instanceof Error ? error.message : "Song workflow save failed.",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
