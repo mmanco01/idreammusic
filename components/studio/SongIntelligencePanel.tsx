@@ -716,7 +716,9 @@ export function SongIntelligencePanel({
   }, [router, saveState.status]);
 
   useEffect(() => {
-    if (!selectedTranscript?.id) {
+    const transcriptId = selectedTranscript?.id;
+
+    if (!transcriptId) {
       setAnalyticsState({
         status: 'idle',
         message: '',
@@ -731,7 +733,7 @@ export function SongIntelligencePanel({
       try {
         const query = new URLSearchParams({
           song_id: songId,
-          transcript_id: selectedTranscript.id,
+          transcript_id: transcriptId,
         });
 
         const response = await fetch(
