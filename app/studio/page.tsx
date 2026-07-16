@@ -43,6 +43,20 @@ function readNumber(value: unknown, key: string): number | null {
     : null;
 }
 
+function normalizeStudioSong(
+  song: Awaited<ReturnType<typeof getMySongs>>[number]
+) {
+  return {
+    id: song.id,
+    slug: song.slug,
+    title: song.title || 'Untitled song',
+    summary: song.summary ?? null,
+    audio_url: song.audio_url ?? null,
+    current_stage: song.current_stage || 'spark',
+    muse_slug: song.muse_slug ?? null,
+  };
+}
+
 async function buildStudioPortfolio(
   userId: string,
   mySongs: Awaited<ReturnType<typeof getMySongs>>
@@ -56,7 +70,7 @@ async function buildStudioPortfolio(
 
   if (!supabase) {
     return mySongs.map((song) => ({
-      ...song,
+      ...normalizeStudioSong(song),
       version_count: 0,
       final_version_count: 0,
       all_versions_final: false,
@@ -183,7 +197,7 @@ async function buildStudioPortfolio(
       workflowStatus === 'archived';
 
     return {
-      ...song,
+      ...normalizeStudioSong(song),
       version_count: version.total,
       final_version_count: version.final,
       all_versions_final: allVersionsFinal,
