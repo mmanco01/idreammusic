@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useActionState, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
@@ -198,6 +198,35 @@ type TaskCreateState = Record<
   }
 >;
 
+type SongTaskStatus = 'open' | 'in_progress' | 'completed' | 'dismissed';
+
+type SongTask = {
+  id: string;
+  song_id: string;
+  song_version_id: string | null;
+  analysis_run_id: string | null;
+  title: string;
+  description: string | null;
+  status: SongTaskStatus;
+  priority: number;
+  sort_order: number;
+  due_date: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  analysis: {
+    model_name: string | null;
+    analysis_version: string | null;
+    completed_at: string | null;
+  } | null;
+};
+
+type TaskListState = {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  message: string;
+  updatingTaskId: string | null;
+};
+
 function SaveTranscriptButton() {
   const { pending } = useFormStatus();
 
@@ -280,29 +309,42 @@ function CreateTaskButton({
   onCreate: () => void;
 }) {
   const state = taskState[taskKey];
+  const isLoading = state?.status === 'loading';
+  const isSuccess = state?.status === 'success';
 
   return (
-    <div style={{ marginTop: '0.55rem' }}>
+    <div style={{ marginTop: '0.7rem' }}>
       <button
         type="button"
         className="button"
         onClick={onCreate}
-        disabled={state?.status === 'loading' || state?.status === 'success'}
+        disabled={isLoading || isSuccess}
         style={{
-          cursor:
-            state?.status === 'loading' || state?.status === 'success'
-              ? 'not-allowed'
-              : 'pointer',
-          opacity: state?.status === 'loading' ? 0.7 : 1,
-          fontSize: '0.88rem',
-          padding: '0.55rem 0.8rem',
+          cursor: isLoading || isSuccess ? 'not-allowed' : 'pointer',
+          opacity: isLoading ? 0.78 : 1,
+          fontSize: '0.9rem',
+          fontWeight: 800,
+          padding: '0.65rem 0.9rem',
+          color: isSuccess ? '#f4fff5' : '#17120a',
+          background: isSuccess
+            ? 'linear-gradient(135deg, #287a45 0%, #1d5e35 100%)'
+            : isLoading
+              ? 'linear-gradient(135deg, #ad8234 0%, #7f5d22 100%)'
+              : 'linear-gradient(135deg, #ffe49a 0%, #dca52f 100%)',
+          border: isSuccess
+            ? '1px solid #68c987'
+            : '1px solid #ffe7a7',
+          boxShadow: isSuccess
+            ? '0 8px 22px rgba(35, 120, 67, 0.24)'
+            : '0 8px 22px rgba(220, 165, 47, 0.28)',
+          textShadow: isSuccess ? '0 1px 1px rgba(0,0,0,0.35)' : 'none',
         }}
       >
-        {state?.status === 'loading'
+        {isLoading
           ? 'Creating Task…'
-          : state?.status === 'success'
-            ? 'Task Created'
-            : label || 'Create Song Task'}
+          : isSuccess
+            ? '✓ Task Created'
+            : label || '+ Create Song Task'}
       </button>
 
       {state?.message ? (
@@ -310,8 +352,9 @@ function CreateTaskButton({
           className="copy"
           role="status"
           style={{
-            marginTop: '0.35rem',
-            fontSize: '0.85rem',
+            marginTop: '0.4rem',
+            fontSize: '0.86rem',
+            fontWeight: 650,
             color: state.status === 'error' ? '#ffb4b4' : '#d9f7d6',
           }}
         >
@@ -319,6 +362,371 @@ function CreateTaskButton({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function formatTaskDate(value: string | null) {
+  if (!value) return '';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+function TaskActionButton({
+  children,
+  onClick,
+  disabled,
+  emphasis = false,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled: boolean;
+  emphasis?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        cursor: disabled ? 'wait' : 'pointer',
+        opacity: disabled ? 0.68 : 1,
+        padding: '0.5rem 0.7rem',
+        fontSize: '0.82rem',
+        fontWeight: 800,
+        color: emphasis ? '#17120a' : '#f5f1e8',
+        background: emphasis
+          ? 'linear-gradient(135deg, #ffe49a 0%, #dca52f 100%)'
+          : 'rgba(255,255,255,0.11)',
+        border: emphasis
+          ? '1px solid #ffe7a7'
+          : '1px solid rgba(255,255,255,0.28)',
+        boxShadow: emphasis
+          ? '0 6px 16px rgba(220, 165, 47, 0.2)'
+          : 'none',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function SongTasksManager({
+  tasks,
+  state,
+  onRefresh,
+  onUpdateStatus,
+}: {
+  tasks: SongTask[];
+  state: TaskListState;
+  onRefresh: () => void;
+  onUpdateStatus: (taskId: string, status: SongTaskStatus) => void;
+}) {
+  const groups: Array<{
+    status: SongTaskStatus;
+    label: string;
+    description: string;
+  }> = [
+    { status: 'open', label: 'Open', description: 'Ready to work' },
+    { status: 'in_progress', label: 'In Progress', description: 'Actively developing' },
+    { status: 'completed', label: 'Completed', description: 'Finished work' },
+    { status: 'dismissed', label: 'Dismissed', description: 'Not pursuing' },
+  ];
+
+  return (
+    <section
+      style={{
+        marginTop: '1.5rem',
+        paddingTop: '1.25rem',
+        borderTop: '1px solid var(--line)',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '1rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          <div className="eyebrow">Song development workflow</div>
+          <h3 className="h2" style={{ marginTop: '0.25rem' }}>
+            Song Tasks
+          </h3>
+          <p className="copy" style={{ maxWidth: 760 }}>
+            Turn AI recommendations into work, move each item through development,
+            then run Song Intelligence again to measure the next version.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="button"
+          onClick={onRefresh}
+          disabled={state.status === 'loading'}
+          style={{
+            cursor: state.status === 'loading' ? 'wait' : 'pointer',
+            opacity: state.status === 'loading' ? 0.7 : 1,
+            color: '#17120a',
+            background: 'linear-gradient(135deg, #ffe49a 0%, #dca52f 100%)',
+            border: '1px solid #ffe7a7',
+            fontWeight: 800,
+            boxShadow: '0 6px 16px rgba(220, 165, 47, 0.2)',
+          }}
+        >
+          {state.status === 'loading' ? 'Loading Tasks…' : 'Refresh Tasks'}
+        </button>
+      </div>
+
+      {state.message ? (
+        <div
+          role="status"
+          className="copy"
+          style={{
+            marginTop: '0.75rem',
+            color: state.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+            fontWeight: 650,
+          }}
+        >
+          {state.message}
+        </div>
+      ) : null}
+
+      {tasks.length === 0 && state.status !== 'loading' ? (
+        <div
+          style={{
+            marginTop: '1rem',
+            padding: '1rem',
+            border: '1px dashed var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <strong>No song tasks yet.</strong>
+          <p className="copy" style={{ marginBottom: 0 }}>
+            Use a gold “Create Song Task” button in Work Needed or Rewrite
+            Opportunities to start the development list.
+          </p>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            gap: '0.85rem',
+            marginTop: '1rem',
+          }}
+        >
+          {groups.map((group) => {
+            const groupTasks = tasks.filter((task) => task.status === group.status);
+
+            return (
+              <div
+                key={group.status}
+                style={{
+                  padding: '0.9rem',
+                  border: '1px solid var(--line)',
+                  borderRadius: 16,
+                  minWidth: 0,
+                  background: 'rgba(255,255,255,0.025)',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.75rem',
+                  }}
+                >
+                  <div>
+                    <strong>{group.label}</strong>
+                    <div className="copy" style={{ fontSize: '0.84rem' }}>
+                      {group.description}
+                    </div>
+                  </div>
+                  <span className="pill">{groupTasks.length}</span>
+                </div>
+
+                <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.8rem' }}>
+                  {groupTasks.length === 0 ? (
+                    <div className="copy" style={{ opacity: 0.7 }}>
+                      Nothing here.
+                    </div>
+                  ) : (
+                    groupTasks.map((task) => {
+                      const updating = state.updatingTaskId === task.id;
+
+                      return (
+                        <article
+                          key={task.id}
+                          style={{
+                            padding: '0.85rem',
+                            border: '1px solid var(--line)',
+                            borderRadius: 14,
+                            background: 'rgba(0,0,0,0.12)',
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'flex-start',
+                              gap: '0.75rem',
+                            }}
+                          >
+                            <strong style={{ lineHeight: 1.3 }}>{task.title}</strong>
+                            <span
+                              className="pill"
+                              title="Priority 1 is highest"
+                              style={{ whiteSpace: 'nowrap' }}
+                            >
+                              P{task.priority}
+                            </span>
+                          </div>
+
+                          <div
+                            className="copy"
+                            style={{
+                              marginTop: '0.45rem',
+                              fontSize: '0.82rem',
+                              opacity: 0.8,
+                            }}
+                          >
+                            {task.analysis_run_id
+                              ? `Linked to AI analysis${
+                                  task.analysis?.analysis_version
+                                    ? ` v${task.analysis.analysis_version}`
+                                    : ''
+                                }`
+                              : 'Manual song task'}
+                            {task.created_at
+                              ? ` · Created ${formatTaskDate(task.created_at)}`
+                              : ''}
+                          </div>
+
+                          {task.description ? (
+                            <div
+                              className="copy"
+                              style={{
+                                marginTop: '0.55rem',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.9rem',
+                              }}
+                            >
+                              {task.description}
+                            </div>
+                          ) : null}
+
+                          <div
+                            style={{
+                              display: 'flex',
+                              flexWrap: 'wrap',
+                              gap: '0.45rem',
+                              marginTop: '0.75rem',
+                            }}
+                          >
+                            {task.status === 'open' ? (
+                              <>
+                                <TaskActionButton
+                                  disabled={updating}
+                                  emphasis
+                                  onClick={() =>
+                                    onUpdateStatus(task.id, 'in_progress')
+                                  }
+                                >
+                                  Start
+                                </TaskActionButton>
+                                <TaskActionButton
+                                  disabled={updating}
+                                  onClick={() =>
+                                    onUpdateStatus(task.id, 'completed')
+                                  }
+                                >
+                                  Complete
+                                </TaskActionButton>
+                                <TaskActionButton
+                                  disabled={updating}
+                                  onClick={() =>
+                                    onUpdateStatus(task.id, 'dismissed')
+                                  }
+                                >
+                                  Dismiss
+                                </TaskActionButton>
+                              </>
+                            ) : null}
+
+                            {task.status === 'in_progress' ? (
+                              <>
+                                <TaskActionButton
+                                  disabled={updating}
+                                  emphasis
+                                  onClick={() =>
+                                    onUpdateStatus(task.id, 'completed')
+                                  }
+                                >
+                                  Complete
+                                </TaskActionButton>
+                                <TaskActionButton
+                                  disabled={updating}
+                                  onClick={() => onUpdateStatus(task.id, 'open')}
+                                >
+                                  Move to Open
+                                </TaskActionButton>
+                                <TaskActionButton
+                                  disabled={updating}
+                                  onClick={() =>
+                                    onUpdateStatus(task.id, 'dismissed')
+                                  }
+                                >
+                                  Dismiss
+                                </TaskActionButton>
+                              </>
+                            ) : null}
+
+                            {task.status === 'completed' ||
+                            task.status === 'dismissed' ? (
+                              <TaskActionButton
+                                disabled={updating}
+                                emphasis
+                                onClick={() => onUpdateStatus(task.id, 'open')}
+                              >
+                                Reopen
+                              </TaskActionButton>
+                            ) : null}
+                          </div>
+
+                          {updating ? (
+                            <div
+                              className="copy"
+                              style={{
+                                marginTop: '0.45rem',
+                                fontSize: '0.84rem',
+                                color: '#f7dda0',
+                              }}
+                            >
+                              Updating task…
+                            </div>
+                          ) : null}
+                        </article>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -794,6 +1202,12 @@ export function SongIntelligencePanel({
     runId: null,
   });
   const [taskCreateState, setTaskCreateState] = useState<TaskCreateState>({});
+  const [songTasks, setSongTasks] = useState<SongTask[]>([]);
+  const [taskListState, setTaskListState] = useState<TaskListState>({
+    status: 'idle',
+    message: '',
+    updatingTaskId: null,
+  });
   const [selectedAttachmentId, setSelectedAttachmentId] = useState(
     audioAttachments[0]?.id ?? ''
   );
@@ -816,6 +1230,59 @@ export function SongIntelligencePanel({
       router.refresh();
     }
   }, [router, saveState.status]);
+
+  const loadSongTasks = useCallback(async () => {
+    setTaskListState((current) => ({
+      ...current,
+      status: 'loading',
+      message: '',
+    }));
+
+    try {
+      const query = new URLSearchParams({ song_id: songId });
+      const response = await fetch(`/api/song-tasks?${query.toString()}`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | {
+            status?: string;
+            message?: string;
+            tasks?: SongTask[];
+          }
+        | null;
+
+      if (!response.ok || result?.status !== 'success') {
+        setTaskListState({
+          status: 'error',
+          message:
+            result?.message ||
+            `Song task lookup failed with status ${response.status}.`,
+          updatingTaskId: null,
+        });
+        return;
+      }
+
+      setSongTasks(result.tasks || []);
+      setTaskListState({
+        status: 'success',
+        message: '',
+        updatingTaskId: null,
+      });
+    } catch (error) {
+      setTaskListState({
+        status: 'error',
+        message:
+          error instanceof Error ? error.message : 'Could not load song tasks.',
+        updatingTaskId: null,
+      });
+    }
+  }, [songId]);
+
+  useEffect(() => {
+    void loadSongTasks();
+  }, [loadSongTasks]);
 
   useEffect(() => {
     const transcriptId = selectedTranscript?.id;
@@ -1088,6 +1555,7 @@ export function SongIntelligencePanel({
           message: result.message || 'Song task created.',
         },
       }));
+      await loadSongTasks();
     } catch (error) {
       setTaskCreateState((current) => ({
         ...current,
@@ -1097,6 +1565,64 @@ export function SongIntelligencePanel({
             error instanceof Error ? error.message : 'Song task creation failed.',
         },
       }));
+    }
+  }
+
+  async function handleUpdateTaskStatus(
+    taskId: string,
+    status: SongTaskStatus
+  ) {
+    setTaskListState((current) => ({
+      ...current,
+      message: '',
+      updatingTaskId: taskId,
+    }));
+
+    try {
+      const requestBody = new FormData();
+      requestBody.append('song_id', songId);
+      requestBody.append('task_id', taskId);
+      requestBody.append('status', status);
+
+      const response = await fetch('/api/song-tasks', {
+        method: 'PATCH',
+        body: requestBody,
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | {
+            status?: string;
+            message?: string;
+            task?: SongTask;
+          }
+        | null;
+
+      if (!response.ok || result?.status !== 'success' || !result.task) {
+        setTaskListState({
+          status: 'error',
+          message:
+            result?.message ||
+            `Task update failed with status ${response.status}.`,
+          updatingTaskId: null,
+        });
+        return;
+      }
+
+      setSongTasks((current) =>
+        current.map((task) => (task.id === taskId ? result.task! : task))
+      );
+      setTaskListState({
+        status: 'success',
+        message: result.message || 'Song task updated.',
+        updatingTaskId: null,
+      });
+    } catch (error) {
+      setTaskListState({
+        status: 'error',
+        message:
+          error instanceof Error ? error.message : 'Song task update failed.',
+        updatingTaskId: null,
+      });
     }
   }
 
@@ -1366,6 +1892,15 @@ export function SongIntelligencePanel({
           onCreateTask={handleCreateSongTask}
         />
       ) : null}
+
+      <SongTasksManager
+        tasks={songTasks}
+        state={taskListState}
+        onRefresh={() => {
+          void loadSongTasks();
+        }}
+        onUpdateStatus={handleUpdateTaskStatus}
+      />
     </div>
   );
 }
