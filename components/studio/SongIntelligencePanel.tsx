@@ -187,7 +187,16 @@ type AnalyticsState = {
   status: 'idle' | 'loading' | 'success' | 'error';
   message: string;
   result: SongIntelligenceResult | null;
+  runId: string | null;
 };
+
+type TaskCreateState = Record<
+  string,
+  {
+    status: 'idle' | 'loading' | 'success' | 'error';
+    message: string;
+  }
+>;
 
 function SaveTranscriptButton() {
   const { pending } = useFormStatus();
@@ -259,7 +268,74 @@ function TextList({ items }: { items: string[] }) {
   );
 }
 
-function IntelligenceResults({ result }: { result: SongIntelligenceResult }) {
+function CreateTaskButton({
+  taskKey,
+  label,
+  taskState,
+  onCreate,
+}: {
+  taskKey: string;
+  label?: string;
+  taskState: TaskCreateState;
+  onCreate: () => void;
+}) {
+  const state = taskState[taskKey];
+
+  return (
+    <div style={{ marginTop: '0.55rem' }}>
+      <button
+        type="button"
+        className="button"
+        onClick={onCreate}
+        disabled={state?.status === 'loading' || state?.status === 'success'}
+        style={{
+          cursor:
+            state?.status === 'loading' || state?.status === 'success'
+              ? 'not-allowed'
+              : 'pointer',
+          opacity: state?.status === 'loading' ? 0.7 : 1,
+          fontSize: '0.88rem',
+          padding: '0.55rem 0.8rem',
+        }}
+      >
+        {state?.status === 'loading'
+          ? 'Creating Task…'
+          : state?.status === 'success'
+            ? 'Task Created'
+            : label || 'Create Song Task'}
+      </button>
+
+      {state?.message ? (
+        <div
+          className="copy"
+          role="status"
+          style={{
+            marginTop: '0.35rem',
+            fontSize: '0.85rem',
+            color: state.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+          }}
+        >
+          {state.message}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function IntelligenceResults({
+  result,
+  taskState,
+  onCreateTask,
+}: {
+  result: SongIntelligenceResult;
+  taskState: TaskCreateState;
+  onCreateTask: (
+    taskKey: string,
+    title: string,
+    description: string,
+    priority: number
+  ) => void;
+}) {
   return (
     <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem' }}>
       <div>
@@ -386,6 +462,18 @@ function IntelligenceResults({ result }: { result: SongIntelligenceResult }) {
                   <div className="copy">
                     <em>Next move:</em> {item.recommended_action}
                   </div>
+                  <CreateTaskButton
+                    taskKey={`work-needed-${index}`}
+                    taskState={taskState}
+                    onCreate={() =>
+                      onCreateTask(
+                        `work-needed-${index}`,
+                        `${item.area}: ${item.issue}`,
+                        `AI Song Intelligence recommendation:\n\n${item.issue}\n\nRecommended action:\n${item.recommended_action}`,
+                        item.priority
+                      )
+                    }
+                  />
                 </div>
               ))}
             </div>
@@ -570,6 +658,18 @@ function IntelligenceResults({ result }: { result: SongIntelligenceResult }) {
                   <div className="copy">
                     <em>Strategy:</em> {item.example_strategy}
                   </div>
+                  <CreateTaskButton
+                    taskKey={`rewrite-${index}`}
+                    taskState={taskState}
+                    onCreate={() =>
+                      onCreateTask(
+                        `rewrite-${index}`,
+                        `Rewrite ${item.section}`,
+                        `AI Song Intelligence rewrite opportunity:\n\nIssue:\n${item.issue}\n\nDirection:\n${item.direction}\n\nSuggested strategy:\n${item.example_strategy}`,
+                        2
+                      )
+                    }
+                  />
                 </div>
               ))}
             </div>
@@ -691,7 +791,9 @@ export function SongIntelligencePanel({
     status: 'idle',
     message: '',
     result: null,
+    runId: null,
   });
+  const [taskCreateState, setTaskCreateState] = useState<TaskCreateState>({});
   const [selectedAttachmentId, setSelectedAttachmentId] = useState(
     audioAttachments[0]?.id ?? ''
   );
@@ -723,7 +825,9 @@ export function SongIntelligencePanel({
         status: 'idle',
         message: '',
         result: null,
+        runId: null,
       });
+      setTaskCreateState({});
       return;
     }
 
@@ -749,6 +853,7 @@ export function SongIntelligencePanel({
               status?: string;
               message?: string;
               result?: SongIntelligenceResult;
+              run_id?: string;
             }
           | null;
 
@@ -759,13 +864,17 @@ export function SongIntelligencePanel({
             status: 'success',
             message: 'Latest saved analysis loaded.',
             result: result.result,
+            runId: result.run_id || null,
           });
+          setTaskCreateState({});
         } else if (response.ok && result?.status === 'empty') {
           setAnalyticsState({
             status: 'idle',
             message: '',
             result: null,
+            runId: null,
           });
+          setTaskCreateState({});
         } else {
           setAnalyticsState({
             status: 'error',
@@ -773,6 +882,7 @@ export function SongIntelligencePanel({
               result?.message ||
               `Analysis lookup failed with status ${response.status}.`,
             result: null,
+            runId: null,
           });
         }
       } catch (error) {
@@ -785,6 +895,7 @@ export function SongIntelligencePanel({
               ? error.message
               : 'Could not load the latest analysis.',
           result: null,
+          runId: null,
         });
       }
     }
@@ -854,6 +965,7 @@ export function SongIntelligencePanel({
         status: 'error',
         message: 'Save or generate a transcript before running AI Song Intelligence.',
         result: null,
+        runId: null,
       });
       return;
     }
@@ -862,6 +974,7 @@ export function SongIntelligencePanel({
       status: 'loading',
       message: '',
       result: current.result,
+      runId: current.runId,
     }));
 
     try {
@@ -880,6 +993,7 @@ export function SongIntelligencePanel({
             status?: string;
             message?: string;
             result?: SongIntelligenceResult;
+            run_id?: string;
           }
         | null;
 
@@ -890,6 +1004,7 @@ export function SongIntelligencePanel({
             result?.message ||
             `AI Song Intelligence failed with status ${response.status}.`,
           result: null,
+          runId: null,
         });
         return;
       }
@@ -898,7 +1013,9 @@ export function SongIntelligencePanel({
         status: 'success',
         message: result.message || 'AI Song Intelligence generated and saved.',
         result: result.result,
+        runId: result.run_id || null,
       });
+      setTaskCreateState({});
     } catch (error) {
       setAnalyticsState({
         status: 'error',
@@ -907,7 +1024,79 @@ export function SongIntelligencePanel({
             ? error.message
             : 'AI Song Intelligence failed.',
         result: null,
+        runId: null,
       });
+    }
+  }
+
+  async function handleCreateSongTask(
+    taskKey: string,
+    title: string,
+    description: string,
+    priority: number
+  ) {
+    setTaskCreateState((current) => ({
+      ...current,
+      [taskKey]: {
+        status: 'loading',
+        message: '',
+      },
+    }));
+
+    try {
+      const requestBody = new FormData();
+      requestBody.append('song_id', songId);
+      requestBody.append(
+        'song_version_id',
+        selectedTranscript?.song_version_id || ''
+      );
+      requestBody.append('analysis_run_id', analyticsState.runId || '');
+      requestBody.append('title', title);
+      requestBody.append('description', description);
+      requestBody.append('priority', String(priority));
+
+      const response = await fetch('/api/song-tasks/create', {
+        method: 'POST',
+        body: requestBody,
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | {
+            status?: string;
+            message?: string;
+            task_id?: string;
+          }
+        | null;
+
+      if (!response.ok || result?.status !== 'success') {
+        setTaskCreateState((current) => ({
+          ...current,
+          [taskKey]: {
+            status: 'error',
+            message:
+              result?.message ||
+              `Task creation failed with status ${response.status}.`,
+          },
+        }));
+        return;
+      }
+
+      setTaskCreateState((current) => ({
+        ...current,
+        [taskKey]: {
+          status: 'success',
+          message: result.message || 'Song task created.',
+        },
+      }));
+    } catch (error) {
+      setTaskCreateState((current) => ({
+        ...current,
+        [taskKey]: {
+          status: 'error',
+          message:
+            error instanceof Error ? error.message : 'Song task creation failed.',
+        },
+      }));
     }
   }
 
@@ -1171,7 +1360,11 @@ export function SongIntelligencePanel({
       ) : null}
 
       {analyticsState.result ? (
-        <IntelligenceResults result={analyticsState.result} />
+        <IntelligenceResults
+          result={analyticsState.result}
+          taskState={taskCreateState}
+          onCreateTask={handleCreateSongTask}
+        />
       ) : null}
     </div>
   );
