@@ -1,10 +1,10 @@
-import Link from 'next/link';
-import { getServerAuthContext } from '@/lib/auth';
-import { getMySongs } from '@/lib/data';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import Link from "next/link";
+import { getServerAuthContext } from "@/lib/auth";
+import { getMySongs } from "@/lib/data";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import StudioPortfolio, {
   type StudioPortfolioSong,
-} from '@/components/studio/StudioPortfolio';
+} from "@/components/studio/StudioPortfolio";
 
 type VersionRow = {
   song_id: string;
@@ -13,11 +13,25 @@ type VersionRow = {
 
 type WorkflowRow = {
   song_id: string;
-  priority_tier: 'now' | 'next' | 'later' | 'someday' | 'archive';
+  priority_tier: "now" | "next" | "later" | "someday" | "archive";
   priority_rank: number | null;
-  workflow_status: 'unreviewed' | 'active' | 'waiting' | 'completed' | 'archived';
+  workflow_status:
+    "unreviewed" | "active" | "waiting" | "completed" | "archived";
   next_action: string | null;
   target_date: string | null;
+  personal_rating: number | null;
+};
+
+type EngagementSummaryRow = {
+  song_id: string;
+  audio_play_count: number | string | null;
+  video_click_count: number | string | null;
+};
+
+type ListenerRatingSummaryRow = {
+  song_id: string;
+  average_rating: number | string | null;
+  rating_count: number | string | null;
 };
 
 type AnalysisRow = {
@@ -29,37 +43,37 @@ type AnalysisRow = {
 
 type TaskRow = {
   song_id: string;
-  status: 'open' | 'in_progress' | 'completed' | 'dismissed';
+  status: "open" | "in_progress" | "completed" | "dismissed";
 };
 
 function readNumber(value: unknown, key: string): number | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
   const candidate = (value as Record<string, unknown>)[key];
-  return typeof candidate === 'number' && Number.isFinite(candidate)
+  return typeof candidate === "number" && Number.isFinite(candidate)
     ? candidate
     : null;
 }
 
 function normalizeStudioSong(
-  song: Awaited<ReturnType<typeof getMySongs>>[number]
+  song: Awaited<ReturnType<typeof getMySongs>>[number],
 ) {
   return {
     id: song.id,
     slug: song.slug,
-    title: song.title || 'Untitled song',
+    title: song.title || "Untitled song",
     summary: song.summary ?? null,
     audio_url: song.audio_url ?? null,
-    current_stage: song.current_stage || 'spark',
+    current_stage: song.current_stage || "spark",
     muse_slug: song.muse_slug ?? null,
   };
 }
 
 async function buildStudioPortfolio(
   userId: string,
-  mySongs: Awaited<ReturnType<typeof getMySongs>>
+  mySongs: Awaited<ReturnType<typeof getMySongs>>,
 ): Promise<StudioPortfolioSong[]> {
   if (!mySongs.length) {
     return [];
@@ -75,66 +89,104 @@ async function buildStudioPortfolio(
       final_version_count: 0,
       all_versions_final: false,
       is_finished: false,
-      priority_tier: 'later',
+      priority_tier: "later",
       priority_rank: null,
-      workflow_status: 'active',
+      workflow_status: "active",
       next_action: null,
       target_date: null,
+      personal_rating: null,
       ai_overall_score: null,
       ai_ready_for_release_score: null,
       ai_completed_at: null,
       open_task_count: 0,
       in_progress_task_count: 0,
+      audio_play_count: 0,
+      video_click_count: 0,
+      listener_rating_average: null,
+      listener_rating_count: 0,
     }));
   }
 
-  const [versionsResult, workflowResult, analysisResult, tasksResult] =
-    await Promise.all([
-      supabase
-        .from('song_versions')
-        .select('song_id, stage')
-        .in('song_id', songIds),
-      supabase
-        .from('song_workflow')
-        .select(
-          'song_id, priority_tier, priority_rank, workflow_status, next_action, target_date'
-        )
-        .eq('user_id', userId)
-        .in('song_id', songIds),
-      supabase
-        .from('ai_analysis_runs')
-        .select('song_id, raw_result, completed_at, created_at')
-        .eq('status', 'ready')
-        .in('song_id', songIds)
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('song_tasks')
-        .select('song_id, status')
-        .in('song_id', songIds),
-    ]);
+  const [
+    versionsResult,
+    workflowResult,
+    analysisResult,
+    tasksResult,
+    engagementResult,
+    listenerRatingsResult,
+  ] = await Promise.all([
+    supabase
+      .from("song_versions")
+      .select("song_id, stage")
+      .in("song_id", songIds),
+    supabase
+      .from("song_workflow")
+      .select(
+        "song_id, priority_tier, priority_rank, workflow_status, next_action, target_date, personal_rating",
+      )
+      .eq("user_id", userId)
+      .in("song_id", songIds),
+    supabase
+      .from("ai_analysis_runs")
+      .select("song_id, raw_result, completed_at, created_at")
+      .eq("status", "ready")
+      .in("song_id", songIds)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("song_tasks")
+      .select("song_id, status")
+      .in("song_id", songIds),
+    supabase
+      .from("song_engagement_summaries")
+      .select("song_id, audio_play_count, video_click_count")
+      .in("song_id", songIds),
+    supabase
+      .from("song_rating_summaries")
+      .select("song_id, average_rating, rating_count")
+      .in("song_id", songIds),
+  ]);
 
   if (versionsResult.error) {
-    console.error('Studio version summary failed:', versionsResult.error.message);
+    console.error(
+      "Studio version summary failed:",
+      versionsResult.error.message,
+    );
   }
   if (workflowResult.error) {
-    console.error('Studio workflow summary failed:', workflowResult.error.message);
+    console.error(
+      "Studio workflow summary failed:",
+      workflowResult.error.message,
+    );
   }
   if (analysisResult.error) {
-    console.error('Studio AI summary failed:', analysisResult.error.message);
+    console.error("Studio AI summary failed:", analysisResult.error.message);
   }
   if (tasksResult.error) {
-    console.error('Studio task summary failed:', tasksResult.error.message);
+    console.error("Studio task summary failed:", tasksResult.error.message);
+  }
+  if (engagementResult.error) {
+    console.error(
+      "Studio engagement summary failed:",
+      engagementResult.error.message,
+    );
+  }
+  if (listenerRatingsResult.error) {
+    console.error(
+      "Studio listener rating summary failed:",
+      listenerRatingsResult.error.message,
+    );
   }
 
   const versions = (versionsResult.data || []) as VersionRow[];
   const workflows = (workflowResult.data || []) as WorkflowRow[];
   const analyses = (analysisResult.data || []) as AnalysisRow[];
   const tasks = (tasksResult.data || []) as TaskRow[];
+  const engagementSummaries = (engagementResult.data ||
+    []) as EngagementSummaryRow[];
+  const listenerRatingSummaries = (listenerRatingsResult.data ||
+    []) as ListenerRatingSummaryRow[];
 
-  const versionSummary = new Map<
-    string,
-    { total: number; final: number }
-  >();
+  const versionSummary = new Map<string, { total: number; final: number }>();
 
   for (const version of versions) {
     const current = versionSummary.get(version.song_id) || {
@@ -143,7 +195,7 @@ async function buildStudioPortfolio(
     };
 
     current.total += 1;
-    if (String(version.stage || '').toLowerCase() === 'final') {
+    if (String(version.stage || "").toLowerCase() === "final") {
       current.final += 1;
     }
 
@@ -151,7 +203,7 @@ async function buildStudioPortfolio(
   }
 
   const workflowBySong = new Map(
-    workflows.map((workflow) => [workflow.song_id, workflow])
+    workflows.map((workflow) => [workflow.song_id, workflow]),
   );
 
   const latestAnalysisBySong = new Map<string, AnalysisRow>();
@@ -161,10 +213,30 @@ async function buildStudioPortfolio(
     }
   }
 
-  const taskSummary = new Map<
-    string,
-    { open: number; inProgress: number }
-  >();
+  const engagementBySong = new Map(
+    engagementSummaries.map((row) => [
+      row.song_id,
+      {
+        audioPlayCount: Number(row.audio_play_count || 0),
+        videoClickCount: Number(row.video_click_count || 0),
+      },
+    ]),
+  );
+
+  const listenerRatingBySong = new Map(
+    listenerRatingSummaries.map((row) => [
+      row.song_id,
+      {
+        averageRating:
+          row.average_rating === null || row.average_rating === undefined
+            ? null
+            : Number(row.average_rating),
+        ratingCount: Number(row.rating_count || 0),
+      },
+    ]),
+  );
+
+  const taskSummary = new Map<string, { open: number; inProgress: number }>();
 
   for (const task of tasks) {
     const current = taskSummary.get(task.song_id) || {
@@ -172,9 +244,9 @@ async function buildStudioPortfolio(
       inProgress: 0,
     };
 
-    if (task.status === 'open') {
+    if (task.status === "open") {
       current.open += 1;
-    } else if (task.status === 'in_progress') {
+    } else if (task.status === "in_progress") {
       current.inProgress += 1;
     }
 
@@ -186,15 +258,23 @@ async function buildStudioPortfolio(
     const workflow = workflowBySong.get(song.id);
     const latestAnalysis = latestAnalysisBySong.get(song.id);
     const task = taskSummary.get(song.id) || { open: 0, inProgress: 0 };
+    const engagement = engagementBySong.get(song.id) || {
+      audioPlayCount: 0,
+      videoClickCount: 0,
+    };
+    const listenerRating = listenerRatingBySong.get(song.id) || {
+      averageRating: null,
+      ratingCount: 0,
+    };
 
     const allVersionsFinal =
       version.total > 0 && version.final === version.total;
 
-    const workflowStatus = workflow?.workflow_status || 'active';
+    const workflowStatus = workflow?.workflow_status || "active";
     const isFinished =
       allVersionsFinal ||
-      workflowStatus === 'completed' ||
-      workflowStatus === 'archived';
+      workflowStatus === "completed" ||
+      workflowStatus === "archived";
 
     return {
       ...normalizeStudioSong(song),
@@ -202,20 +282,29 @@ async function buildStudioPortfolio(
       final_version_count: version.final,
       all_versions_final: allVersionsFinal,
       is_finished: isFinished,
-      priority_tier: workflow?.priority_tier || 'later',
+      priority_tier: workflow?.priority_tier || "later",
       priority_rank: workflow?.priority_rank ?? null,
       workflow_status: workflowStatus,
       next_action: workflow?.next_action || null,
       target_date: workflow?.target_date || null,
+      personal_rating:
+        workflow?.personal_rating === null ||
+        workflow?.personal_rating === undefined
+          ? null
+          : Number(workflow.personal_rating),
       ai_overall_score: latestAnalysis
-        ? readNumber(latestAnalysis.raw_result, 'overall_score')
+        ? readNumber(latestAnalysis.raw_result, "overall_score")
         : null,
       ai_ready_for_release_score: latestAnalysis
-        ? readNumber(latestAnalysis.raw_result, 'ready_for_release_score')
+        ? readNumber(latestAnalysis.raw_result, "ready_for_release_score")
         : null,
       ai_completed_at: latestAnalysis?.completed_at || null,
       open_task_count: task.open,
       in_progress_task_count: task.inProgress,
+      audio_play_count: engagement.audioPlayCount,
+      video_click_count: engagement.videoClickCount,
+      listener_rating_average: listenerRating.averageRating,
+      listener_rating_count: listenerRating.ratingCount,
     };
   });
 }
@@ -296,7 +385,7 @@ export default async function StudioPage() {
             {portfolioSongs.length ? (
               <StudioPortfolio initialSongs={portfolioSongs} />
             ) : (
-              <p className="copy" style={{ marginTop: '1rem' }}>
+              <p className="copy" style={{ marginTop: "1rem" }}>
                 You have not uploaded a song yet. Start at the capture page or
                 any Muse page.
               </p>
