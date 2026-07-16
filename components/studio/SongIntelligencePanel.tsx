@@ -1048,7 +1048,7 @@ export function SongIntelligencePanel({
             }
             title={
               selectedTranscript
-                ? 'Uses the saved transcript'
+                ? 'Generates and automatically saves a new Song Intelligence report'
                 : 'Save or generate a transcript first'
             }
             style={{
@@ -1060,13 +1060,36 @@ export function SongIntelligencePanel({
               opacity:
                 !selectedTranscript ||
                 analyticsState.status === 'loading'
-                  ? 0.6
+                  ? 0.55
                   : 1,
+              color:
+                !selectedTranscript ||
+                analyticsState.status === 'loading'
+                  ? 'rgba(255,255,255,0.72)'
+                  : '#17120a',
+              background:
+                !selectedTranscript
+                  ? 'rgba(255,255,255,0.06)'
+                  : analyticsState.status === 'loading'
+                    ? 'linear-gradient(135deg, #8f6a24 0%, #6f511b 100%)'
+                    : 'linear-gradient(135deg, #ffd978 0%, #d9a12e 100%)',
+              border:
+                !selectedTranscript
+                  ? '1px solid var(--line)'
+                  : '1px solid rgba(255, 221, 132, 0.9)',
+              boxShadow:
+                !selectedTranscript ||
+                analyticsState.status === 'loading'
+                  ? 'none'
+                  : '0 8px 24px rgba(217, 161, 46, 0.25)',
+              fontWeight: 750,
             }}
           >
             {analyticsState.status === 'loading'
-              ? 'Analyzing…'
-              : 'Run AI Song Intelligence'}
+              ? 'Analyzing & Saving…'
+              : analyticsState.status === 'success'
+                ? 'Regenerate AI Song Intelligence'
+                : 'Run AI Song Intelligence'}
           </button>
         </div>
       </form>
@@ -1123,9 +1146,27 @@ export function SongIntelligencePanel({
               analyticsState.status === 'error'
                 ? 'rgba(160, 40, 40, 0.18)'
                 : 'rgba(40, 130, 60, 0.18)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
           }}
         >
-          {analyticsState.message}
+          <span>{analyticsState.message}</span>
+          {analyticsState.status === 'success' ? (
+            <span
+              className="pill"
+              style={{
+                borderColor: 'rgba(140, 225, 150, 0.55)',
+                color: '#d9f7d6',
+                background: 'rgba(40, 130, 60, 0.22)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              Saved automatically
+            </span>
+          ) : null}
         </div>
       ) : null}
 
