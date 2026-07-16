@@ -1,15 +1,11 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import Link from "next/link";
+import { useMemo, useState } from "react";
 
-export type PriorityTier = 'now' | 'next' | 'later' | 'someday' | 'archive';
+export type PriorityTier = "now" | "next" | "later" | "someday" | "archive";
 export type WorkflowStatus =
-  | 'unreviewed'
-  | 'active'
-  | 'waiting'
-  | 'completed'
-  | 'archived';
+  "unreviewed" | "active" | "waiting" | "completed" | "archived";
 
 export type StudioPortfolioSong = {
   id: string;
@@ -28,11 +24,16 @@ export type StudioPortfolioSong = {
   workflow_status: WorkflowStatus;
   next_action: string | null;
   target_date: string | null;
+  personal_rating: number | null;
   ai_overall_score: number | null;
   ai_ready_for_release_score: number | null;
   ai_completed_at: string | null;
   open_task_count: number;
   in_progress_task_count: number;
+  audio_play_count: number;
+  video_click_count: number;
+  listener_rating_average: number | null;
+  listener_rating_count: number;
 };
 
 type Props = {
@@ -42,7 +43,7 @@ type Props = {
 type SaveState = Record<
   string,
   {
-    status: 'idle' | 'saving' | 'success' | 'error';
+    status: "idle" | "saving" | "success" | "error";
     message: string;
   }
 >;
@@ -57,38 +58,38 @@ const PRIORITY_ORDER: Record<PriorityTier, number> = {
 
 function formatLabel(value: string) {
   return value
-    .replaceAll('_', ' ')
+    .replaceAll("_", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatScore(value: number | null) {
-  return value === null ? '—' : Math.round(value).toString();
+  return value === null ? "—" : Math.round(value).toString();
 }
 
 function scoreDescription(value: number | null) {
-  if (value === null) return 'Not analyzed';
-  if (value >= 90) return 'Exceptional';
-  if (value >= 80) return 'Strong';
-  if (value >= 70) return 'Promising';
-  return 'Developing';
+  if (value === null) return "Not analyzed";
+  if (value >= 90) return "Exceptional";
+  if (value >= 80) return "Strong";
+  if (value >= 70) return "Promising";
+  return "Developing";
 }
 
 function recalculateFinished(song: StudioPortfolioSong) {
   return (
     song.all_versions_final ||
-    song.workflow_status === 'completed' ||
-    song.workflow_status === 'archived'
+    song.workflow_status === "completed" ||
+    song.workflow_status === "archived"
   );
 }
 
 export default function StudioPortfolio({ initialSongs }: Props) {
   const [songs, setSongs] = useState(initialSongs);
-  const [search, setSearch] = useState('');
-  const [museFilter, setMuseFilter] = useState('all');
-  const [stageFilter, setStageFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
-  const [analysisFilter, setAnalysisFilter] = useState('all');
-  const [sortMode, setSortMode] = useState('priority');
+  const [search, setSearch] = useState("");
+  const [museFilter, setMuseFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [analysisFilter, setAnalysisFilter] = useState("all");
+  const [sortMode, setSortMode] = useState("priority");
   const [showFinished, setShowFinished] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>({});
 
@@ -98,37 +99,51 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         new Set(
           songs
             .map((song) => song.muse_slug)
-            .filter((value): value is string => Boolean(value))
-        )
+            .filter((value): value is string => Boolean(value)),
+        ),
       ).sort(),
-    [songs]
+    [songs],
   );
 
   const stageOptions = useMemo(
-    () =>
-      Array.from(new Set(songs.map((song) => song.current_stage))).sort(),
-    [songs]
+    () => Array.from(new Set(songs.map((song) => song.current_stage))).sort(),
+    [songs],
   );
 
   const summary = useMemo(() => {
     const active = songs.filter((song) => !recalculateFinished(song)).length;
     const now = songs.filter(
-      (song) =>
-        song.priority_tier === 'now' && !recalculateFinished(song)
+      (song) => song.priority_tier === "now" && !recalculateFinished(song),
     ).length;
     const openTasks = songs.reduce(
       (total, song) =>
         total + song.open_task_count + song.in_progress_task_count,
-      0
+      0,
     );
     const releaseCandidates = songs.filter(
       (song) =>
         (song.ai_ready_for_release_score || 0) >= 80 &&
-        !recalculateFinished(song)
+        !recalculateFinished(song),
     ).length;
     const finished = songs.filter((song) => recalculateFinished(song)).length;
+    const totalListens = songs.reduce(
+      (total, song) => total + song.audio_play_count,
+      0,
+    );
+    const totalRatings = songs.reduce(
+      (total, song) => total + song.listener_rating_count,
+      0,
+    );
 
-    return { active, now, openTasks, releaseCandidates, finished };
+    return {
+      active,
+      now,
+      openTasks,
+      releaseCandidates,
+      finished,
+      totalListens,
+      totalRatings,
+    };
   }, [songs]);
 
   const visibleSongs = useMemo(() => {
@@ -141,28 +156,25 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       if (
         normalizedSearch &&
         !song.title.toLowerCase().includes(normalizedSearch) &&
-        !(song.summary || '').toLowerCase().includes(normalizedSearch)
+        !(song.summary || "").toLowerCase().includes(normalizedSearch)
       ) {
         return false;
       }
-      if (museFilter !== 'all' && song.muse_slug !== museFilter) return false;
-      if (stageFilter !== 'all' && song.current_stage !== stageFilter) {
+      if (museFilter !== "all" && song.muse_slug !== museFilter) return false;
+      if (stageFilter !== "all" && song.current_stage !== stageFilter) {
+        return false;
+      }
+      if (priorityFilter !== "all" && song.priority_tier !== priorityFilter) {
+        return false;
+      }
+      if (analysisFilter === "analyzed" && song.ai_overall_score === null) {
+        return false;
+      }
+      if (analysisFilter === "not_analyzed" && song.ai_overall_score !== null) {
         return false;
       }
       if (
-        priorityFilter !== 'all' &&
-        song.priority_tier !== priorityFilter
-      ) {
-        return false;
-      }
-      if (analysisFilter === 'analyzed' && song.ai_overall_score === null) {
-        return false;
-      }
-      if (analysisFilter === 'not_analyzed' && song.ai_overall_score !== null) {
-        return false;
-      }
-      if (
-        analysisFilter === 'release_candidates' &&
+        analysisFilter === "release_candidates" &&
         (song.ai_ready_for_release_score || 0) < 80
       ) {
         return false;
@@ -172,22 +184,43 @@ export default function StudioPortfolio({ initialSongs }: Props) {
     });
 
     return [...filtered].sort((a, b) => {
-      if (sortMode === 'ai_score') {
+      if (sortMode === "ai_score") {
         return (b.ai_overall_score ?? -1) - (a.ai_overall_score ?? -1);
       }
 
-      if (sortMode === 'release_score') {
+      if (sortMode === "release_score") {
         return (
           (b.ai_ready_for_release_score ?? -1) -
           (a.ai_ready_for_release_score ?? -1)
         );
       }
 
-      if (sortMode === 'versions') {
+      if (sortMode === "my_rating") {
+        return (b.personal_rating ?? -1) - (a.personal_rating ?? -1);
+      }
+
+      if (sortMode === "listener_rating") {
+        const ratingDifference =
+          (b.listener_rating_average ?? -1) - (a.listener_rating_average ?? -1);
+
+        if (ratingDifference !== 0) return ratingDifference;
+
+        return b.listener_rating_count - a.listener_rating_count;
+      }
+
+      if (sortMode === "most_listened") {
+        return b.audio_play_count - a.audio_play_count;
+      }
+
+      if (sortMode === "video_clicks") {
+        return b.video_click_count - a.video_click_count;
+      }
+
+      if (sortMode === "versions") {
         return b.version_count - a.version_count;
       }
 
-      if (sortMode === 'title') {
+      if (sortMode === "title") {
         return a.title.localeCompare(b.title);
       }
 
@@ -216,7 +249,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
   function updateLocalSong(
     songId: string,
-    patch: Partial<StudioPortfolioSong>
+    patch: Partial<StudioPortfolioSong>,
   ) {
     setSongs((current) =>
       current.map((song) => {
@@ -231,7 +264,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
           ...updated,
           is_finished: recalculateFinished(updated),
         };
-      })
+      }),
     );
   }
 
@@ -240,9 +273,12 @@ export default function StudioPortfolio({ initialSongs }: Props) {
     patch: Partial<
       Pick<
         StudioPortfolioSong,
-        'priority_tier' | 'priority_rank' | 'workflow_status'
+        | "priority_tier"
+        | "priority_rank"
+        | "workflow_status"
+        | "personal_rating"
       >
-    >
+    >,
   ) {
     const nextSong = {
       ...song,
@@ -253,42 +289,47 @@ export default function StudioPortfolio({ initialSongs }: Props) {
     setSaveState((current) => ({
       ...current,
       [song.id]: {
-        status: 'saving',
-        message: 'Saving…',
+        status: "saving",
+        message: "Saving…",
       },
     }));
 
     try {
       const requestBody = new FormData();
-      requestBody.append('song_id', song.id);
-      requestBody.append('priority_tier', nextSong.priority_tier);
+      requestBody.append("song_id", song.id);
+      requestBody.append("priority_tier", nextSong.priority_tier);
       requestBody.append(
-        'priority_rank',
-        nextSong.priority_rank ? String(nextSong.priority_rank) : ''
+        "priority_rank",
+        nextSong.priority_rank ? String(nextSong.priority_rank) : "",
       );
-      requestBody.append('workflow_status', nextSong.workflow_status);
+      requestBody.append("workflow_status", nextSong.workflow_status);
+      requestBody.append(
+        "personal_rating",
+        nextSong.personal_rating === null
+          ? ""
+          : String(nextSong.personal_rating),
+      );
 
-      const response = await fetch('/api/studio/song-workflow', {
-        method: 'PATCH',
+      const response = await fetch("/api/studio/song-workflow", {
+        method: "PATCH",
         body: requestBody,
       });
 
-      const result = (await response.json().catch(() => null)) as
-        | {
-            status?: string;
-            message?: string;
-            workflow?: {
-              priority_tier: PriorityTier;
-              priority_rank: number | null;
-              workflow_status: WorkflowStatus;
-            };
-          }
-        | null;
+      const result = (await response.json().catch(() => null)) as {
+        status?: string;
+        message?: string;
+        workflow?: {
+          priority_tier: PriorityTier;
+          priority_rank: number | null;
+          workflow_status: WorkflowStatus;
+          personal_rating: number | null;
+        };
+      } | null;
 
-      if (!response.ok || result?.status !== 'success' || !result.workflow) {
+      if (!response.ok || result?.status !== "success" || !result.workflow) {
         throw new Error(
           result?.message ||
-            `Workflow update failed with status ${response.status}.`
+            `Workflow update failed with status ${response.status}.`,
         );
       }
 
@@ -296,8 +337,8 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       setSaveState((current) => ({
         ...current,
         [song.id]: {
-          status: 'success',
-          message: 'Saved',
+          status: "success",
+          message: "Saved",
         },
       }));
     } catch (error) {
@@ -305,50 +346,53 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         priority_tier: song.priority_tier,
         priority_rank: song.priority_rank,
         workflow_status: song.workflow_status,
+        personal_rating: song.personal_rating,
       });
 
       setSaveState((current) => ({
         ...current,
         [song.id]: {
-          status: 'error',
+          status: "error",
           message:
-            error instanceof Error ? error.message : 'Workflow save failed.',
+            error instanceof Error ? error.message : "Workflow save failed.",
         },
       }));
     }
   }
 
   return (
-    <div style={{ marginTop: '1.25rem' }}>
+    <div style={{ marginTop: "1.25rem" }}>
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-          gap: '0.75rem',
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "0.75rem",
         }}
       >
         {[
-          ['Active Songs', summary.active],
-          ['Work Now', summary.now],
-          ['Active Tasks', summary.openTasks],
-          ['Release Candidates', summary.releaseCandidates],
-          ['Finished', summary.finished],
+          ["Active Songs", summary.active],
+          ["Work Now", summary.now],
+          ["Active Tasks", summary.openTasks],
+          ["Release Candidates", summary.releaseCandidates],
+          ["Finished", summary.finished],
+          ["Total Listens", summary.totalListens],
+          ["Listener Ratings", summary.totalRatings],
         ].map(([label, value]) => (
           <div
             key={label}
             style={{
-              padding: '0.9rem',
-              border: '1px solid var(--line)',
+              padding: "0.9rem",
+              border: "1px solid var(--line)",
               borderRadius: 16,
-              background: 'rgba(255,255,255,0.025)',
+              background: "rgba(255,255,255,0.025)",
             }}
           >
             <div className="eyebrow">{label}</div>
             <div
               style={{
-                fontSize: '1.85rem',
+                fontSize: "1.85rem",
                 fontWeight: 800,
-                marginTop: '0.2rem',
+                marginTop: "0.2rem",
               }}
             >
               {value}
@@ -359,12 +403,12 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
-          gap: '0.65rem',
-          marginTop: '1rem',
-          padding: '0.9rem',
-          border: '1px solid var(--line)',
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: "0.65rem",
+          marginTop: "1rem",
+          padding: "0.9rem",
+          border: "1px solid var(--line)",
           borderRadius: 16,
         }}
       >
@@ -375,7 +419,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Song title or summary"
-            style={{ marginTop: '0.35rem' }}
+            style={{ marginTop: "0.35rem" }}
           />
         </label>
 
@@ -385,7 +429,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
             className="input"
             value={museFilter}
             onChange={(event) => setMuseFilter(event.target.value)}
-            style={{ marginTop: '0.35rem' }}
+            style={{ marginTop: "0.35rem" }}
           >
             <option value="all">All Muses</option>
             {museOptions.map((muse) => (
@@ -402,7 +446,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
             className="input"
             value={stageFilter}
             onChange={(event) => setStageFilter(event.target.value)}
-            style={{ marginTop: '0.35rem' }}
+            style={{ marginTop: "0.35rem" }}
           >
             <option value="all">All stages</option>
             {stageOptions.map((stage) => (
@@ -419,7 +463,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
             className="input"
             value={priorityFilter}
             onChange={(event) => setPriorityFilter(event.target.value)}
-            style={{ marginTop: '0.35rem' }}
+            style={{ marginTop: "0.35rem" }}
           >
             <option value="all">All priorities</option>
             <option value="now">Now</option>
@@ -436,7 +480,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
             className="input"
             value={analysisFilter}
             onChange={(event) => setAnalysisFilter(event.target.value)}
-            style={{ marginTop: '0.35rem' }}
+            style={{ marginTop: "0.35rem" }}
           >
             <option value="all">All songs</option>
             <option value="analyzed">Analyzed</option>
@@ -451,11 +495,15 @@ export default function StudioPortfolio({ initialSongs }: Props) {
             className="input"
             value={sortMode}
             onChange={(event) => setSortMode(event.target.value)}
-            style={{ marginTop: '0.35rem' }}
+            style={{ marginTop: "0.35rem" }}
           >
             <option value="priority">Priority</option>
             <option value="ai_score">AI score: highest</option>
             <option value="release_score">Release score: highest</option>
+            <option value="my_rating">My rating: highest</option>
+            <option value="listener_rating">Listener rating: highest</option>
+            <option value="most_listened">Most listened</option>
+            <option value="video_clicks">Most video clicks</option>
             <option value="versions">Most versions</option>
             <option value="title">Title</option>
           </select>
@@ -464,10 +512,10 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         <label
           className="copy"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.65rem',
-            alignSelf: 'end',
+            display: "flex",
+            alignItems: "center",
+            gap: "0.65rem",
+            alignSelf: "end",
             minHeight: 46,
           }}
         >
@@ -483,15 +531,15 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       <div
         className="copy"
         style={{
-          marginTop: '0.75rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          flexWrap: 'wrap',
+          marginTop: "0.75rem",
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "1rem",
+          flexWrap: "wrap",
         }}
       >
         <span>
-          Showing <strong>{visibleSongs.length}</strong> of{' '}
+          Showing <strong>{visibleSongs.length}</strong> of{" "}
           <strong>{songs.length}</strong> songs
         </span>
         {!showFinished && summary.finished > 0 ? (
@@ -501,9 +549,9 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
       <div
         style={{
-          display: 'grid',
-          gap: '0.85rem',
-          marginTop: '1rem',
+          display: "grid",
+          gap: "0.85rem",
+          marginTop: "1rem",
         }}
       >
         {visibleSongs.map((song) => {
@@ -514,35 +562,44 @@ export default function StudioPortfolio({ initialSongs }: Props) {
               key={song.id}
               className="subsection"
               style={{
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0, 1.8fr) minmax(250px, 1fr)',
-                gap: '1rem',
-                alignItems: 'start',
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1.8fr) minmax(250px, 1fr)",
+                gap: "1rem",
+                alignItems: "start",
               }}
             >
               <div style={{ minWidth: 0 }}>
-                <div
-                  className="pillRow"
-                  style={{ marginBottom: '0.75rem' }}
-                >
-                  <span className="pill">{formatLabel(song.current_stage)}</span>
+                <div className="pillRow" style={{ marginBottom: "0.75rem" }}>
+                  <span className="pill">
+                    {formatLabel(song.current_stage)}
+                  </span>
                   {song.muse_slug ? (
                     <span className="pill">{formatLabel(song.muse_slug)}</span>
                   ) : null}
                   <span className="pill">
-                    {song.version_count}{' '}
-                    {song.version_count === 1 ? 'version' : 'versions'}
+                    {song.version_count}{" "}
+                    {song.version_count === 1 ? "version" : "versions"}
                   </span>
                   <span className="pill">
                     Priority {formatLabel(song.priority_tier)}
-                    {song.priority_rank ? ` #${song.priority_rank}` : ''}
+                    {song.priority_rank ? ` #${song.priority_rank}` : ""}
                   </span>
                   <span className="pill">
                     AI {formatScore(song.ai_overall_score)}
                   </span>
+                  <span className="pill">
+                    My rating {formatScore(song.personal_rating)}
+                  </span>
+                  <span className="pill">{song.audio_play_count} listens</span>
+                  {song.listener_rating_count > 0 ? (
+                    <span className="pill">
+                      ★ {song.listener_rating_average?.toFixed(1)} (
+                      {song.listener_rating_count})
+                    </span>
+                  ) : null}
                   {song.open_task_count + song.in_progress_task_count > 0 ? (
                     <span className="pill">
-                      {song.open_task_count + song.in_progress_task_count}{' '}
+                      {song.open_task_count + song.in_progress_task_count}{" "}
                       active task(s)
                     </span>
                   ) : null}
@@ -551,7 +608,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                   ) : null}
                 </div>
 
-                <h3 className="h3" style={{ marginBottom: '0.4rem' }}>
+                <h3 className="h3" style={{ marginBottom: "0.4rem" }}>
                   <Link href={`/songs/${song.slug}`}>{song.title}</Link>
                 </h3>
 
@@ -559,11 +616,10 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns:
-                      'repeat(auto-fit, minmax(135px, 1fr))',
-                    gap: '0.55rem',
-                    marginTop: '0.8rem',
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(135px, 1fr))",
+                    gap: "0.55rem",
+                    marginTop: "0.8rem",
                   }}
                 >
                   <div>
@@ -575,7 +631,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                   <div>
                     <div className="eyebrow">AI overall</div>
                     <div className="copy">
-                      <strong>{formatScore(song.ai_overall_score)}</strong>{' '}
+                      <strong>{formatScore(song.ai_overall_score)}</strong>{" "}
                       {scoreDescription(song.ai_overall_score)}
                     </div>
                   </div>
@@ -588,9 +644,36 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                     </div>
                   </div>
                   <div>
+                    <div className="eyebrow">My rating</div>
+                    <div className="copy">
+                      <strong>{formatScore(song.personal_rating)}</strong> / 100
+                    </div>
+                  </div>
+                  <div>
+                    <div className="eyebrow">Listener rating</div>
+                    <div className="copy">
+                      {song.listener_rating_average === null
+                        ? "No ratings"
+                        : `${song.listener_rating_average.toFixed(1)} / 5 · ${
+                            song.listener_rating_count
+                          } ${
+                            song.listener_rating_count === 1
+                              ? "rating"
+                              : "ratings"
+                          }`}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="eyebrow">Engagement</div>
+                    <div className="copy">
+                      {song.audio_play_count} listens · {song.video_click_count}{" "}
+                      video clicks
+                    </div>
+                  </div>
+                  <div>
                     <div className="eyebrow">Tasks</div>
                     <div className="copy">
-                      {song.open_task_count} open ·{' '}
+                      {song.open_task_count} open ·{" "}
                       {song.in_progress_task_count} in progress
                     </div>
                   </div>
@@ -601,16 +684,13 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                     controls
                     preload="none"
                     className="audioPlayer"
-                    style={{ marginTop: '0.85rem' }}
+                    style={{ marginTop: "0.85rem" }}
                   >
                     <source src={song.audio_url} />
                   </audio>
                 ) : null}
 
-                <div
-                  className="button-row"
-                  style={{ marginTop: '0.9rem' }}
-                >
+                <div className="button-row" style={{ marginTop: "0.9rem" }}>
                   <Link
                     className="button primary"
                     href={`/studio/songs/${song.slug}/edit`}
@@ -625,17 +705,17 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
               <div
                 style={{
-                  padding: '0.9rem',
-                  border: '1px solid var(--line)',
+                  padding: "0.9rem",
+                  border: "1px solid var(--line)",
                   borderRadius: 16,
-                  background: 'rgba(255,255,255,0.025)',
+                  background: "rgba(255,255,255,0.025)",
                 }}
               >
                 <div className="eyebrow">Portfolio controls</div>
 
                 <label
                   className="copy"
-                  style={{ display: 'block', marginTop: '0.7rem' }}
+                  style={{ display: "block", marginTop: "0.7rem" }}
                 >
                   Priority
                   <select
@@ -646,7 +726,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                         priority_tier: event.target.value as PriorityTier,
                       })
                     }
-                    style={{ marginTop: '0.3rem' }}
+                    style={{ marginTop: "0.3rem" }}
                   >
                     <option value="now">Now</option>
                     <option value="next">Next</option>
@@ -658,14 +738,14 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
                 <label
                   className="copy"
-                  style={{ display: 'block', marginTop: '0.65rem' }}
+                  style={{ display: "block", marginTop: "0.65rem" }}
                 >
                   Rank within priority
                   <input
                     className="input"
                     type="number"
                     min={1}
-                    value={song.priority_rank ?? ''}
+                    value={song.priority_rank ?? ""}
                     placeholder="Optional"
                     onChange={(event) =>
                       updateLocalSong(song.id, {
@@ -681,13 +761,44 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                           : null,
                       })
                     }
-                    style={{ marginTop: '0.3rem' }}
+                    style={{ marginTop: "0.3rem" }}
                   />
                 </label>
 
                 <label
                   className="copy"
-                  style={{ display: 'block', marginTop: '0.65rem' }}
+                  style={{ display: "block", marginTop: "0.65rem" }}
+                >
+                  My rating
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={song.personal_rating ?? ""}
+                    placeholder="0–100"
+                    onChange={(event) =>
+                      updateLocalSong(song.id, {
+                        personal_rating: event.target.value
+                          ? Number(event.target.value)
+                          : null,
+                      })
+                    }
+                    onBlur={(event) =>
+                      void saveWorkflow(song, {
+                        personal_rating: event.target.value
+                          ? Number(event.target.value)
+                          : null,
+                      })
+                    }
+                    style={{ marginTop: "0.3rem" }}
+                  />
+                </label>
+
+                <label
+                  className="copy"
+                  style={{ display: "block", marginTop: "0.65rem" }}
                 >
                   Workflow status
                   <select
@@ -695,11 +806,10 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                     value={song.workflow_status}
                     onChange={(event) =>
                       void saveWorkflow(song, {
-                        workflow_status: event.target
-                          .value as WorkflowStatus,
+                        workflow_status: event.target.value as WorkflowStatus,
                       })
                     }
-                    style={{ marginTop: '0.3rem' }}
+                    style={{ marginTop: "0.3rem" }}
                   >
                     <option value="unreviewed">Unreviewed</option>
                     <option value="active">Active</option>
@@ -713,10 +823,10 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                   <div
                     className="copy"
                     style={{
-                      marginTop: '0.7rem',
-                      padding: '0.65rem',
+                      marginTop: "0.7rem",
+                      padding: "0.65rem",
                       borderRadius: 12,
-                      border: '1px solid var(--line)',
+                      border: "1px solid var(--line)",
                     }}
                   >
                     All current versions are marked Final.
@@ -728,14 +838,14 @@ export default function StudioPortfolio({ initialSongs }: Props) {
                     role="status"
                     className="copy"
                     style={{
-                      marginTop: '0.65rem',
+                      marginTop: "0.65rem",
                       fontWeight: 700,
                       color:
-                        state.status === 'error'
-                          ? '#ffb4b4'
-                          : state.status === 'saving'
-                            ? '#f7dda0'
-                            : '#d9f7d6',
+                        state.status === "error"
+                          ? "#ffb4b4"
+                          : state.status === "saving"
+                            ? "#f7dda0"
+                            : "#d9f7d6",
                     }}
                   >
                     {state.message}
@@ -751,9 +861,9 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         <div
           className="copy"
           style={{
-            marginTop: '1rem',
-            padding: '1rem',
-            border: '1px dashed var(--line)',
+            marginTop: "1rem",
+            padding: "1rem",
+            border: "1px dashed var(--line)",
             borderRadius: 16,
           }}
         >
