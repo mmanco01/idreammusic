@@ -4,9 +4,7 @@ import { useActionState, useEffect, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import {
-  generateSongTranscript,
   saveSongTranscript,
-  type TranscriptGenerateState,
   type TranscriptSaveState,
 } from '@/app/studio/songs/[slug]/edit/actions';
 
@@ -41,9 +39,9 @@ const initialSaveState: TranscriptSaveState = {
   message: '',
 };
 
-const initialGenerateState: TranscriptGenerateState = {
-  status: 'idle',
-  message: '',
+type GenerateState = {
+  status: 'idle' | 'loading' | 'success' | 'error';
+  message: string;
 };
 
 function SaveTranscriptButton() {
@@ -62,21 +60,6 @@ function SaveTranscriptButton() {
 }
 
 
-function GenerateTranscriptButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <button
-      type="submit"
-      className="button"
-      disabled={pending}
-      style={{ cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.7 : 1 }}
-    >
-      {pending ? 'Generating…' : 'Generate Transcript'}
-    </button>
-  );
-}
-
 export function SongIntelligencePanel({
   songId,
   slug,
@@ -85,10 +68,10 @@ export function SongIntelligencePanel({
 }: Props) {
   const router = useRouter();
   const [saveState, saveFormAction] = useActionState(saveSongTranscript, initialSaveState);
-  const [generateState, generateFormAction] = useActionState(
-    generateSongTranscript,
-    initialGenerateState
-  );
+  const [generateState, setGenerateState] = useState<GenerateState>({
+    status: 'idle',
+    message: '',
+  });
   const [selectedAttachmentId, setSelectedAttachmentId] = useState(
     audioAttachments[0]?.id ?? ''
   );
@@ -104,10 +87,54 @@ export function SongIntelligencePanel({
   );
 
   useEffect(() => {
-    if (saveState.status === 'success' || generateState.status === 'success') {
+    if (saveState.status === 'success') {
       router.refresh();
     }
-  }, [router, saveState.status, generateState.status]);
+  }, [router, saveState.status]);
+
+  async function handleGenerateTranscript() {
+    if (!selectedAttachmentId) {
+      setGenerateState({ status: 'error', message: 'Choose an audio recording first.' });
+      return;
+    }
+
+    setGenerateState({ status: 'loading', message: '' });
+
+    try {
+      const requestBody = new FormData();
+      requestBody.append('song_id', songId);
+      requestBody.append('slug', slug);
+      requestBody.append('attachment_id', selectedAttachmentId);
+
+      const response = await fetch('/api/song-transcript/generate', {
+        method: 'POST',
+        body: requestBody,
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | { status?: string; message?: string }
+        | null;
+
+      if (!response.ok || result?.status !== 'success') {
+        setGenerateState({
+          status: 'error',
+          message: result?.message || `Transcription failed with status ${response.status}.`,
+        });
+        return;
+      }
+
+      setGenerateState({
+        status: 'success',
+        message: result.message || 'Transcript generated successfully.',
+      });
+      router.refresh();
+    } catch (error) {
+      setGenerateState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Transcript generation failed.',
+      });
+    }
+  }
 
   if (audioAttachments.length === 0) {
     return (
@@ -220,11 +247,19 @@ export function SongIntelligencePanel({
         </div>
       </form>
 
-      <form action={generateFormAction} key={`generate-${selectedAttachmentId}`} style={{ marginTop: '1rem' }}>
-        <input type="hidden" name="song_id" value={songId} />
-        <input type="hidden" name="slug" value={slug} />
-        <input type="hidden" name="attachment_id" value={selectedAttachmentId} />
-        <GenerateTranscriptButton />
+      <div style={{ marginTop: '1rem' }}>
+        <button
+          type="button"
+          className="button primary"
+          onClick={handleGenerateTranscript}
+          disabled={generateState.status === 'loading'}
+          style={{
+            cursor: generateState.status === 'loading' ? 'wait' : 'pointer',
+            opacity: generateState.status === 'loading' ? 0.7 : 1,
+          }}
+        >
+          {generateState.status === 'loading' ? 'Generating…' : 'Generate Transcript'}
+        </button>
 
         {generateState.message ? (
           <div
@@ -244,7 +279,7 @@ export function SongIntelligencePanel({
             {generateState.message}
           </div>
         ) : null}
-      </form>
+      </div>
     </div>
   );
 }
