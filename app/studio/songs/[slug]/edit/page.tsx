@@ -48,6 +48,7 @@ export default async function EditSongPage({
         id,
         title,
         storage_path,
+        bucket,
         mime_type,
         song_version_id,
         file_type,

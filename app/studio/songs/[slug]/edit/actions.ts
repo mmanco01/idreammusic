@@ -249,3 +249,196 @@ export async function saveSongTranscript(
     };
   }
 }
+
+
+export type TranscriptGenerateState = {
+  status: 'idle' | 'success' | 'error';
+  message: string;
+};
+
+export async function generateSongTranscript(
+  _previousState: TranscriptGenerateState,
+  formData: FormData
+): Promise<TranscriptGenerateState> {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return { status: 'error', message: 'OPENAI_API_KEY is not configured.' };
+    }
+
+    const supabase = await createServerSupabaseClient();
+    if (!supabase) {
+      return { status: 'error', message: 'Supabase is not available.' };
+    }
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { status: 'error', message: 'You must be signed in.' };
+    }
+
+    const slug = String(formData.get('slug') || '');
+    const songId = String(formData.get('song_id') || '');
+    const attachmentId = String(formData.get('attachment_id') || '');
+
+    if (!songId || !attachmentId) {
+      return { status: 'error', message: 'Choose an audio recording first.' };
+    }
+
+    const { data: ownedSong, error: ownedSongError } = await supabase
+      .from('songs')
+      .select('id')
+      .eq('id', songId)
+      .eq('owner_user_id', user.id)
+      .maybeSingle();
+
+    if (ownedSongError || !ownedSong) {
+      return {
+        status: 'error',
+        message: ownedSongError?.message || 'Song not found or not owned by you.',
+      };
+    }
+
+    const { data: attachment, error: attachmentError } = await supabase
+      .from('attachments')
+      .select('id, song_id, song_version_id, bucket, storage_path, mime_type, title, file_type')
+      .eq('id', attachmentId)
+      .eq('song_id', songId)
+      .eq('file_type', 'audio')
+      .maybeSingle();
+
+    if (attachmentError || !attachment) {
+      return {
+        status: 'error',
+        message: attachmentError?.message || 'Audio attachment not found for this song.',
+      };
+    }
+
+    const bucket = attachment.bucket || 'song-assets';
+    const { data: audioBlob, error: downloadError } = await supabase.storage
+      .from(bucket)
+      .download(attachment.storage_path);
+
+    if (downloadError || !audioBlob) {
+      return {
+        status: 'error',
+        message: `Audio download failed: ${downloadError?.message || 'No file returned.'}`,
+      };
+    }
+
+    const maxBytes = 25 * 1024 * 1024;
+    if (audioBlob.size > maxBytes) {
+      return {
+        status: 'error',
+        message: 'This recording is larger than 25 MB. Upload a smaller audio file for transcription.',
+      };
+    }
+
+    const originalName =
+      attachment.storage_path.split('/').pop() || attachment.title || 'recording.mp3';
+    const file = new File([audioBlob], originalName, {
+      type: attachment.mime_type || audioBlob.type || 'audio/mpeg',
+    });
+
+    const requestBody = new FormData();
+    requestBody.append('file', file);
+    requestBody.append('model', 'gpt-4o-mini-transcribe');
+    requestBody.append('response_format', 'json');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: requestBody,
+    });
+
+    const responseText = await response.text();
+    let result: { text?: string; error?: { message?: string } } = {};
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      // Preserve the raw response in the message below.
+    }
+
+    if (!response.ok) {
+      return {
+        status: 'error',
+        message: `OpenAI transcription failed: ${result.error?.message || responseText || response.statusText}`,
+      };
+    }
+
+    const transcriptText = String(result.text || '').trim();
+    if (!transcriptText) {
+      return { status: 'error', message: 'OpenAI returned an empty transcript.' };
+    }
+
+    const now = new Date().toISOString();
+    const { data: existingTranscript, error: existingError } = await supabase
+      .from('song_transcripts')
+      .select('id')
+      .eq('song_id', songId)
+      .eq('attachment_id', attachmentId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      return { status: 'error', message: `Transcript lookup failed: ${existingError.message}` };
+    }
+
+    if (existingTranscript) {
+      const { error } = await supabase
+        .from('song_transcripts')
+        .update({
+          transcript_text: transcriptText,
+          transcript_source: 'ai',
+          transcription_model: 'gpt-4o-mini-transcribe',
+          language_code: 'en',
+          is_reviewed: false,
+          reviewed_at: null,
+          reviewed_by: null,
+          updated_at: now,
+        })
+        .eq('id', existingTranscript.id)
+        .eq('song_id', songId);
+
+      if (error) {
+        return { status: 'error', message: `Transcript update failed: ${error.message}` };
+      }
+    } else {
+      const { error } = await supabase.from('song_transcripts').insert({
+        song_id: songId,
+        song_version_id: attachment.song_version_id || null,
+        attachment_id: attachmentId,
+        transcript_text: transcriptText,
+        transcript_source: 'ai',
+        language_code: 'en',
+        transcription_model: 'gpt-4o-mini-transcribe',
+        is_reviewed: false,
+        created_by: user.id,
+        created_at: now,
+        updated_at: now,
+      });
+
+      if (error) {
+        return { status: 'error', message: `Transcript insert failed: ${error.message}` };
+      }
+    }
+
+    revalidatePath(`/studio/songs/${slug}/edit`);
+    revalidatePath('/studio');
+
+    return {
+      status: 'success',
+      message: 'Transcript generated and saved. Review it against the recording before analytics.',
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Transcript generation failed.',
+    };
+  }
+}
