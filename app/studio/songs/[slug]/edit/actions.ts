@@ -129,97 +129,123 @@ export async function saveSongEdits(formData: FormData) {
 
   redirect(`/songs/${slug}`);
 }
-export async function saveSongTranscript(formData: FormData) {
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) {
-    throw new Error('Supabase is not available.');
-  }
+export type TranscriptSaveState = {
+  status: 'idle' | 'success' | 'error';
+  message: string;
+};
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    throw new Error('You must be signed in.');
-  }
-
-  const slug = String(formData.get('slug') || '');
-  const songId = String(formData.get('song_id') || '');
-  const attachmentId = String(formData.get('attachment_id') || '');
-  const songVersionId = String(formData.get('song_version_id') || '');
-  const transcriptId = String(formData.get('transcript_id') || '');
-  const transcriptText = String(formData.get('transcript_text') || '');
-  const isReviewed = formData.get('is_reviewed') === 'on';
-
-  if (!songId || !attachmentId) {
-    throw new Error('A song and audio attachment are required.');
-  }
-
-  const { data: ownedSong, error: ownedSongError } = await supabase
-    .from('songs')
-    .select('id')
-    .eq('id', songId)
-    .eq('owner_user_id', user.id)
-    .maybeSingle();
-
-  if (ownedSongError || !ownedSong) {
-    throw new Error('Song not found or not owned by you.');
-  }
-
-  const { data: attachment, error: attachmentError } = await supabase
-    .from('attachments')
-    .select('id, song_id, song_version_id, file_type')
-    .eq('id', attachmentId)
-    .eq('song_id', songId)
-    .eq('file_type', 'audio')
-    .maybeSingle();
-
-  if (attachmentError || !attachment) {
-    throw new Error('Audio attachment not found for this song.');
-  }
-
-  const now = new Date().toISOString();
-  const transcriptPayload = {
-    song_id: songId,
-    song_version_id: songVersionId || attachment.song_version_id || null,
-    attachment_id: attachmentId,
-    transcript_text: transcriptText,
-    transcript_source: 'manual',
-    language_code: 'en',
-    is_reviewed: isReviewed,
-    reviewed_at: isReviewed ? now : null,
-    reviewed_by: isReviewed ? user.id : null,
-    created_by: user.id,
-    updated_at: now,
-  };
-
-  if (transcriptId) {
-    const { error } = await supabase
-      .from('song_transcripts')
-      .update({
-        transcript_text: transcriptPayload.transcript_text,
-        transcript_source: transcriptPayload.transcript_source,
-        language_code: transcriptPayload.language_code,
-        is_reviewed: transcriptPayload.is_reviewed,
-        reviewed_at: transcriptPayload.reviewed_at,
-        reviewed_by: transcriptPayload.reviewed_by,
-        updated_at: transcriptPayload.updated_at,
-      })
-      .eq('id', transcriptId)
-      .eq('song_id', songId);
-
-    if (error) {
-      throw new Error(`Transcript update failed: ${error.message}`);
+export async function saveSongTranscript(
+  _previousState: TranscriptSaveState,
+  formData: FormData
+): Promise<TranscriptSaveState> {
+  try {
+    const supabase = await createServerSupabaseClient();
+    if (!supabase) {
+      return { status: 'error', message: 'Supabase is not available.' };
     }
-  } else {
-    const { error } = await supabase.from('song_transcripts').insert(transcriptPayload);
 
-    if (error) {
-      throw new Error(`Transcript insert failed: ${error.message}`);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { status: 'error', message: 'You must be signed in.' };
     }
-  }
 
-  revalidatePath(`/studio/songs/${slug}/edit`);
-  revalidatePath('/studio');
-  redirect(`/studio/songs/${slug}/edit`);
+    const slug = String(formData.get('slug') || '');
+    const songId = String(formData.get('song_id') || '');
+    const attachmentId = String(formData.get('attachment_id') || '');
+    const songVersionId = String(formData.get('song_version_id') || '');
+    const transcriptId = String(formData.get('transcript_id') || '');
+    const transcriptText = String(formData.get('transcript_text') || '').trim();
+    const isReviewed = formData.get('is_reviewed') === 'on';
+
+    if (!songId || !attachmentId) {
+      return { status: 'error', message: 'A song and audio attachment are required.' };
+    }
+
+    if (!transcriptText) {
+      return { status: 'error', message: 'Enter or paste a transcript before saving.' };
+    }
+
+    const { data: ownedSong, error: ownedSongError } = await supabase
+      .from('songs')
+      .select('id')
+      .eq('id', songId)
+      .eq('owner_user_id', user.id)
+      .maybeSingle();
+
+    if (ownedSongError || !ownedSong) {
+      return {
+        status: 'error',
+        message: ownedSongError?.message || 'Song not found or not owned by you.',
+      };
+    }
+
+    const { data: attachment, error: attachmentError } = await supabase
+      .from('attachments')
+      .select('id, song_id, song_version_id, file_type')
+      .eq('id', attachmentId)
+      .eq('song_id', songId)
+      .eq('file_type', 'audio')
+      .maybeSingle();
+
+    if (attachmentError || !attachment) {
+      return {
+        status: 'error',
+        message: attachmentError?.message || 'Audio attachment not found for this song.',
+      };
+    }
+
+    const now = new Date().toISOString();
+    const transcriptPayload = {
+      song_id: songId,
+      song_version_id: songVersionId || attachment.song_version_id || null,
+      attachment_id: attachmentId,
+      transcript_text: transcriptText,
+      transcript_source: 'manual',
+      language_code: 'en',
+      is_reviewed: isReviewed,
+      reviewed_at: isReviewed ? now : null,
+      reviewed_by: isReviewed ? user.id : null,
+      created_by: user.id,
+      updated_at: now,
+    };
+
+    if (transcriptId) {
+      const { error } = await supabase
+        .from('song_transcripts')
+        .update({
+          transcript_text: transcriptPayload.transcript_text,
+          transcript_source: transcriptPayload.transcript_source,
+          language_code: transcriptPayload.language_code,
+          is_reviewed: transcriptPayload.is_reviewed,
+          reviewed_at: transcriptPayload.reviewed_at,
+          reviewed_by: transcriptPayload.reviewed_by,
+          updated_at: transcriptPayload.updated_at,
+        })
+        .eq('id', transcriptId)
+        .eq('song_id', songId);
+
+      if (error) {
+        return { status: 'error', message: `Transcript update failed: ${error.message}` };
+      }
+    } else {
+      const { error } = await supabase.from('song_transcripts').insert(transcriptPayload);
+
+      if (error) {
+        return { status: 'error', message: `Transcript insert failed: ${error.message}` };
+      }
+    }
+
+    revalidatePath(`/studio/songs/${slug}/edit`);
+    revalidatePath('/studio');
+
+    return { status: 'success', message: 'Transcript saved successfully.' };
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Transcript save failed.',
+    };
+  }
 }
