@@ -729,11 +729,11 @@ export function SongIntelligencePanel({
 
     let cancelled = false;
 
-    async function loadLatestAnalysis() {
+    async function loadLatestAnalysis(id: string) {
       try {
         const query = new URLSearchParams({
           song_id: songId,
-          transcript_id: transcriptId,
+          transcript_id: id,
         });
 
         const response = await fetch(
@@ -789,7 +789,7 @@ export function SongIntelligencePanel({
       }
     }
 
-    void loadLatestAnalysis();
+    void loadLatestAnalysis(transcriptId);
 
     return () => {
       cancelled = true;
