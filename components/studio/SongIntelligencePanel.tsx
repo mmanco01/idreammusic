@@ -1,7 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { saveSongTranscript } from '@/app/studio/songs/[slug]/edit/actions';
+import { useActionState, useEffect, useMemo, useState } from 'react';
+import { useFormStatus } from 'react-dom';
+import { useRouter } from 'next/navigation';
+import {
+  saveSongTranscript,
+  type TranscriptSaveState,
+} from '@/app/studio/songs/[slug]/edit/actions';
 
 type AudioAttachment = {
   id: string;
@@ -28,12 +33,34 @@ type Props = {
   transcripts: Transcript[];
 };
 
+const initialState: TranscriptSaveState = {
+  status: 'idle',
+  message: '',
+};
+
+function SaveTranscriptButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      type="submit"
+      className="button primary"
+      disabled={pending}
+      style={{ cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.7 : 1 }}
+    >
+      {pending ? 'Saving…' : 'Save transcript'}
+    </button>
+  );
+}
+
 export function SongIntelligencePanel({
   songId,
   slug,
   audioAttachments,
   transcripts,
 }: Props) {
+  const router = useRouter();
+  const [state, formAction] = useActionState(saveSongTranscript, initialState);
   const [selectedAttachmentId, setSelectedAttachmentId] = useState(
     audioAttachments[0]?.id ?? ''
   );
@@ -47,6 +74,12 @@ export function SongIntelligencePanel({
     () => transcripts.find((item) => item.attachment_id === selectedAttachmentId) ?? null,
     [transcripts, selectedAttachmentId]
   );
+
+  useEffect(() => {
+    if (state.status === 'success') {
+      router.refresh();
+    }
+  }, [router, state.status]);
 
   if (audioAttachments.length === 0) {
     return (
@@ -97,7 +130,7 @@ export function SongIntelligencePanel({
         )}
       </div>
 
-      <form action={saveSongTranscript} key={selectedAttachmentId}>
+      <form action={formAction} key={selectedAttachmentId}>
         <input type="hidden" name="song_id" value={songId} />
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="attachment_id" value={selectedAttachmentId} />
@@ -120,19 +153,39 @@ export function SongIntelligencePanel({
           placeholder="Paste or type the transcript here. Automated transcription will populate this field in the next phase."
         />
 
-        <label className="copy" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <label
+          className="copy"
+          style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginTop: '0.75rem' }}
+        >
           <input
             type="checkbox"
             name="is_reviewed"
             defaultChecked={selectedTranscript?.is_reviewed ?? false}
           />
-          I reviewed this transcript against the recording.
+          <span>I reviewed this transcript against the recording.</span>
         </label>
 
+        {state.message ? (
+          <div
+            role="status"
+            style={{
+              marginTop: '1rem',
+              padding: '0.85rem 1rem',
+              borderRadius: 14,
+              border: '1px solid var(--line)',
+              color: state.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+              background:
+                state.status === 'error'
+                  ? 'rgba(160, 40, 40, 0.18)'
+                  : 'rgba(40, 130, 60, 0.18)',
+            }}
+          >
+            {state.message}
+          </div>
+        ) : null}
+
         <div className="button-row" style={{ marginTop: '1rem' }}>
-          <button type="submit" className="button primary">
-            Save transcript
-          </button>
+          <SaveTranscriptButton />
           <button type="button" className="button" disabled title="Coming in the next phase">
             Generate Transcript
           </button>
