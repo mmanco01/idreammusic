@@ -177,7 +177,13 @@ export function SongRating({ songId }: SongRatingProps) {
                 cursor: isSaving ? 'wait' : 'pointer',
                 fontSize: '1.65rem',
                 lineHeight: 1,
-                opacity: isActive ? 1 : 0.35,
+  color: isActive
+    ? '#f4c542'
+    : 'rgba(255, 255, 255, 0.55)',
+  textShadow: isActive
+    ? '0 0 8px rgba(244, 197, 66, 0.35)'
+    : 'none',
+  opacity: 1,
               }}
             >
               ★
