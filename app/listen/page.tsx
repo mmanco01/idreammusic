@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { SectionIntro } from '@/components/SectionIntro';
+import { TrackedAudioPlayer } from '@/components/TrackedAudioPlayer';
 import { getSongs } from '@/lib/data';
 import type { SongSummary } from '@/lib/types';
-import { TrackedAudioPlayer } from '@/components/TrackedAudioPlayer';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,50 +54,37 @@ function numberValue(...values: unknown[]) {
 
 function getSongMetrics(song: SongSummary) {
   const item = song as any;
-  const engagement = item.engagement ?? item.song_engagement ?? {};
 
   const listens = numberValue(
     item.listen_count,
-    item.listens_count,
+    item.audio_play_count,
     item.total_listens,
-    item.play_count,
-    item.plays,
-    engagement.listen_count,
-    engagement.total_listens,
-    engagement.play_count,
+    item.play_count
   );
 
   const averageRating = numberValue(
     item.average_rating,
     item.rating_average,
-    item.avg_rating,
-    engagement.average_rating,
-    engagement.rating_average,
+    item.avg_rating
   );
 
   const ratingCount = numberValue(
     item.rating_count,
     item.ratings_count,
-    item.total_ratings,
-    engagement.rating_count,
-    engagement.total_ratings,
+    item.total_ratings
   );
 
   const favorites = numberValue(
     item.favorite_count,
     item.favorites_count,
-    item.total_favorites,
-    engagement.favorite_count,
-    engagement.total_favorites,
+    item.total_favorites
   );
 
   const videoClicks = numberValue(
     item.video_click_count,
     item.video_clicks,
     item.video_play_count,
-    item.video_plays,
-    engagement.video_click_count,
-    engagement.video_clicks,
+    item.video_plays
   );
 
   return {
@@ -180,11 +167,11 @@ function SongCard({ song }: { song: SongSummary }) {
 
       {song.audio_url ? (
         <div style={{ marginTop: '1rem' }}>
-<TrackedAudioPlayer
-  songId={song.id}
-  songVersionId={(song as any).song_version_id ?? null}
-  audioUrl={song.audio_url}
-/>
+          <TrackedAudioPlayer
+            songId={song.id}
+            songVersionId={(song as any).song_version_id ?? null}
+            audioUrl={song.audio_url}
+          />
 
           {song.audio_title ? (
             <p className="copy">{song.audio_title}</p>
@@ -215,7 +202,7 @@ export default async function ListenPage() {
 
         {buckets.map((bucket) => {
           const bucketSongs = songs.filter(
-            (song) => (song as any).primary_bucket === bucket.key,
+            (song) => (song as any).primary_bucket === bucket.key
           );
 
           if (!bucketSongs.length) return null;
