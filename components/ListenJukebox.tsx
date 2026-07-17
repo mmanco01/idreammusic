@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { TrackedAudioPlayer } from '@/components/TrackedAudioPlayer';
-import type { SongSummary } from '@/lib/types';
 import { SongRating } from '@/components/SongRating';
+import type { SongSummary } from '@/lib/types';
 
 type ListenJukeboxProps = {
   songs: SongSummary[];
@@ -25,6 +25,14 @@ type ExtendedSongSummary = SongSummary & {
   genre?: string | null;
   genre_name?: string | null;
 };
+
+type SortMode =
+  | 'default'
+  | 'most-listened'
+  | 'highest-rated'
+  | 'most-rated'
+  | 'newest'
+  | 'alphabetical';
 
 const buckets = [
   {
@@ -63,7 +71,11 @@ function stageLabel(song: SongSummary) {
 
 function numberValue(...values: unknown[]) {
   for (const value of values) {
-    if (value !== null && value !== undefined && value !== '') {
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== ''
+    ) {
       const parsed = Number(value);
 
       if (Number.isFinite(parsed)) {
@@ -82,21 +94,13 @@ function getSongMetrics(song: ExtendedSongSummary) {
       song.audio_play_count
     ),
 
-    averageRating: numberValue(
-      song.average_rating
-    ),
+    averageRating: numberValue(song.average_rating),
 
-    ratingCount: numberValue(
-      song.rating_count
-    ),
+    ratingCount: numberValue(song.rating_count),
 
-    favorites: numberValue(
-      song.favorite_count
-    ),
+    favorites: numberValue(song.favorite_count),
 
-    videoClicks: numberValue(
-      song.video_click_count
-    ),
+    videoClicks: numberValue(song.video_click_count),
   };
 }
 
@@ -113,7 +117,23 @@ function getGenre(song: ExtendedSongSummary) {
   return song.genre_name ?? song.genre ?? null;
 }
 
-function SongMetrics({ song }: { song: ExtendedSongSummary }) {
+function getActivityTime(song: ExtendedSongSummary) {
+  if (!song.latest_public_activity_at) {
+    return 0;
+  }
+
+  const time = new Date(
+    song.latest_public_activity_at
+  ).getTime();
+
+  return Number.isFinite(time) ? time : 0;
+}
+
+function SongMetrics({
+  song,
+}: {
+  song: ExtendedSongSummary;
+}) {
   const metrics = getSongMetrics(song);
 
   return (
@@ -125,8 +145,10 @@ function SongMetrics({ song }: { song: ExtendedSongSummary }) {
         gap: '0.55rem 1rem',
         marginTop: '0.9rem',
         padding: '0.7rem 0',
-        borderTop: '1px solid rgba(255,255,255,0.12)',
-        borderBottom: '1px solid rgba(255,255,255,0.12)',
+        borderTop:
+          '1px solid rgba(255,255,255,0.12)',
+        borderBottom:
+          '1px solid rgba(255,255,255,0.12)',
         fontSize: '0.9rem',
         opacity: 0.88,
       }}
@@ -157,7 +179,11 @@ function SongMetrics({ song }: { song: ExtendedSongSummary }) {
   );
 }
 
-function SongCard({ song }: { song: ExtendedSongSummary }) {
+function SongCard({
+  song,
+}: {
+  song: ExtendedSongSummary;
+}) {
   return (
     <article className="card">
       <div
@@ -195,13 +221,15 @@ function SongCard({ song }: { song: ExtendedSongSummary }) {
 
       <SongMetrics song={song} />
 
-<SongRating songId={song.id} />
+      <SongRating songId={song.id} />
 
       {song.audio_url ? (
         <div style={{ marginTop: '1rem' }}>
           <TrackedAudioPlayer
             songId={song.id}
-            songVersionId={song.song_version_id ?? null}
+            songVersionId={
+              song.song_version_id ?? null
+            }
             audioUrl={song.audio_url}
           />
 
@@ -231,26 +259,38 @@ function SongCard({ song }: { song: ExtendedSongSummary }) {
 function formatOption(value: string) {
   return value
     .replace(/[-_]/g, ' ')
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase()
+    );
 }
 
 export function ListenJukebox({
   songs,
 }: ListenJukeboxProps) {
-  const extendedSongs = songs as ExtendedSongSummary[];
+  const extendedSongs =
+    songs as ExtendedSongSummary[];
 
   const [search, setSearch] = useState('');
-  const [museFilter, setMuseFilter] = useState('all');
-  const [stageFilter, setStageFilter] = useState('all');
-  const [songwriterFilter, setSongwriterFilter] = useState('all');
-  const [genreFilter, setGenreFilter] = useState('all');
+  const [museFilter, setMuseFilter] =
+    useState('all');
+  const [stageFilter, setStageFilter] =
+    useState('all');
+  const [songwriterFilter, setSongwriterFilter] =
+    useState('all');
+  const [genreFilter, setGenreFilter] =
+    useState('all');
+  const [sortMode, setSortMode] =
+    useState<SortMode>('default');
 
   const museOptions = useMemo(() => {
     return Array.from(
       new Set(
         extendedSongs
           .map((song) => song.muse_slug)
-          .filter((value): value is string => Boolean(value))
+          .filter(
+            (value): value is string =>
+              Boolean(value)
+          )
       )
     ).sort();
   }, [extendedSongs]);
@@ -258,7 +298,9 @@ export function ListenJukebox({
   const stageOptions = useMemo(() => {
     return Array.from(
       new Set(
-        extendedSongs.map((song) => stageLabel(song))
+        extendedSongs.map((song) =>
+          stageLabel(song)
+        )
       )
     ).sort();
   }, [extendedSongs]);
@@ -268,7 +310,10 @@ export function ListenJukebox({
       new Set(
         extendedSongs
           .map(getSongwriter)
-          .filter((value): value is string => Boolean(value))
+          .filter(
+            (value): value is string =>
+              Boolean(value)
+          )
       )
     ).sort();
   }, [extendedSongs]);
@@ -278,20 +323,31 @@ export function ListenJukebox({
       new Set(
         extendedSongs
           .map(getGenre)
-          .filter((value): value is string => Boolean(value))
+          .filter(
+            (value): value is string =>
+              Boolean(value)
+          )
       )
     ).sort();
   }, [extendedSongs]);
 
   const filteredSongs = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
+    const normalizedSearch = search
+      .trim()
+      .toLowerCase();
 
     return extendedSongs.filter((song) => {
       const matchesSearch =
         !normalizedSearch ||
-        song.title.toLowerCase().includes(normalizedSearch) ||
-        song.summary?.toLowerCase().includes(normalizedSearch) ||
-        song.hook_line?.toLowerCase().includes(normalizedSearch);
+        song.title
+          .toLowerCase()
+          .includes(normalizedSearch) ||
+        song.summary
+          ?.toLowerCase()
+          .includes(normalizedSearch) ||
+        song.hook_line
+          ?.toLowerCase()
+          .includes(normalizedSearch);
 
       const matchesMuse =
         museFilter === 'all' ||
@@ -326,12 +382,85 @@ export function ListenJukebox({
     genreFilter,
   ]);
 
+  const sortedSongs = useMemo(() => {
+    const songsToSort = [...filteredSongs];
+
+    switch (sortMode) {
+      case 'most-listened':
+        return songsToSort.sort((a, b) => {
+          const aMetrics = getSongMetrics(a);
+          const bMetrics = getSongMetrics(b);
+
+          return (
+            bMetrics.listens -
+              aMetrics.listens ||
+            a.title.localeCompare(b.title)
+          );
+        });
+
+      case 'highest-rated':
+        return songsToSort.sort((a, b) => {
+          const aMetrics = getSongMetrics(a);
+          const bMetrics = getSongMetrics(b);
+
+          const aHasRatings =
+            aMetrics.ratingCount > 0;
+          const bHasRatings =
+            bMetrics.ratingCount > 0;
+
+          if (aHasRatings !== bHasRatings) {
+            return bHasRatings ? 1 : -1;
+          }
+
+          return (
+            bMetrics.averageRating -
+              aMetrics.averageRating ||
+            bMetrics.ratingCount -
+              aMetrics.ratingCount ||
+            a.title.localeCompare(b.title)
+          );
+        });
+
+      case 'most-rated':
+        return songsToSort.sort((a, b) => {
+          const aMetrics = getSongMetrics(a);
+          const bMetrics = getSongMetrics(b);
+
+          return (
+            bMetrics.ratingCount -
+              aMetrics.ratingCount ||
+            bMetrics.averageRating -
+              aMetrics.averageRating ||
+            a.title.localeCompare(b.title)
+          );
+        });
+
+      case 'newest':
+        return songsToSort.sort((a, b) => {
+          return (
+            getActivityTime(b) -
+              getActivityTime(a) ||
+            a.title.localeCompare(b.title)
+          );
+        });
+
+      case 'alphabetical':
+        return songsToSort.sort((a, b) =>
+          a.title.localeCompare(b.title)
+        );
+
+      default:
+        return songsToSort;
+    }
+  }, [filteredSongs, sortMode]);
+
   const hasFilters =
     search !== '' ||
     museFilter !== 'all' ||
     stageFilter !== 'all' ||
     songwriterFilter !== 'all' ||
-    genreFilter !== 'all';
+    genreFilter !== 'all' ||
+    sortMode !== 'default';
 
   function clearFilters() {
     setSearch('');
@@ -339,6 +468,7 @@ export function ListenJukebox({
     setStageFilter('all');
     setSongwriterFilter('all');
     setGenreFilter('all');
+    setSortMode('default');
   }
 
   return (
@@ -408,10 +538,15 @@ export function ListenJukebox({
                 borderRadius: 8,
               }}
             >
-              <option value="all">All muses</option>
+              <option value="all">
+                All muses
+              </option>
 
               {museOptions.map((muse) => (
-                <option key={muse} value={muse}>
+                <option
+                  key={muse}
+                  value={muse}
+                >
                   {formatOption(muse)}
                 </option>
               ))}
@@ -441,10 +576,15 @@ export function ListenJukebox({
                 borderRadius: 8,
               }}
             >
-              <option value="all">All stages</option>
+              <option value="all">
+                All stages
+              </option>
 
               {stageOptions.map((stage) => (
-                <option key={stage} value={stage}>
+                <option
+                  key={stage}
+                  value={stage}
+                >
                   {stage}
                 </option>
               ))}
@@ -466,7 +606,9 @@ export function ListenJukebox({
               <select
                 value={songwriterFilter}
                 onChange={(event) =>
-                  setSongwriterFilter(event.target.value)
+                  setSongwriterFilter(
+                    event.target.value
+                  )
                 }
                 style={{
                   width: '100%',
@@ -479,14 +621,16 @@ export function ListenJukebox({
                   All songwriters
                 </option>
 
-                {songwriterOptions.map((songwriter) => (
-                  <option
-                    key={songwriter}
-                    value={songwriter}
-                  >
-                    {songwriter}
-                  </option>
-                ))}
+                {songwriterOptions.map(
+                  (songwriter) => (
+                    <option
+                      key={songwriter}
+                      value={songwriter}
+                    >
+                      {songwriter}
+                    </option>
+                  )
+                )}
               </select>
             </label>
           ) : null}
@@ -520,13 +664,67 @@ export function ListenJukebox({
                 </option>
 
                 {genreOptions.map((genre) => (
-                  <option key={genre} value={genre}>
+                  <option
+                    key={genre}
+                    value={genre}
+                  >
                     {genre}
                   </option>
                 ))}
               </select>
             </label>
           ) : null}
+
+          <label>
+            <span
+              className="copy"
+              style={{
+                display: 'block',
+                marginBottom: '0.35rem',
+              }}
+            >
+              Sort
+            </span>
+
+            <select
+              value={sortMode}
+              onChange={(event) =>
+                setSortMode(
+                  event.target.value as SortMode
+                )
+              }
+              style={{
+                width: '100%',
+                minHeight: 44,
+                padding: '0.65rem 0.75rem',
+                borderRadius: 8,
+              }}
+            >
+              <option value="default">
+                Default order
+              </option>
+
+              <option value="most-listened">
+                Most listened
+              </option>
+
+              <option value="highest-rated">
+                Highest rated
+              </option>
+
+              <option value="most-rated">
+                Most rated
+              </option>
+
+              <option value="newest">
+                Newest
+              </option>
+
+              <option value="alphabetical">
+                A–Z
+              </option>
+            </select>
+          </label>
         </div>
 
         <div
@@ -539,7 +737,10 @@ export function ListenJukebox({
             marginTop: '1rem',
           }}
         >
-          <p className="copy" style={{ margin: 0 }}>
+          <p
+            className="copy"
+            style={{ margin: 0 }}
+          >
             Showing {filteredSongs.length} of{' '}
             {extendedSongs.length} songs
           </p>
@@ -557,11 +758,14 @@ export function ListenJukebox({
       </div>
 
       {buckets.map((bucket) => {
-        const bucketSongs = filteredSongs.filter(
-          (song) => song.primary_bucket === bucket.key
+        const bucketSongs = sortedSongs.filter(
+          (song) =>
+            song.primary_bucket === bucket.key
         );
 
-        if (!bucketSongs.length) return null;
+        if (!bucketSongs.length) {
+          return null;
+        }
 
         return (
           <section
