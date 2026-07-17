@@ -32,6 +32,14 @@ export async function saveSongEdits(formData: FormData) {
   const hookLine = String(formData.get('hook_line') || '');
   const summary = String(formData.get('summary') || '');
 
+  const songwriterName = String(
+  formData.get('songwriter_name') || ''
+);
+
+const genre = String(
+  formData.get('genre') || ''
+);
+  
   const versionStage = String(formData.get('version_stage') || 'spark');
   const versionTitle = String(formData.get('version_title') || '');
   const lyrics = String(formData.get('lyrics') || '');
@@ -53,20 +61,22 @@ export async function saveSongEdits(formData: FormData) {
     throw new Error('Song not found or not owned by you.');
   }
 
-  const { error: songUpdateError } = await supabase
-    .from('songs')
-    .update({
-      title_working: titleWorking || null,
-      title_final: titleFinal || null,
-      hook_line: hookLine || null,
-      summary: summary || null,
-      current_stage: currentStage,
-      status,
-      song_origin: songOrigin,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', songId)
-    .eq('owner_user_id', user.id);
+const { error: songUpdateError } = await supabase
+  .from('songs')
+  .update({
+    title_working: titleWorking || null,
+    title_final: titleFinal || null,
+    hook_line: hookLine || null,
+    summary: summary || null,
+    songwriter_name: songwriterName || null,
+    genre: genre || null,
+    current_stage: currentStage,
+    status,
+    song_origin: songOrigin,
+    updated_at: new Date().toISOString(),
+  })
+  .eq('id', songId)
+  .eq('owner_user_id', user.id);
 
   if (songUpdateError) {
     throw new Error(`Song update failed: ${songUpdateError.message}`);
