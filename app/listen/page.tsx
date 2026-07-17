@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { SectionIntro } from '@/components/SectionIntro';
 import { getSongs } from '@/lib/data';
 import type { SongSummary } from '@/lib/types';
+import { TrackedAudioPlayer } from '@/components/TrackedAudioPlayer';
 
 export const dynamic = 'force-dynamic';
 
@@ -179,14 +180,11 @@ function SongCard({ song }: { song: SongSummary }) {
 
       {song.audio_url ? (
         <div style={{ marginTop: '1rem' }}>
-          <audio
-            controls
-            preload="none"
-            style={{ width: '100%' }}
-            src={song.audio_url}
-          >
-            Your browser does not support audio playback.
-          </audio>
+<TrackedAudioPlayer
+  songId={song.id}
+  songVersionId={(song as any).song_version_id ?? null}
+  audioUrl={song.audio_url}
+/>
 
           {song.audio_title ? (
             <p className="copy">{song.audio_title}</p>
