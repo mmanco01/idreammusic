@@ -53,7 +53,7 @@ export const veiledMuse: MuseDefinition = {
   teaser: 'For songs whose source has not yet revealed itself.',
   description:
     'Some songs arrive before they can be named. The Veiled Muse holds sparks whose true current is still forming.',
-  image: '/muses/shared/veiled.png',
+  image: '/muses/shared/Veiled.png',
   cardImage: '/muses/shared/veiled-card.png',
   symbol: 'Veil • Lantern',
   tagline: 'Not-aMused-Yet',
