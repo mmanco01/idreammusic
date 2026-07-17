@@ -27,14 +27,18 @@ export type SongSummary = {
   muse_slug: string | null;
   song_origin?: SongOrigin | null;
   current_labels: string[];
+
+  songwriter_name?: string | null;
+  genre?: string | null;
+
   audio_url?: string | null;
   audio_title?: string | null;
- song_version_id?: string | null;
- version_number?: number | null;
- version_stage?: string | null;
- latest_public_activity_at?: string | null;
- primary_bucket?: 'featured' | 'finished' | 'crafting' | 'sparks';
- bucket_rank?: number | null;
+  song_version_id?: string | null;
+  version_number?: number | null;
+  version_stage?: string | null;
+  latest_public_activity_at?: string | null;
+  primary_bucket?: 'featured' | 'finished' | 'crafting' | 'sparks';
+  bucket_rank?: number | null;
 };
 
 export type SongAttachment = {
