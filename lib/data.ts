@@ -52,6 +52,8 @@ type PublicListenSongRow = {
   audio_bucket: string | null;
   audio_storage_path: string | null;
   audio_title: string | null;
+  songwriter_name: string | null;
+genre: string | null;
 };
 
 function mapPublicListenSong(row: PublicListenSongRow): SongSummary {
@@ -75,6 +77,8 @@ function mapPublicListenSong(row: PublicListenSongRow): SongSummary {
     latest_public_activity_at: row.latest_public_activity_at,
     primary_bucket: row.primary_bucket,
     bucket_rank: row.bucket_rank,
+    songwriter_name: row.songwriter_name,
+genre: row.genre,
   } as SongSummary;
 }
 
