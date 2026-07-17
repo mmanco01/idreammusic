@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { TrackedAudioPlayer } from '@/components/TrackedAudioPlayer';
 import type { SongSummary } from '@/lib/types';
+import { SongRating } from '@/components/SongRating';
 
 type ListenJukeboxProps = {
   songs: SongSummary[];
@@ -193,6 +194,8 @@ function SongCard({ song }: { song: ExtendedSongSummary }) {
       </p>
 
       <SongMetrics song={song} />
+
+<SongRating songId={song.id} />
 
       {song.audio_url ? (
         <div style={{ marginTop: '1rem' }}>
