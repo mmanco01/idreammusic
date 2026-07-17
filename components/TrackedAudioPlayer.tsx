@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/client';
 
 type TrackedAudioPlayerProps = {
   songId: string;
@@ -31,22 +31,17 @@ export function TrackedAudioPlayer({
 
   async function recordPlay() {
     if (recordedRef.current) return;
+
     recordedRef.current = true;
 
     try {
-      const supabase = createBrowserSupabaseClient();
+      const supabase = createClient();
 
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       const anonymousSessionId = user ? null : getAnonymousSessionId();
-
-      /*
-       * This counts a song once per signed-in user/browser session.
-       * The database's unique event_key prevents duplicate counts when
-       * pause/play is clicked repeatedly during the same visit.
-       */
       const listenerIdentity = user?.id ?? anonymousSessionId;
 
       const eventKey = [
@@ -68,10 +63,6 @@ export function TrackedAudioPlayer({
           source_page: '/listen',
         });
 
-      /*
-       * Duplicate event keys are expected when someone pauses and
-       * resumes the same song during one session.
-       */
       if (error && error.code !== '23505') {
         console.error('Unable to record audio play:', error);
         recordedRef.current = false;
