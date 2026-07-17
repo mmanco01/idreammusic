@@ -20,7 +20,6 @@ export async function Header() {
               {item.label}
             </Link>
           ))}
-          {user ? <Link href="/studio">Studio</Link> : null}
           {canReview ? <Link href="/admin/review">Review</Link> : null}
         </nav>
 
