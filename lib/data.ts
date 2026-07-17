@@ -78,38 +78,132 @@ function mapPublicListenSong(row: PublicListenSongRow): SongSummary {
   } as SongSummary;
 }
 
+function attachPublicEngagementMetrics(
+  songs: SongSummary[],
+  engagementRows: any[] | null | undefined,
+  ratingRows: any[] | null | undefined
+): SongSummary[] {
+  const engagementMap = new Map<string, any>();
+  const ratingMap = new Map<string, any>();
+
+  for (const row of engagementRows ?? []) {
+    engagementMap.set(row.song_id, row);
+  }
+
+  for (const row of ratingRows ?? []) {
+    ratingMap.set(row.song_id, row);
+  }
+
+  return songs.map((song) => {
+    const engagement = engagementMap.get(song.id);
+    const ratings = ratingMap.get(song.id);
+
+    return {
+      ...song,
+      listen_count: Number(engagement?.audio_play_count ?? 0),
+      audio_play_count: Number(engagement?.audio_play_count ?? 0),
+      video_click_count: Number(engagement?.video_click_count ?? 0),
+      average_rating: Number(ratings?.average_rating ?? 0),
+      rating_count: Number(ratings?.rating_count ?? 0),
+      last_audio_play_at: engagement?.last_audio_play_at ?? null,
+      last_video_click_at: engagement?.last_video_click_at ?? null,
+      favorite_count: 0,
+    } as SongSummary;
+  });
+}
+
 export const getSongs = cache(async (): Promise<SongSummary[]> => {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return sampleSongs;
 
-  const { data, error } = await (supabase as any)
-    .from('public_listen_song_cards')
-    .select('*')
-    .order('bucket_rank', { ascending: true })
-    .order('latest_public_activity_at', { ascending: false });
+  const [
+    { data: songRows, error: songError },
+    { data: engagementRows, error: engagementError },
+    { data: ratingRows, error: ratingError },
+  ] = await Promise.all([
+    (supabase as any)
+      .from('public_listen_song_cards')
+      .select('*')
+      .order('bucket_rank', { ascending: true })
+      .order('latest_public_activity_at', { ascending: false }),
 
-  if (error || !data) return sampleSongs;
+    (supabase as any)
+      .from('song_engagement_summaries')
+      .select(
+        'song_id, audio_play_count, video_click_count, last_audio_play_at, last_video_click_at'
+      ),
 
-  return (data as PublicListenSongRow[]).map(mapPublicListenSong);
+    (supabase as any)
+      .from('song_rating_summaries')
+      .select('song_id, average_rating, rating_count'),
+  ]);
+
+  if (songError || !songRows) {
+    console.error('Unable to load public songs:', songError);
+    return sampleSongs;
+  }
+
+  if (engagementError) {
+    console.error('Unable to load engagement summaries:', engagementError);
+  }
+
+  if (ratingError) {
+    console.error('Unable to load rating summaries:', ratingError);
+  }
+
+  const songs = (songRows as PublicListenSongRow[]).map(mapPublicListenSong);
+
+  return attachPublicEngagementMetrics(songs, engagementRows, ratingRows);
 });
 
 export const getPublicSongsByMuse = cache(async (museSlug: string): Promise<SongSummary[]> => {
   const supabase = await createServerSupabaseClient();
-  if (!supabase) return sampleSongs.filter((song) => song.muse_slug === museSlug);
 
-  const { data, error } = await (supabase as any)
-    .from('public_listen_song_cards')
-    .select('*')
-    .eq('muse_slug', museSlug)
-    .order('bucket_rank', { ascending: true })
-    .order('latest_public_activity_at', { ascending: false })
-    .limit(12);
+  if (!supabase) {
+    return sampleSongs.filter((song) => song.muse_slug === museSlug);
+  }
 
-  if (error || !data) return [];
+  const [
+    { data: songRows, error: songError },
+    { data: engagementRows, error: engagementError },
+    { data: ratingRows, error: ratingError },
+  ] = await Promise.all([
+    (supabase as any)
+      .from('public_listen_song_cards')
+      .select('*')
+      .eq('muse_slug', museSlug)
+      .order('bucket_rank', { ascending: true })
+      .order('latest_public_activity_at', { ascending: false })
+      .limit(12),
 
-  return (data as PublicListenSongRow[]).map(mapPublicListenSong);
+    (supabase as any)
+      .from('song_engagement_summaries')
+      .select(
+        'song_id, audio_play_count, video_click_count, last_audio_play_at, last_video_click_at'
+      ),
+
+    (supabase as any)
+      .from('song_rating_summaries')
+      .select('song_id, average_rating, rating_count'),
+  ]);
+
+  if (songError || !songRows) {
+    console.error(`Unable to load public songs for muse "${museSlug}":`, songError);
+    return [];
+  }
+
+  if (engagementError) {
+    console.error('Unable to load engagement summaries:', engagementError);
+  }
+
+  if (ratingError) {
+    console.error('Unable to load rating summaries:', ratingError);
+  }
+
+  const songs = (songRows as PublicListenSongRow[]).map(mapPublicListenSong);
+
+  return attachPublicEngagementMetrics(songs, engagementRows, ratingRows);
 });
-
 
 export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | null> => {
   const supabase = await createServerSupabaseClient();
