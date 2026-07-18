@@ -13,13 +13,15 @@ const journey = [
   {
     step: "01",
     label: "Inspiration",
-    title: "Capture the human moment first",
+    title: "Where it began",
     description:
-      "The song began with a dream. The writer recorded the remembered lines and documented the experience before trying to turn it into a finished lyric.",
+      "“Do You Believe?” began as a dream. I woke up with the song still in my head, sang the lines I could remember, and recorded myself talking through the entire dream before it faded. In the dream, someone else was singing the song. I preserved what I could, turned that spoken story into lyrics, and then—boom—it became a song. The final lines even acknowledge where it came from: it was only a dream, but it felt so real.",
     image: "/demo/do-you-believe/01-inspiration.png",
     alt: "Writer note describing the dream that inspired Do You Believe",
     takeaway:
       "Songcatcher Studio preserves the source of the song—the memory, dream, phrase, or musical moment that made it worth writing.",
+    reflection:
+      "If I copied it from my dream…did I really write it?",
   },
   {
     step: "02",
@@ -130,6 +132,12 @@ export default function DoYouBelieveDemoPage() {
               <span>What this demonstrates</span>
               <p>{item.takeaway}</p>
             </div>
+
+            {"reflection" in item && item.reflection ? (
+              <blockquote className={styles.reflection}>
+                {item.reflection}
+              </blockquote>
+            ) : null}
           </article>
         ))}
       </section>

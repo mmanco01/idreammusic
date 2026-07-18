@@ -282,3 +282,18 @@
     text-align: center;
   }
 }
+
+
+.reflection {
+  margin: 24px 0 0;
+  padding: 24px 28px;
+  border: 1px solid rgba(239, 199, 94, 0.34);
+  border-radius: 18px;
+  color: #f6d98f;
+  background: rgba(239, 199, 94, 0.07);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.35rem, 3vw, 2.1rem);
+  font-style: italic;
+  line-height: 1.45;
+  text-align: center;
+}
