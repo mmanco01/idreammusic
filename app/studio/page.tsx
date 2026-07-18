@@ -426,7 +426,13 @@ async function buildStudioPortfolio(
 
 export default async function StudioPage() {
   const { user, profile } = await getServerAuthContext();
-  const mySongs = user ? await getMySongs(user.id) : [];
+
+const rawMySongs = user ? await getMySongs(user.id) : [];
+
+const mySongs = Array.from(
+  new Map(rawMySongs.map((song) => [song.id, song])).values(),
+);
+  
   const portfolioSongs = user
     ? await buildStudioPortfolio(user.id, mySongs)
     : [];
