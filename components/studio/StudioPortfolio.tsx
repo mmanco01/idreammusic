@@ -20,6 +20,8 @@ export type StudioPortfolioSong = {
   current_stage: string;
   muse_slug: string | null;
   version_count: number;
+  spark_version_count: number;
+  draft_version_count: number;
   final_version_count: number;
   all_versions_final: boolean;
   is_finished: boolean;
@@ -172,6 +174,7 @@ function opportunityTone(value: number) {
 
 function recalculateFinished(song: StudioPortfolioSong) {
   return (
+    song.current_stage.toLowerCase() === "final" ||
     song.all_versions_final ||
     song.workflow_status === "completed" ||
     song.workflow_status === "archived"
@@ -804,7 +807,7 @@ function PortfolioFilters({
           checked={showFinished}
           onChange={(event) => setShowFinished(event.target.checked)}
         />
-        Show finished songs
+        Show finished songs and version history
       </label>
     </div>
   );
@@ -1029,7 +1032,9 @@ function SongOpportunityCard({
             <span className="pill">{formatLabel(song.muse_slug)}</span>
           ) : null}
           <span className="pill">
-            {song.version_count} {song.version_count === 1 ? "version" : "versions"}
+            {song.version_count === 1
+              ? "1-version history"
+              : `${song.version_count}-version history`}
           </span>
           <span className="pill">
             Priority {formatLabel(song.priority_tier)}
@@ -1101,9 +1106,23 @@ function SongOpportunityCard({
             </div>
           </div>
           <div>
-            <div className="eyebrow">Versions</div>
+            <div className="eyebrow">Version history</div>
             <div className="copy">
-              {song.final_version_count} final of {song.version_count}
+              {song.version_count === 0
+                ? "No saved versions"
+                : [
+                    song.spark_version_count
+                      ? `${song.spark_version_count} Spark`
+                      : null,
+                    song.draft_version_count
+                      ? `${song.draft_version_count} Draft`
+                      : null,
+                    song.final_version_count
+                      ? `${song.final_version_count} Final`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
             </div>
           </div>
           <div>
