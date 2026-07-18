@@ -137,9 +137,12 @@ async function buildStudioPortfolio(
     return mySongs.map((song) => ({
       ...normalizeStudioSong(song),
       version_count: 0,
+      spark_version_count: 0,
+      draft_version_count: 0,
       final_version_count: 0,
       all_versions_final: false,
-      is_finished: false,
+      is_finished:
+        String(song.current_stage || "").toLowerCase() === "final",
       priority_tier: "later",
       priority_rank: null,
       workflow_status: "active",
@@ -250,6 +253,8 @@ async function buildStudioPortfolio(
     string,
     {
       total: number;
+      spark: number;
+      draft: number;
       final: number;
     }
   >();
@@ -257,12 +262,20 @@ async function buildStudioPortfolio(
   for (const version of versions) {
     const current = versionSummary.get(version.song_id) || {
       total: 0,
+      spark: 0,
+      draft: 0,
       final: 0,
     };
 
     current.total += 1;
 
-    if (String(version.stage || "").toLowerCase() === "final") {
+    const stage = String(version.stage || "").toLowerCase();
+
+    if (stage === "spark") {
+      current.spark += 1;
+    } else if (stage === "draft") {
+      current.draft += 1;
+    } else if (stage === "final") {
       current.final += 1;
     }
 
@@ -330,6 +343,8 @@ async function buildStudioPortfolio(
   return mySongs.map((song) => {
     const version = versionSummary.get(song.id) || {
       total: 0,
+      spark: 0,
+      draft: 0,
       final: 0,
     };
 
@@ -356,6 +371,7 @@ async function buildStudioPortfolio(
     const workflowStatus = workflow?.workflow_status || "active";
 
     const isFinished =
+      String(song.current_stage || "").toLowerCase() === "final" ||
       allVersionsFinal ||
       workflowStatus === "completed" ||
       workflowStatus === "archived";
@@ -363,6 +379,8 @@ async function buildStudioPortfolio(
     return {
       ...normalizeStudioSong(song),
       version_count: version.total,
+      spark_version_count: version.spark,
+      draft_version_count: version.draft,
       final_version_count: version.final,
       all_versions_final: allVersionsFinal,
       is_finished: isFinished,
@@ -426,13 +444,7 @@ async function buildStudioPortfolio(
 
 export default async function StudioPage() {
   const { user, profile } = await getServerAuthContext();
-
-const rawMySongs = user ? await getMySongs(user.id) : [];
-
-const mySongs = Array.from(
-  new Map(rawMySongs.map((song) => [song.id, song])).values(),
-);
-  
+  const mySongs = user ? await getMySongs(user.id) : [];
   const portfolioSongs = user
     ? await buildStudioPortfolio(user.id, mySongs)
     : [];
