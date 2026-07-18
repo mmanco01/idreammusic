@@ -166,11 +166,19 @@ type SongIntelligenceResult = {
   }>;
 };
 
+type AudienceMetrics = {
+  totalListens: number;
+  uniqueListeners: number;
+  recentListens: number;
+  lastListenedAt: string | null;
+};
+
 type Props = {
   songId: string;
   slug: string;
   audioAttachments: AudioAttachment[];
   transcripts: Transcript[];
+  audienceMetrics: AudienceMetrics;
 };
 
 const initialSaveState: TranscriptSaveState = {
@@ -376,6 +384,220 @@ function formatTaskDate(value: string | null) {
     day: 'numeric',
     year: 'numeric',
   }).format(date);
+}
+
+function formatAudienceDate(value: string | null) {
+  if (!value) return 'No listens yet';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+function AudienceIntelligencePanel({
+  metrics,
+  intelligence,
+}: {
+  metrics: AudienceMetrics;
+  intelligence: SongIntelligenceResult | null;
+}) {
+  const audience = intelligence?.audience ?? null;
+  const repeatListens = Math.max(
+    0,
+    metrics.totalListens - metrics.uniqueListeners
+  );
+
+  return (
+    <section
+      style={{
+        marginTop: '1.5rem',
+        padding: '1.25rem',
+        border: '1px solid var(--line)',
+        borderRadius: 18,
+        background:
+          'linear-gradient(145deg, rgba(255,217,120,0.08), rgba(255,255,255,0.025))',
+      }}
+    >
+      <div className="eyebrow">Audience intelligence</div>
+      <h3 className="h2" style={{ marginTop: '0.25rem' }}>
+        Listener Response &amp; Audience Fit
+      </h3>
+      <p className="copy" style={{ maxWidth: 850 }}>
+        Combine real listener engagement with Song Intelligence to understand
+        which songs are attracting attention and where they may fit in the
+        marketplace.
+      </p>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+          gap: '0.75rem',
+          marginTop: '1rem',
+        }}
+      >
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Total listens</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800 }}>
+            {metrics.totalListens.toLocaleString()}
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Unique listeners</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800 }}>
+            {metrics.uniqueListeners.toLocaleString()}
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Last 7 days</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800 }}>
+            {metrics.recentListens.toLocaleString()}
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Audience score</div>
+          <div style={{ fontSize: '2rem', fontWeight: 800 }}>
+            {audience
+              ? `${Math.round(audience.audience_rank_score)} / 100`
+              : 'Pending'}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+          gap: '0.75rem',
+          marginTop: '0.75rem',
+        }}
+      >
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Listener activity</div>
+          <p className="copy">
+            <strong>Last listened:</strong>{' '}
+            {formatAudienceDate(metrics.lastListenedAt)}
+          </p>
+          <p className="copy">
+            <strong>Repeat-listen activity:</strong>{' '}
+            {repeatListens > 0
+              ? `${repeatListens.toLocaleString()} additional listens beyond first-time sessions`
+              : 'No repeat-listen activity identified yet'}
+          </p>
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Best-fit audiences</div>
+          {audience ? (
+            <TextList items={audience.likely_listeners} />
+          ) : (
+            <p className="copy">
+              Run AI Song Intelligence to identify likely listeners.
+            </p>
+          )}
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Playlist opportunities</div>
+          {audience ? (
+            <TextList items={audience.streaming_playlist_fit} />
+          ) : (
+            <p className="copy">
+              Playlist recommendations will appear after analysis.
+            </p>
+          )}
+        </div>
+
+        <div
+          style={{
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Sync opportunities</div>
+          {audience ? (
+            <TextList items={audience.sync_opportunities} />
+          ) : (
+            <p className="copy">
+              Sync opportunities will appear after analysis.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {intelligence ? (
+        <div
+          style={{
+            marginTop: '0.75rem',
+            padding: '1rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+          }}
+        >
+          <div className="eyebrow">Commercial perspective</div>
+          <p className="copy">
+            <strong>Radio potential:</strong>{' '}
+            {intelligence.audience.radio_potential}
+          </p>
+          <p className="copy">
+            <strong>Hook potential:</strong>{' '}
+            {intelligence.hook.commercial_potential}
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 function TaskActionButton({
@@ -1185,6 +1407,7 @@ export function SongIntelligencePanel({
   slug,
   audioAttachments,
   transcripts,
+  audienceMetrics,
 }: Props) {
   const router = useRouter();
   const [saveState, saveFormAction] = useActionState(
@@ -1884,6 +2107,11 @@ export function SongIntelligencePanel({
           ) : null}
         </div>
       ) : null}
+
+      <AudienceIntelligencePanel
+        metrics={audienceMetrics}
+        intelligence={analyticsState.result}
+      />
 
       {analyticsState.result ? (
         <IntelligenceResults
