@@ -6,6 +6,7 @@ import StudioPortfolio, {
   type StudioPortfolioSong,
 } from "@/components/studio/StudioPortfolio";
 import { FeaturedDemoCard } from "@/components/studio/FeaturedDemoCard";
+import StudioStageGrid from "@/components/studio/StudioStageGrid";
 
 type VersionRow = {
   song_id: string;
@@ -444,7 +445,10 @@ async function buildStudioPortfolio(
 
 export default async function StudioPage() {
   const { user, profile } = await getServerAuthContext();
-  const mySongs = user ? await getMySongs(user.id) : [];
+  const rawMySongs = user ? await getMySongs(user.id) : [];
+  const mySongs = Array.from(
+    new Map(rawMySongs.map((song) => [song.id, song])).values(),
+  );
   const portfolioSongs = user
     ? await buildStudioPortfolio(user.id, mySongs)
     : [];
@@ -474,41 +478,10 @@ export default async function StudioPage() {
           )}
         </div>
 
-        <div className="stage-grid">
-          <div className="stage-card">
-            <h3 className="h3">Capture</h3>
-            <p className="copy">
-              Upload a spark, draft, final cut, lyric sheet, or voice memo and
-              connect it to the right Muse.
-            </p>
-            <Link className="button" href="/studio/capture">
-              New upload
-            </Link>
-          </div>
-
-          <div className="stage-card">
-            <h3 className="h3">Develop</h3>
-            <p className="copy">
-              Generate transcripts and Song Intelligence, create development
-              tasks, and move songs through Now, Next, and Later.
-            </p>
-            <Link className="button" href="#song-portfolio">
-              Open workspace
-            </Link>
-          </div>
-
-          <div className="stage-card">
-            <h3 className="h3">Review &amp; Prioritize</h3>
-            <p className="copy">
-              Compare Opportunity Scores, human ratings, listener engagement,
-              development stage, AI analysis, and release readiness—then decide
-              what deserves attention next.
-            </p>
-            <Link className="button" href="/admin/review">
-              Review songs
-            </Link>
-          </div>
-        </div>
+        <StudioStageGrid
+          songs={portfolioSongs}
+          isSignedIn={Boolean(user)}
+        />
 
         <FeaturedDemoCard />
 
