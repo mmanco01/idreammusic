@@ -51,16 +51,61 @@ type TaskRow = {
   status: "open" | "in_progress" | "completed" | "dismissed";
 };
 
-function readNumber(value: unknown, key: string): number | null {
+function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
-  const candidate = (value as Record<string, unknown>)[key];
+  return value as Record<string, unknown>;
+}
+
+function readNumber(value: unknown, key: string): number | null {
+  const record = asRecord(value);
+  if (!record) return null;
+
+  const candidate = record[key];
 
   return typeof candidate === "number" && Number.isFinite(candidate)
     ? candidate
     : null;
+}
+
+function readNestedValue(value: unknown, path: string[]): unknown {
+  let current: unknown = value;
+
+  for (const key of path) {
+    const record = asRecord(current);
+    if (!record) return null;
+    current = record[key];
+  }
+
+  return current;
+}
+
+function readNestedNumber(value: unknown, path: string[]): number | null {
+  const candidate = readNestedValue(value, path);
+
+  return typeof candidate === "number" && Number.isFinite(candidate)
+    ? candidate
+    : null;
+}
+
+function readNestedString(value: unknown, path: string[]): string | null {
+  const candidate = readNestedValue(value, path);
+
+  return typeof candidate === "string" && candidate.trim()
+    ? candidate.trim()
+    : null;
+}
+
+function readNestedStringArray(value: unknown, path: string[]): string[] {
+  const candidate = readNestedValue(value, path);
+
+  if (!Array.isArray(candidate)) return [];
+
+  return candidate.filter(
+    (item): item is string => typeof item === "string" && Boolean(item.trim()),
+  );
 }
 
 function normalizeStudioSong(
@@ -103,6 +148,12 @@ async function buildStudioPortfolio(
       personal_rating: null,
       ai_overall_score: null,
       ai_ready_for_release_score: null,
+      ai_audience_score: null,
+      ai_likely_listeners: [],
+      ai_playlist_fit: [],
+      ai_sync_opportunities: [],
+      ai_radio_potential: null,
+      ai_hook_commercial_potential: null,
       ai_completed_at: null,
       open_task_count: 0,
       in_progress_task_count: 0,
@@ -158,17 +209,11 @@ async function buildStudioPortfolio(
   ]);
 
   if (versionsResult.error) {
-    console.error(
-      "Studio version summary failed:",
-      versionsResult.error.message,
-    );
+    console.error("Studio version summary failed:", versionsResult.error.message);
   }
 
   if (workflowResult.error) {
-    console.error(
-      "Studio workflow summary failed:",
-      workflowResult.error.message,
-    );
+    console.error("Studio workflow summary failed:", workflowResult.error.message);
   }
 
   if (analysisResult.error) {
@@ -197,10 +242,7 @@ async function buildStudioPortfolio(
   const workflows = (workflowResult.data || []) as WorkflowRow[];
   const analyses = (analysisResult.data || []) as AnalysisRow[];
   const tasks = (tasksResult.data || []) as TaskRow[];
-
-  const engagementSummaries = (engagementResult.data ||
-    []) as EngagementSummaryRow[];
-
+  const engagementSummaries = (engagementResult.data || []) as EngagementSummaryRow[];
   const listenerRatingSummaries = (listenerRatingsResult.data ||
     []) as ListenerRatingSummaryRow[];
 
@@ -293,6 +335,7 @@ async function buildStudioPortfolio(
 
     const workflow = workflowBySong.get(song.id);
     const latestAnalysis = latestAnalysisBySong.get(song.id);
+    const rawResult = latestAnalysis?.raw_result;
 
     const task = taskSummary.get(song.id) || {
       open: 0,
@@ -309,9 +352,7 @@ async function buildStudioPortfolio(
       ratingCount: 0,
     };
 
-    const allVersionsFinal =
-      version.total > 0 && version.final === version.total;
-
+    const allVersionsFinal = version.total > 0 && version.final === version.total;
     const workflowStatus = workflow?.workflow_status || "active";
 
     const isFinished =
@@ -338,24 +379,45 @@ async function buildStudioPortfolio(
           : Number(workflow.personal_rating),
 
       ai_overall_score: latestAnalysis
-        ? readNumber(latestAnalysis.raw_result, "overall_score")
+        ? readNumber(rawResult, "overall_score")
         : null,
 
       ai_ready_for_release_score: latestAnalysis
-        ? readNumber(
-            latestAnalysis.raw_result,
-            "ready_for_release_score",
-          )
+        ? readNumber(rawResult, "ready_for_release_score")
+        : null,
+
+      ai_audience_score: latestAnalysis
+        ? readNestedNumber(rawResult, ["audience", "audience_rank_score"])
+        : null,
+
+      ai_likely_listeners: latestAnalysis
+        ? readNestedStringArray(rawResult, ["audience", "likely_listeners"])
+        : [],
+
+      ai_playlist_fit: latestAnalysis
+        ? readNestedStringArray(rawResult, [
+            "audience",
+            "streaming_playlist_fit",
+          ])
+        : [],
+
+      ai_sync_opportunities: latestAnalysis
+        ? readNestedStringArray(rawResult, ["audience", "sync_opportunities"])
+        : [],
+
+      ai_radio_potential: latestAnalysis
+        ? readNestedString(rawResult, ["audience", "radio_potential"])
+        : null,
+
+      ai_hook_commercial_potential: latestAnalysis
+        ? readNestedString(rawResult, ["hook", "commercial_potential"])
         : null,
 
       ai_completed_at: latestAnalysis?.completed_at || null,
-
       open_task_count: task.open,
       in_progress_task_count: task.inProgress,
-
       audio_play_count: engagement.audioPlayCount,
       video_click_count: engagement.videoClickCount,
-
       listener_rating_average: listenerRating.averageRating,
       listener_rating_count: listenerRating.ratingCount,
     };
@@ -364,9 +426,7 @@ async function buildStudioPortfolio(
 
 export default async function StudioPage() {
   const { user, profile } = await getServerAuthContext();
-
   const mySongs = user ? await getMySongs(user.id) : [];
-
   const portfolioSongs = user
     ? await buildStudioPortfolio(user.id, mySongs)
     : [];
@@ -377,22 +437,16 @@ export default async function StudioPage() {
         <div className="page-intro">
           <div>
             <div className="eyebrow">Creator Studio</div>
-
             <h1 className="h2">Songcatcher Studio</h1>
-
             <p className="copy" style={{ maxWidth: 820 }}>
-              Capture ideas, prioritize the songs that matter now, work AI
-              recommendations into tasks, track versions, measure listener
-              engagement, and move completed songs out of the active pipeline
-              without losing their history.
+              Capture ideas, develop songs with AI guidance, measure real listener
+              response, and use Song Opportunity Intelligence to decide what
+              deserves your time and attention next.
             </p>
           </div>
 
           {!user ? (
-            <Link
-              className="button primary"
-              href="/auth/sign-in?next=/studio"
-            >
+            <Link className="button primary" href="/auth/sign-in?next=/studio">
               Sign in to upload
             </Link>
           ) : (
@@ -405,12 +459,10 @@ export default async function StudioPage() {
         <div className="stage-grid">
           <div className="stage-card">
             <h3 className="h3">Capture</h3>
-
             <p className="copy">
               Upload a spark, draft, final cut, lyric sheet, or voice memo and
               connect it to the right Muse.
             </p>
-
             <Link className="button" href="/studio/capture">
               New upload
             </Link>
@@ -418,12 +470,10 @@ export default async function StudioPage() {
 
           <div className="stage-card">
             <h3 className="h3">Develop</h3>
-
             <p className="copy">
               Generate transcripts and Song Intelligence, create development
               tasks, and move songs through Now, Next, and Later.
             </p>
-
             <Link className="button" href="#song-portfolio">
               Open workspace
             </Link>
@@ -431,13 +481,11 @@ export default async function StudioPage() {
 
           <div className="stage-card">
             <h3 className="h3">Review &amp; Prioritize</h3>
-
             <p className="copy">
-              Compare songs using human ratings, listener engagement,
+              Compare Opportunity Scores, human ratings, listener engagement,
               development stage, AI analysis, and release readiness—then decide
               what deserves attention next.
             </p>
-
             <Link className="button" href="/admin/review">
               Review songs
             </Link>
@@ -449,14 +497,11 @@ export default async function StudioPage() {
         {user ? (
           <div className="card" id="song-portfolio">
             <div className="eyebrow">Signed in as</div>
-
-            <h2 className="h3">
-              {profile?.display_name || user.email}
-            </h2>
-
+            <h2 className="h3">{profile?.display_name || user.email}</h2>
             <p className="copy">
-              Your active catalog, priorities, AI ratings, listener ratings,
-              plays, versions, and development workload.
+              Your catalog ranked by explainable Song Opportunity Intelligence,
+              with priorities, AI scores, audience fit, listener ratings, plays,
+              versions, and development workload in one place.
             </p>
 
             {portfolioSongs.length ? (
@@ -471,7 +516,6 @@ export default async function StudioPage() {
         ) : (
           <div className="card" id="song-portfolio">
             <h2 className="h3">Not signed in yet</h2>
-
             <p className="copy">
               Sign in first, then use the Muse pages as direct upload entry
               points for your songs.
