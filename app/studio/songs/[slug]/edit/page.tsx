@@ -85,6 +85,47 @@ export default async function EditSongPage({
     notFound();
   }
 
+  const { data: engagementSummary } = await supabase
+    .from('song_engagement_summaries')
+    .select('audio_play_count, last_audio_play_at')
+    .eq('song_id', song.id)
+    .maybeSingle();
+
+  const { data: audioPlayEvents } = await supabase
+    .from('song_engagement_events')
+    .select('user_id, anonymous_session_id, occurred_at')
+    .eq('song_id', song.id)
+    .eq('event_type', 'audio_play');
+
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  const uniqueListenerKeys = new Set(
+    (audioPlayEvents ?? [])
+      .map((event: any) => {
+        if (event.user_id) {
+          return `user:${event.user_id}`;
+        }
+
+        if (event.anonymous_session_id) {
+          return `session:${event.anonymous_session_id}`;
+        }
+
+        return null;
+      })
+      .filter((value): value is string => Boolean(value))
+  );
+
+  const audienceMetrics = {
+    totalListens: Number(engagementSummary?.audio_play_count ?? 0),
+    uniqueListeners: uniqueListenerKeys.size,
+    recentListens: (audioPlayEvents ?? []).filter((event: any) => {
+      const occurredAt = new Date(event.occurred_at).getTime();
+
+      return !Number.isNaN(occurredAt) && occurredAt >= sevenDaysAgo;
+    }).length,
+    lastListenedAt: engagementSummary?.last_audio_play_at ?? null,
+  };
+
   const versions = [...(song.song_versions ?? [])].sort(
     (a: any, b: any) => a.version_number - b.version_number
   );
@@ -470,6 +511,7 @@ export default async function EditSongPage({
                   attachment.file_type === 'audio'
               )}
               transcripts={song.song_transcripts ?? []}
+              audienceMetrics={audienceMetrics}
             />
           </div>
         </div>
