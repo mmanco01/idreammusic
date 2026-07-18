@@ -10,19 +10,17 @@ export const metadata: Metadata = {
 };
 
 const journey = [
-  {
-    step: "01",
-    label: "Inspiration",
-    title: "Where it began",
-    description:
-      "“Do You Believe?” began as a dream. I woke up with the song still in my head, sang the lines I could remember, and recorded myself talking through the entire dream before it faded. In the dream, someone else was singing the song. I preserved what I could, turned that spoken story into lyrics, and then—boom—it became a song. The final lines even acknowledge where it came from: it was only a dream, but it felt so real.",
-    image: "/demo/do-you-believe/01-inspiration.png",
-    alt: "Writer note describing the dream that inspired Do You Believe",
-    takeaway:
-      "Songcatcher Studio preserves the source of the song—the memory, dream, phrase, or musical moment that made it worth writing.",
-    reflection:
-      "If I copied it from my dream…did I really write it?",
-  },
+{
+  step: "01",
+  label: "Inspiration",
+  title: "Where it began",
+  description:
+    "“Do You Believe?” began as a dream. I woke up with the song still in my head, sang the lines I could remember, and recorded myself talking through the entire dream before it faded. In the dream, someone else was singing the song. I preserved what I could, turned that spoken story into lyrics, and then—boom—it became a song. The final lines even acknowledge where it came from: it was only a dream, but it felt so real.",
+  takeaway:
+    "Songcatcher Studio preserves the source of the song—the memory, dream, phrase, or musical moment that made it worth writing.",
+  reflection:
+    "If I copied it from my dream…did I really write it?",
+},
   {
     step: "02",
     label: "Transcription",
@@ -110,23 +108,28 @@ export default function DoYouBelieveDemoPage() {
               </div>
             </header>
 
-            <a
-              className={styles.imageLink}
-              href={item.image}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Open full-size image: ${item.alt}`}
-            >
-              <Image
-                className={styles.screenshot}
-                src={item.image}
-                alt={item.alt}
-                width={1400}
-                height={1100}
-                sizes="(max-width: 900px) 94vw, 1100px"
-              />
-              <span className={styles.expandLabel}>Open full-size screenshot ↗</span>
-            </a>
+{"image" in item && item.image ? (
+  <a
+    className={styles.imageLink}
+    href={item.image}
+    target="_blank"
+    rel="noreferrer"
+    aria-label={`Open full-size image: ${item.alt}`}
+  >
+    <Image
+      className={styles.screenshot}
+      src={item.image}
+      alt={item.alt}
+      width={1400}
+      height={1100}
+      sizes="(max-width: 900px) 94vw, 1100px"
+    />
+
+    <span className={styles.expandLabel}>
+      Open full-size screenshot ↗
+    </span>
+  </a>
+) : null}
 
             <div className={styles.takeaway}>
               <span>What this demonstrates</span>
