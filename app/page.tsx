@@ -72,7 +72,7 @@ export default async function HomePage() {
               overflow: "hidden",
               border: "1px solid rgba(220, 182, 92, 0.32)",
               background:
-                "radial-gradient(circle at 88% 18%, rgba(214, 170, 77, 0.14), transparent 28%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
+                "radial-gradient(circle at 88% 18%, rgba(214, 170, 77, 0.12), transparent 28%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
             }}
           >
             <div
@@ -84,27 +84,33 @@ export default async function HomePage() {
                 borderRadius: "50%",
                 right: -240,
                 top: -230,
-                border: "1px solid rgba(220, 182, 92, 0.18)",
+                border: "1px solid rgba(220, 182, 92, 0.16)",
               }}
             />
 
             <div className="hero-grid" style={{ position: "relative" }}>
               <div>
-                <div className="eyebrow">Shared home for songcatchers</div>
+                <div className="eyebrow">
+                  Shared home for songcatchers
+                </div>
 
-                <h1 className="display">Songs Are Caught, Not Written</h1>
+                <h1 className="display">
+                  Songs Are Caught, Not Written
+                </h1>
 
                 <p className="lead">
-                  iDreamMusic is a human-centered creative home for people who
-                  discover songs in the flow of life, dream, memory, faith,
-                  rhythm, love, pain, and wonder.
+                  iDreamMusic is a human-centered creative home for
+                  people who discover songs in the flow of life,
+                  dream, memory, faith, rhythm, love, pain, and
+                  wonder.
                 </p>
 
                 <p className="copy">
-                  A song may arrive as a phrase, a voice memo, a prayer, a riff,
-                  a memory, or something that cannot yet be explained.
-                  iDreamMusic helps you catch it, understand what it needs,
-                  develop it with the Muses, and share it when it is ready.
+                  A song may arrive as a phrase, a voice memo, a
+                  prayer, a riff, a memory, or something that cannot
+                  yet be explained. iDreamMusic helps you catch it,
+                  understand what it needs, develop it with the Muses,
+                  and share it when it is ready.
                 </p>
 
                 <div className="button-row">
@@ -125,31 +131,21 @@ export default async function HomePage() {
               <div
                 className="card"
                 style={{
-                  border: "1px solid rgba(220, 182, 92, 0.52)",
+                  border: "1px solid rgba(220, 182, 92, 0.5)",
                   background:
-                    "linear-gradient(155deg, rgba(151, 106, 40, 0.18), rgba(93, 76, 150, 0.10), rgba(255,255,255,0.025))",
+                    "linear-gradient(155deg, rgba(151, 106, 40, 0.16), rgba(93, 76, 150, 0.09), rgba(255,255,255,0.025))",
                 }}
               >
-                <div>
-                  <span
-                    className="pill"
-                    style={{
-                      display: "inline-flex",
-                      borderColor: "rgba(220, 182, 92, 0.72)",
-                      background: "rgba(151, 106, 40, 0.18)",
-                    }}
-                  >
-                    NEW — THE LIVING MUSES
-                  </span>
-                </div>
+                <div className="eyebrow">The Living Muses</div>
 
-                <h2 className="h3" style={{ marginTop: "0.9rem" }}>
-                  Your song now has an active creative council
+                <h2 className="h3" style={{ marginTop: "0.65rem" }}>
+                  Your song has an active creative council
                 </h2>
 
                 <p className="copy">
-                  Begin with the Muse assigned to the song. Then invite another
-                  Muse to offer a genuinely different perspective.
+                  Begin with the Muse assigned to the song. Then
+                  invite another Muse to offer a genuinely different
+                  perspective.
                 </p>
 
                 <div
@@ -163,11 +159,15 @@ export default async function HomePage() {
                     style={{
                       padding: "0.85rem",
                       borderRadius: 14,
-                      border: "1px solid rgba(220, 182, 92, 0.38)",
+                      border:
+                        "1px solid rgba(220, 182, 92, 0.38)",
                       background: "rgba(0,0,0,0.14)",
                     }}
                   >
-                    <div className="eyebrow">Polyhymnia — Faith</div>
+                    <div className="eyebrow">
+                      Polyhymnia — Faith
+                    </div>
+
                     <p
                       className="copy"
                       style={{
@@ -175,8 +175,9 @@ export default async function HomePage() {
                         fontStyle: "italic",
                       }}
                     >
-                      “The spiritual center feels honest, but the hope may
-                      arrive before the struggle has fully earned it.”
+                      “The spiritual center feels honest, but the
+                      hope may arrive before the struggle has fully
+                      earned it.”
                     </p>
                   </div>
 
@@ -184,11 +185,15 @@ export default async function HomePage() {
                     style={{
                       padding: "0.85rem",
                       borderRadius: 14,
-                      border: "1px solid rgba(156, 137, 220, 0.5)",
+                      border:
+                        "1px solid rgba(156, 137, 220, 0.5)",
                       background: "rgba(86, 67, 145, 0.13)",
                     }}
                   >
-                    <div className="eyebrow">Calliope — Story</div>
+                    <div className="eyebrow">
+                      Calliope — Story
+                    </div>
+
                     <p
                       className="copy"
                       style={{
@@ -196,14 +201,21 @@ export default async function HomePage() {
                         fontStyle: "italic",
                       }}
                     >
-                      “From the story perspective, the missing element is not
-                      more explanation—it is a turning point.”
+                      “From the story perspective, the missing
+                      element is not more explanation—it is a turning
+                      point.”
                     </p>
                   </div>
                 </div>
 
-                <div className="button-row" style={{ marginTop: "1rem" }}>
-                  <Link href="/nine-muses" className="button primary">
+                <div
+                  className="button-row"
+                  style={{ marginTop: "1rem" }}
+                >
+                  <Link
+                    href="/nine-muses"
+                    className="button primary"
+                  >
                     Talk with a Muse
                   </Link>
                 </div>
@@ -220,7 +232,7 @@ export default async function HomePage() {
           <SectionIntro
             eyebrow="See it happen"
             title="One song. More than one way of seeing it."
-            text="The Muses are not decorative labels or nine versions of the same chatbot. Each one brings a defined specialty, asks different questions, and helps the songwriter notice something the others may not emphasize."
+            text="Each Muse brings a defined specialty, asks different questions, and helps the songwriter notice something the others may not emphasize."
           />
 
           <div
@@ -238,12 +250,16 @@ export default async function HomePage() {
                 background: "rgba(255,255,255,0.025)",
               }}
             >
-              <div className="eyebrow">The songwriter asks</div>
+              <div className="eyebrow">
+                The songwriter asks
+              </div>
+
               <h3 className="h3">
                 “Does this chorus carry the heart of the song?”
               </h3>
+
               <p className="copy">
-                The same question can reveal different creative opportunities
+                One question can reveal different opportunities,
                 depending on which Muse is listening.
               </p>
             </div>
@@ -251,32 +267,48 @@ export default async function HomePage() {
             <div
               className="card"
               style={{
-                border: "1px solid rgba(220, 182, 92, 0.55)",
+                border:
+                  "1px solid rgba(220, 182, 92, 0.55)",
                 background:
                   "linear-gradient(155deg, rgba(151, 106, 40, 0.18), rgba(255,255,255,0.025))",
               }}
             >
-              <div className="eyebrow">Polyhymnia — Faith</div>
-              <h3 className="h3">She listens for spiritual truth</h3>
+              <div className="eyebrow">
+                Polyhymnia — Faith
+              </div>
+
+              <h3 className="h3">
+                She listens for spiritual truth
+              </h3>
+
               <p className="copy">
-                Is the chorus prayer, testimony, praise, lament, surrender, or
-                a question? Does its hope feel lived and earned?
+                Is the chorus prayer, testimony, praise, lament,
+                surrender, or a question? Does its hope feel lived
+                and earned?
               </p>
             </div>
 
             <div
               className="card"
               style={{
-                border: "1px solid rgba(156, 137, 220, 0.55)",
+                border:
+                  "1px solid rgba(156, 137, 220, 0.55)",
                 background:
                   "linear-gradient(155deg, rgba(86, 67, 145, 0.17), rgba(255,255,255,0.025))",
               }}
             >
-              <div className="eyebrow">Calliope — Story</div>
-              <h3 className="h3">She listens for narrative movement</h3>
+              <div className="eyebrow">
+                Calliope — Story
+              </div>
+
+              <h3 className="h3">
+                She listens for narrative movement
+              </h3>
+
               <p className="copy">
-                Does the chorus reveal what the narrator wants? Do the verses
-                move toward it? Has the ending earned the final declaration?
+                Does the chorus reveal what the narrator wants? Do
+                the verses move toward it? Has the ending earned the
+                final declaration?
               </p>
             </div>
           </div>
@@ -286,23 +318,29 @@ export default async function HomePage() {
             style={{
               marginTop: "1rem",
               textAlign: "center",
-              border: "1px solid rgba(220, 182, 92, 0.36)",
+              border:
+                "1px solid rgba(220, 182, 92, 0.34)",
               background: "rgba(0,0,0,0.12)",
             }}
           >
             <div className="eyebrow">
               Same song · Same songwriter · Distinct creative lenses
             </div>
-            <h3 className="h3" style={{ marginBottom: "0.4rem" }}>
+
+            <h3
+              className="h3"
+              style={{ marginBottom: "0.4rem" }}
+            >
               The human remains the songwriter
             </h3>
+
             <p
               className="copy"
               style={{ maxWidth: 800, margin: "0 auto" }}
             >
-              The Muses do not replace authorship. They listen, question,
-              compare perspectives, and help the songwriter choose the next
-              meaningful move.
+              The Muses do not replace authorship. They listen,
+              question, compare perspectives, and help the songwriter
+              choose the next meaningful move.
             </p>
           </div>
         </div>
@@ -314,21 +352,30 @@ export default async function HomePage() {
             className="card"
             style={{
               marginBottom: "1.25rem",
-              border: "1px solid rgba(220, 182, 92, 0.34)",
+              border:
+                "1px solid rgba(220, 182, 92, 0.34)",
               background:
                 "linear-gradient(145deg, rgba(151, 106, 40, 0.12), rgba(255,255,255,0.025))",
             }}
           >
-            <div className="eyebrow">Nine active creative partners</div>
+            <div className="eyebrow">
+              Nine active creative partners
+            </div>
+
             <h2 className="h2">Meet the Living Muses</h2>
+
             <p className="copy" style={{ maxWidth: 900 }}>
-              Each Muse represents a creative current and an active specialty.
-              Open any Muse page to explore her world, ask a question, and
-              invite another Muse to compare perspectives.
+              Each Muse represents a creative current and an active
+              specialty. Open any Muse page to explore her world, ask
+              a question, and invite another Muse to compare
+              perspectives.
             </p>
 
             <div className="button-row">
-              <Link href="/nine-muses" className="button primary">
+              <Link
+                href="/nine-muses"
+                className="button primary"
+              >
                 Start a Muse conversation
               </Link>
             </div>
@@ -361,7 +408,7 @@ export default async function HomePage() {
           <SectionIntro
             eyebrow="The complete creative loop"
             title="How a Song Moves Through iDreamMusic"
-            text="The journey is no longer only Spark → Draft → Final. A song can now be caught, shaped, understood, developed with specialized Muses, shared with listeners, and revisited through the insight that returns."
+            text="A song can be caught, shaped, understood, developed with specialized Muses, shared with listeners, and revisited through the insight that returns."
           />
 
           <div
@@ -392,7 +439,7 @@ export default async function HomePage() {
                   key={step.number}
                   className="card"
                   style={{
-                    minHeight: 235,
+                    minHeight: 225,
                     border,
                     background,
                   }}
@@ -402,17 +449,22 @@ export default async function HomePage() {
                     style={{
                       fontSize: "0.8rem",
                       letterSpacing: "0.12em",
-                      opacity: 0.75,
+                      opacity: 0.72,
                     }}
                   >
                     {step.number}
                   </div>
 
-                  <h3 className="h3" style={{ marginTop: "0.7rem" }}>
+                  <h3
+                    className="h3"
+                    style={{ marginTop: "0.7rem" }}
+                  >
                     {step.title}
                   </h3>
 
-                  <p className="copy">{step.description}</p>
+                  <p className="copy">
+                    {step.description}
+                  </p>
                 </article>
               );
             })}
@@ -429,10 +481,12 @@ export default async function HomePage() {
               className="pill"
               style={{
                 padding: "0.7rem 1rem",
-                borderColor: "rgba(220, 182, 92, 0.55)",
+                borderColor:
+                  "rgba(220, 182, 92, 0.55)",
               }}
             >
-              Catch → Shape → Understand → Collaborate → Share → Return ↻
+              Catch → Shape → Understand → Collaborate → Share →
+              Return ↻
             </div>
           </div>
         </div>
@@ -442,39 +496,50 @@ export default async function HomePage() {
         <div className="container">
           <div
             className="two-col"
-            style={{
-              alignItems: "stretch",
-            }}
+            style={{ alignItems: "stretch" }}
           >
             <div
               className="card"
               style={{
-                border: "1px solid rgba(220, 182, 92, 0.48)",
+                border:
+                  "1px solid rgba(220, 182, 92, 0.48)",
                 background:
                   "linear-gradient(145deg, rgba(151, 106, 40, 0.15), rgba(255,255,255,0.025))",
               }}
             >
-              <div className="eyebrow">The song finds its listeners</div>
-              <h2 className="h2">Sharing is part of the creative process</h2>
+              <div className="eyebrow">
+                The song finds its listeners
+              </div>
+
+              <h2 className="h2">
+                Sharing is part of the creative process
+              </h2>
 
               <p className="copy">
-                A song can be shared while it is developing or after it reaches
-                Final. The iDreamMusic Jukebox gives listeners a place to hear
-                it, rate it, comment on it, and follow the story behind it.
+                A song can be shared while it is developing or after
+                it reaches Final. The Jukebox gives listeners a place
+                to hear it, rate it, comment on it, and follow the
+                story behind it.
               </p>
 
               <p className="copy">
-                The response does not disappear into a feed. Plays, ratings,
-                comments, and engagement return to the songwriter as new
-                creative intelligence.
+                The response does not disappear into a feed. Plays,
+                ratings, comments, and engagement return to the
+                songwriter as new creative intelligence.
               </p>
 
               <div className="button-row">
-                <Link href="/listen" className="button primary">
+                <Link
+                  href="/listen"
+                  className="button primary"
+                >
                   Open the Jukebox
                 </Link>
 
-                <Link href="/studio/capture" className="button">
+                <Link
+                  href="/studio/capture"
+                  className="button"
+                >
                   Share a Song
                 </Link>
               </div>
@@ -485,13 +550,19 @@ export default async function HomePage() {
               style={{
                 position: "relative",
                 overflow: "hidden",
-                border: "1px solid rgba(156, 137, 220, 0.45)",
+                border:
+                  "1px solid rgba(156, 137, 220, 0.45)",
                 background:
                   "radial-gradient(circle at top right, rgba(93, 76, 150, 0.20), transparent 34%), rgba(255,255,255,0.025)",
               }}
             >
-              <div className="eyebrow">Jukebox experience</div>
-              <h3 className="h3">A song becomes a conversation</h3>
+              <div className="eyebrow">
+                Jukebox experience
+              </div>
+
+              <h3 className="h3">
+                A song becomes a conversation
+              </h3>
 
               <div
                 style={{
@@ -502,13 +573,19 @@ export default async function HomePage() {
                   background: "rgba(0,0,0,0.16)",
                 }}
               >
-                <div className="pillRow" style={{ marginBottom: "0.7rem" }}>
+                <div
+                  className="pillRow"
+                  style={{ marginBottom: "0.7rem" }}
+                >
                   <span className="pill">Final</span>
                   <span className="pill">Muse-guided</span>
                   <span className="pill">Public</span>
                 </div>
 
-                <h4 className="h3" style={{ marginBottom: "0.35rem" }}>
+                <h4
+                  className="h3"
+                  style={{ marginBottom: "0.35rem" }}
+                >
                   The song, its story, and the listener response
                 </h4>
 
@@ -529,8 +606,10 @@ export default async function HomePage() {
                       display: "grid",
                       placeItems: "center",
                       borderRadius: "50%",
-                      border: "1px solid rgba(220, 182, 92, 0.55)",
-                      background: "rgba(151, 106, 40, 0.18)",
+                      border:
+                        "1px solid rgba(220, 182, 92, 0.55)",
+                      background:
+                        "rgba(151, 106, 40, 0.18)",
                     }}
                   >
                     ▶
@@ -563,13 +642,19 @@ export default async function HomePage() {
                   <span className="pill">Plays</span>
                   <span className="pill">Ratings</span>
                   <span className="pill">Comments</span>
-                  <span className="pill">Listener insight</span>
+                  <span className="pill">
+                    Listener insight
+                  </span>
                 </div>
               </div>
 
-              <div className="quote-panel" style={{ marginTop: "1rem" }}>
-                “The song’s journey does not end when it is shared. Connection
-                becomes part of what the song teaches the songwriter next.”
+              <div
+                className="quote-panel"
+                style={{ marginTop: "1rem" }}
+              >
+                “The song’s journey does not end when it is shared.
+                Connection becomes part of what the song teaches the
+                songwriter next.”
               </div>
             </div>
           </div>
@@ -579,18 +664,24 @@ export default async function HomePage() {
       <section className="section">
         <div className="container two-col">
           <div className="card">
-            <div className="eyebrow">Watch the current</div>
-            <h2 className="h2">Follow iDreamMusic Songs on YouTube</h2>
+            <div className="eyebrow">
+              Watch the current
+            </div>
+
+            <h2 className="h2">
+              Follow iDreamMusic Songs on YouTube
+            </h2>
 
             <p className="copy">
-              iDreamMusic.com is the creative home base. YouTube extends the
-              current through song clips, live performances, songcatcher
-              stories, and Muse reflections.
+              iDreamMusic.com is the creative home base. YouTube
+              extends the current through song clips, live
+              performances, songcatcher stories, and Muse
+              reflections.
             </p>
 
             <div className="quote-panel">
-              Watch the videos. Follow the current. Then return for the deeper
-              journey behind the song.
+              Watch the videos. Follow the current. Then return for
+              the deeper journey behind the song.
             </div>
 
             <div className="button-row">
@@ -610,19 +701,31 @@ export default async function HomePage() {
           </div>
 
           <div className="card">
-            <div className="eyebrow">One music · Four visual traditions</div>
-            <h2 className="h2">The Muses can reflect the songcatcher</h2>
+            <div className="eyebrow">
+              One music · Four visual traditions
+            </div>
+
+            <h2 className="h2">
+              The Muses can reflect the songcatcher
+            </h2>
 
             <p className="copy">
-              The same nine creative currents can appear through different
-              visual heritage themes without changing their meaning,
-              intelligence, or role in the creative process.
+              The same nine creative currents can appear through
+              different visual heritage themes without changing
+              their meaning, intelligence, or role in the creative
+              process.
             </p>
 
             <ul className="list">
-              <li className="pill">Muses = universal currents</li>
-              <li className="pill">Heritage = visual reflection</li>
-              <li className="pill">Meaning remains consistent</li>
+              <li className="pill">
+                Muses = universal currents
+              </li>
+              <li className="pill">
+                Heritage = visual reflection
+              </li>
+              <li className="pill">
+                Meaning remains consistent
+              </li>
             </ul>
 
             <div className="button-row">
@@ -646,7 +749,8 @@ export default async function HomePage() {
               overflow: "hidden",
               textAlign: "center",
               padding: "clamp(1.5rem, 4vw, 3rem)",
-              border: "1px solid rgba(220, 182, 92, 0.55)",
+              border:
+                "1px solid rgba(220, 182, 92, 0.55)",
               background:
                 "radial-gradient(circle at 50% 0%, rgba(151, 106, 40, 0.20), transparent 40%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
             }}
@@ -675,8 +779,8 @@ export default async function HomePage() {
                 fontSize: "1.08rem",
               }}
             >
-              Discover its Muse. Understand what it needs. Invite another
-              perspective. Share it when it is ready.
+              Discover its Muse. Understand what it needs. Invite
+              another perspective. Share it when it is ready.
             </p>
 
             <div
@@ -686,15 +790,24 @@ export default async function HomePage() {
                 marginTop: "1.25rem",
               }}
             >
-              <Link href="/studio/capture" className="button primary">
+              <Link
+                href="/studio/capture"
+                className="button primary"
+              >
                 Catch a Song
               </Link>
 
-              <Link href="/nine-muses" className="button">
+              <Link
+                href="/nine-muses"
+                className="button"
+              >
                 Talk with a Muse
               </Link>
 
-              <Link href="/listen" className="button">
+              <Link
+                href="/listen"
+                className="button"
+              >
                 Listen to the Jukebox
               </Link>
             </div>
