@@ -23,18 +23,29 @@ type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  museSlug?: string;
+  museName?: string;
+  kind?: "primary" | "collaborator";
+  question?: string;
+  comparisonWith?: string;
 };
 
 type MuseChatResponse = {
   status?: string;
   message?: string;
   reply?: string;
+  mode?: "chat" | "collaborate";
   muse?: {
     slug?: string;
     name?: string;
     domain?: string;
     isPrimaryMuse?: boolean;
   };
+  primaryMuse?: {
+    slug?: string;
+    name?: string;
+    domain?: string;
+  } | null;
 };
 
 function createMessageId() {
@@ -62,24 +73,37 @@ export function MuseChatPanel({
   >("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
+  const [collaborationSourceId, setCollaborationSourceId] = useState<
+    string | null
+  >(null);
+  const [collaboratorMuseSlug, setCollaboratorMuseSlug] = useState("");
+  const [collaborationStatus, setCollaborationStatus] = useState<
+    "idle" | "sending" | "error"
+  >("idle");
+  const [collaborationError, setCollaborationError] = useState("");
+
   const selectedMuse =
     museOptions.find((option) => option.slug === selectedMuseSlug) ??
     safeDefaultMuse;
 
   const isSongConversation = Boolean(songId);
   const isPrimaryMuse = selectedMuse?.slug === safeDefaultMuse?.slug;
-  const canSend = input.trim().length > 0 && status !== "sending";
+  const isBusy =
+    status === "sending" || collaborationStatus === "sending";
+  const canSend = input.trim().length > 0 && !isBusy;
 
   const conversationContext = useMemo(
     () =>
       messages
         .slice(-8)
-        .map(
-          (message) =>
-            `${message.role === "user" ? "Songwriter" : selectedMuse?.name ?? "Muse"}: ${
-              message.content
-            }`,
-        )
+        .map((message) => {
+          const speaker =
+            message.role === "user"
+              ? "Songwriter"
+              : message.museName || selectedMuse?.name || "Muse";
+
+          return `${speaker}: ${message.content}`;
+        })
         .join("\n\n"),
     [messages, selectedMuse?.name],
   );
@@ -93,12 +117,46 @@ export function MuseChatPanel({
     setInput("");
     setStatus("idle");
     setErrorMessage("");
+    setCollaborationSourceId(null);
+    setCollaboratorMuseSlug("");
+    setCollaborationStatus("idle");
+    setCollaborationError("");
+  }
+
+  function getFirstAvailableCollaborator(primaryMuseSlug: string) {
+    return (
+      museOptions.find((option) => option.slug !== primaryMuseSlug)?.slug ?? ""
+    );
+  }
+
+  function openCollaboration(message: ChatMessage) {
+    if (!message.museSlug) {
+      return;
+    }
+
+    setCollaborationSourceId(message.id);
+    setCollaboratorMuseSlug(
+      getFirstAvailableCollaborator(message.museSlug),
+    );
+    setCollaborationStatus("idle");
+    setCollaborationError("");
+  }
+
+  function closeCollaboration() {
+    if (collaborationStatus === "sending") {
+      return;
+    }
+
+    setCollaborationSourceId(null);
+    setCollaboratorMuseSlug("");
+    setCollaborationStatus("idle");
+    setCollaborationError("");
   }
 
   async function sendMessage(rawMessage: string) {
     const message = rawMessage.trim();
 
-    if (!message || status === "sending" || !selectedMuse) {
+    if (!message || isBusy || !selectedMuse) {
       return;
     }
 
@@ -112,6 +170,8 @@ export function MuseChatPanel({
     setInput("");
     setStatus("sending");
     setErrorMessage("");
+    setCollaborationSourceId(null);
+    setCollaborationError("");
 
     try {
       const requestMessage = conversationContext
@@ -124,6 +184,7 @@ export function MuseChatPanel({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          mode: "chat",
           museSlug: selectedMuse.slug,
           message: requestMessage,
           ...(songId ? { songId } : {}),
@@ -151,6 +212,10 @@ export function MuseChatPanel({
           id: createMessageId(),
           role: "assistant",
           content: result.reply!.trim(),
+          museSlug: result.muse?.slug || selectedMuse.slug,
+          museName: result.muse?.name || selectedMuse.name,
+          kind: "primary",
+          question: message,
         },
       ]);
 
@@ -161,6 +226,88 @@ export function MuseChatPanel({
         error instanceof Error
           ? error.message
           : `${selectedMuse.name} could not respond.`,
+      );
+    }
+  }
+
+  async function requestCollaboration(sourceMessage: ChatMessage) {
+    if (
+      !sourceMessage.museSlug ||
+      !sourceMessage.museName ||
+      !sourceMessage.question ||
+      !collaboratorMuseSlug ||
+      collaborationStatus === "sending"
+    ) {
+      return;
+    }
+
+    const collaborator = museOptions.find(
+      (option) => option.slug === collaboratorMuseSlug,
+    );
+
+    if (!collaborator) {
+      setCollaborationStatus("error");
+      setCollaborationError("Choose a Muse to invite.");
+      return;
+    }
+
+    setCollaborationStatus("sending");
+    setCollaborationError("");
+
+    try {
+      const response = await fetch("/api/muses/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode: "collaborate",
+          primaryMuseSlug: sourceMessage.museSlug,
+          collaboratorMuseSlug: collaborator.slug,
+          originalQuestion: sourceMessage.question,
+          primaryResponse: sourceMessage.content,
+          ...(songId ? { songId } : {}),
+        }),
+      });
+
+      const result = (await response.json().catch(() => null)) as
+        | MuseChatResponse
+        | null;
+
+      if (
+        !response.ok ||
+        result?.status !== "success" ||
+        !result.reply?.trim()
+      ) {
+        throw new Error(
+          result?.message ||
+            `${collaborator.name} could not join the conversation. Request failed with status ${response.status}.`,
+        );
+      }
+
+      setMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "assistant",
+          content: result.reply!.trim(),
+          museSlug: result.muse?.slug || collaborator.slug,
+          museName: result.muse?.name || collaborator.name,
+          kind: "collaborator",
+          question: sourceMessage.question,
+          comparisonWith: sourceMessage.museName,
+        },
+      ]);
+
+      setCollaborationStatus("idle");
+      setCollaborationSourceId(null);
+      setCollaboratorMuseSlug("");
+    } catch (error) {
+      setCollaborationStatus("error");
+      setCollaborationError(
+        error instanceof Error
+          ? error.message
+          : `${collaborator.name} could not join the conversation.`,
       );
     }
   }
@@ -237,7 +384,7 @@ export function MuseChatPanel({
             id="muse-selector"
             className="input"
             value={selectedMuse.slug}
-            disabled={status === "sending"}
+            disabled={isBusy}
             onChange={(event) => resetConversation(event.target.value)}
             style={{ marginTop: "0.35rem" }}
           >
@@ -279,7 +426,7 @@ export function MuseChatPanel({
                 key={question}
                 type="button"
                 className="button"
-                disabled={status === "sending"}
+                disabled={isBusy}
                 onClick={() => void sendMessage(question)}
               >
                 {question}
@@ -296,43 +443,179 @@ export function MuseChatPanel({
             marginTop: "1rem",
           }}
         >
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              style={{
-                justifySelf:
-                  message.role === "user" ? "end" : "start",
-                width: "min(100%, 850px)",
-                padding: "0.9rem 1rem",
-                borderRadius: 16,
-                border:
-                  message.role === "assistant"
-                    ? "1px solid rgba(220, 182, 92, 0.5)"
-                    : "1px solid var(--line)",
-                background:
-                  message.role === "assistant"
-                    ? "rgba(137, 96, 31, 0.14)"
-                    : "rgba(255,255,255,0.04)",
-              }}
-            >
-              <div className="eyebrow">
-                {message.role === "assistant"
-                  ? selectedMuse.name
-                  : "You"}
-              </div>
+          {messages.map((message) => {
+            const isAssistant = message.role === "assistant";
+            const isCollaborationOpen =
+              collaborationSourceId === message.id;
 
+            return (
               <div
-                className="copy"
+                key={message.id}
                 style={{
-                  marginTop: "0.35rem",
-                  whiteSpace: "pre-wrap",
-                  lineHeight: 1.65,
+                  justifySelf:
+                    message.role === "user" ? "end" : "start",
+                  width: "min(100%, 850px)",
                 }}
               >
-                {message.content}
+                <div
+                  style={{
+                    padding: "0.9rem 1rem",
+                    borderRadius: 16,
+                    border:
+                      isAssistant
+                        ? message.kind === "collaborator"
+                          ? "1px solid rgba(154, 134, 220, 0.65)"
+                          : "1px solid rgba(220, 182, 92, 0.5)"
+                        : "1px solid var(--line)",
+                    background:
+                      isAssistant
+                        ? message.kind === "collaborator"
+                          ? "rgba(105, 85, 170, 0.13)"
+                          : "rgba(137, 96, 31, 0.14)"
+                        : "rgba(255,255,255,0.04)",
+                  }}
+                >
+                  <div className="eyebrow">
+                    {message.role === "assistant"
+                      ? message.kind === "collaborator"
+                        ? `${message.museName} — another Muse's perspective`
+                        : message.museName
+                      : "You"}
+                  </div>
+
+                  {message.kind === "collaborator" &&
+                  message.comparisonWith ? (
+                    <p
+                      className="copy"
+                      style={{
+                        marginTop: "0.25rem",
+                        marginBottom: 0,
+                        fontSize: "0.82rem",
+                        opacity: 0.8,
+                      }}
+                    >
+                      A different lens from {message.comparisonWith}
+                    </p>
+                  ) : null}
+
+                  <div
+                    className="copy"
+                    style={{
+                      marginTop: "0.35rem",
+                      whiteSpace: "pre-wrap",
+                      lineHeight: 1.65,
+                    }}
+                  >
+                    {message.content}
+                  </div>
+                </div>
+
+                {message.role === "assistant" &&
+                message.kind === "primary" ? (
+                  <div style={{ marginTop: "0.55rem" }}>
+                    {!isCollaborationOpen ? (
+                      <button
+                        type="button"
+                        className="button"
+                        disabled={isBusy}
+                        onClick={() => openCollaboration(message)}
+                      >
+                        Invite another Muse
+                      </button>
+                    ) : (
+                      <div
+                        style={{
+                          padding: "0.85rem",
+                          border: "1px solid var(--line)",
+                          borderRadius: 14,
+                          background: "rgba(0,0,0,0.12)",
+                        }}
+                      >
+                        <div className="eyebrow">
+                          What would another Muse say?
+                        </div>
+
+                        <label
+                          className="copy"
+                          htmlFor={`collaborator-${message.id}`}
+                          style={{ display: "block", marginTop: "0.45rem" }}
+                        >
+                          Invite a different perspective
+                        </label>
+
+                        <select
+                          id={`collaborator-${message.id}`}
+                          className="input"
+                          value={collaboratorMuseSlug}
+                          disabled={collaborationStatus === "sending"}
+                          onChange={(event) =>
+                            setCollaboratorMuseSlug(event.target.value)
+                          }
+                          style={{ marginTop: "0.35rem" }}
+                        >
+                          {museOptions
+                            .filter(
+                              (option) =>
+                                option.slug !== message.museSlug,
+                            )
+                            .map((option) => (
+                              <option
+                                key={option.slug}
+                                value={option.slug}
+                              >
+                                {option.name} — {option.domain}
+                              </option>
+                            ))}
+                        </select>
+
+                        <div
+                          className="button-row"
+                          style={{ marginTop: "0.65rem" }}
+                        >
+                          <button
+                            type="button"
+                            className="button primary"
+                            disabled={
+                              collaborationStatus === "sending" ||
+                              !collaboratorMuseSlug
+                            }
+                            onClick={() =>
+                              void requestCollaboration(message)
+                            }
+                          >
+                            {collaborationStatus === "sending"
+                              ? "Inviting Muse…"
+                              : "Compare perspectives"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="button"
+                            disabled={
+                              collaborationStatus === "sending"
+                            }
+                            onClick={closeCollaboration}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+
+                        {collaborationError ? (
+                          <div
+                            role="alert"
+                            className="statusMessage statusError"
+                            style={{ marginTop: "0.65rem" }}
+                          >
+                            {collaborationError}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {status === "sending" ? (
             <div
@@ -360,7 +643,7 @@ export function MuseChatPanel({
           className="textarea"
           rows={5}
           value={input}
-          disabled={status === "sending"}
+          disabled={isBusy}
           placeholder={`Ask ${selectedMuse.name} about ${selectedMuse.domain.toLowerCase()}...`}
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={handleKeyDown}
@@ -386,7 +669,7 @@ export function MuseChatPanel({
             <button
               type="button"
               className="button"
-              disabled={status === "sending"}
+              disabled={isBusy}
               onClick={() => resetConversation()}
             >
               Start new conversation
