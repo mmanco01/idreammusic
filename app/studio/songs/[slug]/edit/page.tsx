@@ -203,7 +203,33 @@ export default async function EditSongPage({
               "radial-gradient(circle at top right, rgba(151, 106, 40, 0.16), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
           }}
         >
+          <style>{`
+            @media (min-width: 760px) {
+              .work-song-title-one-line {
+                white-space: nowrap;
+              }
+            }
+
+            @media (max-width: 759px) {
+              .work-song-title-one-line {
+                white-space: normal;
+              }
+            }
+          `}</style>
+
           <div className="eyebrow">Song workbench</div>
+
+          <h1
+            className="h2 work-song-title-one-line"
+            style={{
+              marginTop: "0.45rem",
+              marginBottom: "1rem",
+              fontSize: "clamp(2.35rem, 5vw, 4.45rem)",
+              lineHeight: 1,
+            }}
+          >
+            Work the Song
+          </h1>
 
           <div
             style={{
@@ -215,18 +241,7 @@ export default async function EditSongPage({
             }}
           >
             <div>
-              <h1
-                className="h2"
-                style={{
-                  marginBottom: "0.5rem",
-                  fontSize: "clamp(2.5rem, 6vw, 4.8rem)",
-                  lineHeight: 1,
-                }}
-              >
-                Work the Song
-              </h1>
-
-              <h2 className="h3" style={{ marginTop: "0.8rem" }}>
+              <h2 className="h3" style={{ marginTop: 0 }}>
                 {songTitle}
               </h2>
 
