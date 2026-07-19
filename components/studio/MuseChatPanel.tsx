@@ -12,10 +12,11 @@ export type MuseChatOption = {
 };
 
 type Props = {
-  songId: string;
-  songTitle: string;
   defaultMuseSlug: string;
   museOptions: readonly MuseChatOption[];
+  songId?: string;
+  songTitle?: string;
+  lockedMuse?: boolean;
 };
 
 type ChatMessage = {
@@ -41,10 +42,11 @@ function createMessageId() {
 }
 
 export function MuseChatPanel({
-  songId,
-  songTitle,
   defaultMuseSlug,
   museOptions,
+  songId,
+  songTitle,
+  lockedMuse = false,
 }: Props) {
   const safeDefaultMuse =
     museOptions.find((option) => option.slug === defaultMuseSlug) ??
@@ -64,6 +66,7 @@ export function MuseChatPanel({
     museOptions.find((option) => option.slug === selectedMuseSlug) ??
     safeDefaultMuse;
 
+  const isSongConversation = Boolean(songId);
   const isPrimaryMuse = selectedMuse?.slug === safeDefaultMuse?.slug;
   const canSend = input.trim().length > 0 && status !== "sending";
 
@@ -71,10 +74,11 @@ export function MuseChatPanel({
     () =>
       messages
         .slice(-8)
-        .map((message) =>
-          `${message.role === "user" ? "Songwriter" : selectedMuse?.name ?? "Muse"}: ${
-            message.content
-          }`,
+        .map(
+          (message) =>
+            `${message.role === "user" ? "Songwriter" : selectedMuse?.name ?? "Muse"}: ${
+              message.content
+            }`,
         )
         .join("\n\n"),
     [messages, selectedMuse?.name],
@@ -121,8 +125,8 @@ export function MuseChatPanel({
         },
         body: JSON.stringify({
           museSlug: selectedMuse.slug,
-          songId,
           message: requestMessage,
+          ...(songId ? { songId } : {}),
         }),
       });
 
@@ -149,6 +153,7 @@ export function MuseChatPanel({
           content: result.reply!.trim(),
         },
       ]);
+
       setStatus("idle");
     } catch (error) {
       setStatus("error");
@@ -189,7 +194,11 @@ export function MuseChatPanel({
       }}
     >
       <div className="eyebrow">
-        {isPrimaryMuse ? "Your song's Muse" : "Invited Muse specialist"}
+        {isSongConversation
+          ? isPrimaryMuse
+            ? "Your song's Muse"
+            : "Invited Muse specialist"
+          : `Conversation with the Muse of ${selectedMuse.domain}`}
       </div>
 
       <h2 className="h2" style={{ marginBottom: "0.35rem" }}>
@@ -198,46 +207,61 @@ export function MuseChatPanel({
 
       <p className="copy" style={{ maxWidth: 850 }}>
         <strong>{selectedMuse.name}</strong> is the Muse of{" "}
-        <strong>{selectedMuse.domain}</strong>. {selectedMuse.label}. She will
-        work with the saved material for <strong>{songTitle}</strong>.
+        <strong>{selectedMuse.domain}</strong>. {selectedMuse.label}.
+        {isSongConversation && songTitle ? (
+          <>
+            {" "}
+            She will work with the saved material for{" "}
+            <strong>{songTitle}</strong>.
+          </>
+        ) : (
+          " Ask about songwriting, creative direction, a new idea, or a song you are developing."
+        )}
       </p>
 
-      <div
-        style={{
-          marginTop: "0.85rem",
-          padding: "0.85rem",
-          border: "1px solid var(--line)",
-          borderRadius: 14,
-          background: "rgba(0,0,0,0.12)",
-        }}
-      >
-        <label className="copy" htmlFor="muse-selector">
-          Creative partner
-        </label>
-
-        <select
-          id="muse-selector"
-          className="input"
-          value={selectedMuse.slug}
-          disabled={status === "sending"}
-          onChange={(event) => resetConversation(event.target.value)}
-          style={{ marginTop: "0.35rem" }}
+      {!lockedMuse ? (
+        <div
+          style={{
+            marginTop: "0.85rem",
+            padding: "0.85rem",
+            border: "1px solid var(--line)",
+            borderRadius: 14,
+            background: "rgba(0,0,0,0.12)",
+          }}
         >
-          {museOptions.map((option) => (
-            <option key={option.slug} value={option.slug}>
-              {option.name} — {option.domain}
-              {option.slug === safeDefaultMuse?.slug ? " (Primary Muse)" : ""}
-            </option>
-          ))}
-        </select>
+          <label className="copy" htmlFor="muse-selector">
+            Creative partner
+          </label>
 
-        {!isPrimaryMuse ? (
-          <p className="copy" style={{ marginTop: "0.45rem", fontSize: "0.86rem" }}>
-            {selectedMuse.name} is joining as a specialist. The song remains
-            assigned to {safeDefaultMuse?.name}.
-          </p>
-        ) : null}
-      </div>
+          <select
+            id="muse-selector"
+            className="input"
+            value={selectedMuse.slug}
+            disabled={status === "sending"}
+            onChange={(event) => resetConversation(event.target.value)}
+            style={{ marginTop: "0.35rem" }}
+          >
+            {museOptions.map((option) => (
+              <option key={option.slug} value={option.slug}>
+                {option.name} — {option.domain}
+                {option.slug === safeDefaultMuse?.slug
+                  ? " (Primary Muse)"
+                  : ""}
+              </option>
+            ))}
+          </select>
+
+          {!isPrimaryMuse && isSongConversation ? (
+            <p
+              className="copy"
+              style={{ marginTop: "0.45rem", fontSize: "0.86rem" }}
+            >
+              {selectedMuse.name} is joining as a specialist. The song remains
+              assigned to {safeDefaultMuse?.name}.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       {messages.length === 0 ? (
         <div style={{ marginTop: "1rem" }}>
@@ -320,7 +344,7 @@ export function MuseChatPanel({
                 width: "fit-content",
               }}
             >
-              {selectedMuse.name} is considering the song…
+              {selectedMuse.name} is considering your question…
             </div>
           ) : null}
         </div>
