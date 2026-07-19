@@ -1390,7 +1390,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       (total, song) => total + song.listener_rating_count,
       0,
     );
-
+const DISPLAY_LIMIT = 12;
     return {
       active,
       now,
@@ -1436,7 +1436,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
 
       return true;
     });
-
+const displayedSongs = visibleSongs.slice(0, DISPLAY_LIMIT);
     return [...filtered].sort((a, b) => {
       if (sortMode === "opportunity") {
         return (
@@ -1699,7 +1699,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         }}
       >
         <span>
-          Showing <strong>{visibleSongs.length}</strong> of{" "}
+          Showing <strong>{displayedSongs.length}</strong> of{" "}
           <strong>{songs.length}</strong> songs
         </span>
         {!showFinished && summary.finished > 0 ? (
@@ -1708,7 +1708,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       </div>
 
       <div style={{ display: "grid", gap: "0.85rem", marginTop: "1rem" }}>
-        {visibleSongs.map((song) => {
+        {displayedSongs.map((song) => {
           const assessment = opportunityModel.assessments.get(song.id);
 
           if (!assessment) return null;
@@ -1727,7 +1727,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         })}
       </div>
 
-      {visibleSongs.length === 0 ? (
+      {displayedSongs.length === 0 ? (
         <div
           className="copy"
           style={{
