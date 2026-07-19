@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+const DISPLAY_LIMIT = 100;
+
 export type PriorityTier = "now" | "next" | "later" | "someday" | "archive";
 export type WorkflowStatus =
   | "unreviewed"
