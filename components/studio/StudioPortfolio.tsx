@@ -1215,19 +1215,6 @@ function SongOpportunityCard({
           </div>
         </div>
 
-        {song.ai_likely_listeners.length ? (
-          <div style={{ marginTop: "0.75rem" }}>
-            <div className="eyebrow">Best-fit audiences</div>
-            <div className="pillRow" style={{ marginTop: "0.4rem" }}>
-              {song.ai_likely_listeners.slice(0, 4).map((listener) => (
-                <span className="pill" key={listener}>
-                  {listener}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <div
           style={{
             display: "grid",
@@ -1313,45 +1300,123 @@ function SongOpportunityCard({
           </div>
         </div>
 
-        {song.ai_radio_potential || song.ai_hook_commercial_potential ? (
-          <div
+        {song.ai_likely_listeners.length ||
+        song.ai_playlist_fit.length ||
+        song.ai_sync_opportunities.length ||
+        song.ai_radio_potential ||
+        song.ai_hook_commercial_potential ? (
+          <details
             style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
-              gap: "0.65rem",
-              marginTop: "0.75rem",
+              marginTop: "0.8rem",
+              padding: "0.75rem",
+              border: "1px solid var(--line)",
+              borderRadius: 14,
+              background: "rgba(0,0,0,0.08)",
             }}
           >
-            {song.ai_radio_potential ? (
-              <div
-                style={{
-                  padding: "0.75rem",
-                  border: "1px solid var(--line)",
-                  borderRadius: 12,
-                }}
-              >
-                <div className="eyebrow">Radio potential</div>
-                <div className="copy" style={{ marginTop: "0.25rem" }}>
-                  {song.ai_radio_potential}
-                </div>
-              </div>
-            ) : null}
+            <summary
+              className="copy"
+              style={{
+                cursor: "pointer",
+                fontWeight: 800,
+                width: "fit-content",
+              }}
+            >
+              Audience &amp; commercial details
+            </summary>
 
-            {song.ai_hook_commercial_potential ? (
-              <div
-                style={{
-                  padding: "0.75rem",
-                  border: "1px solid var(--line)",
-                  borderRadius: 12,
-                }}
-              >
-                <div className="eyebrow">Commercial hook potential</div>
-                <div className="copy" style={{ marginTop: "0.25rem" }}>
-                  {song.ai_hook_commercial_potential}
+            <div style={{ marginTop: "0.8rem" }}>
+              {song.ai_likely_listeners.length ? (
+                <div>
+                  <div className="eyebrow">Best-fit audiences</div>
+                  <div className="pillRow" style={{ marginTop: "0.4rem" }}>
+                    {song.ai_likely_listeners.slice(0, 4).map((listener) => (
+                      <span className="pill" key={listener}>
+                        {listener}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
+              ) : null}
+
+              {song.ai_playlist_fit.length ? (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <div className="eyebrow">Playlist fit</div>
+                  <div className="pillRow" style={{ marginTop: "0.4rem" }}>
+                    {song.ai_playlist_fit.slice(0, 4).map((playlist) => (
+                      <span className="pill" key={playlist}>
+                        {playlist}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {song.ai_sync_opportunities.length ? (
+                <div style={{ marginTop: "0.75rem" }}>
+                  <div className="eyebrow">Sync opportunities</div>
+                  <div className="pillRow" style={{ marginTop: "0.4rem" }}>
+                    {song.ai_sync_opportunities.slice(0, 4).map((item) => (
+                      <span className="pill" key={item}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {song.ai_radio_potential ||
+              song.ai_hook_commercial_potential ? (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(230px, 1fr))",
+                    gap: "0.65rem",
+                    marginTop: "0.75rem",
+                  }}
+                >
+                  {song.ai_radio_potential ? (
+                    <div
+                      style={{
+                        padding: "0.75rem",
+                        border: "1px solid var(--line)",
+                        borderRadius: 12,
+                      }}
+                    >
+                      <div className="eyebrow">Radio potential</div>
+                      <div
+                        className="copy"
+                        style={{ marginTop: "0.25rem" }}
+                      >
+                        {song.ai_radio_potential}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {song.ai_hook_commercial_potential ? (
+                    <div
+                      style={{
+                        padding: "0.75rem",
+                        border: "1px solid var(--line)",
+                        borderRadius: 12,
+                      }}
+                    >
+                      <div className="eyebrow">
+                        Commercial hook potential
+                      </div>
+                      <div
+                        className="copy"
+                        style={{ marginTop: "0.25rem" }}
+                      >
+                        {song.ai_hook_commercial_potential}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </details>
         ) : null}
 
         <details style={{ marginTop: "0.8rem" }}>
