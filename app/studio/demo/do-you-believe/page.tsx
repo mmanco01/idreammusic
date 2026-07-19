@@ -8,6 +8,74 @@ export const dynamic = "force-dynamic";
 const DEMO_SONG_SLUG =
   process.env.IDREAMMUSIC_DEMO_SONG_SLUG || "do-you-believe";
 
+async function findDemoSong() {
+  const candidateSlugs = Array.from(
+    new Set(
+      [
+        process.env.IDREAMMUSIC_DEMO_SONG_SLUG,
+        "do-you-believe",
+      ].filter(
+        (value): value is string =>
+          typeof value === "string" &&
+          Boolean(value.trim()),
+      ),
+    ),
+  );
+
+  for (const candidateSlug of candidateSlugs) {
+    const candidateSong =
+      await getSongBySlug(candidateSlug);
+
+    if (candidateSong) {
+      return candidateSong;
+    }
+  }
+
+  const supabase =
+    await createServerSupabaseClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  const titleColumns = [
+    "title_final",
+    "title_working",
+  ] as const;
+
+  for (const column of titleColumns) {
+    const { data, error } = await (supabase as any)
+      .from("songs")
+      .select("slug")
+      .ilike(column, "%do you believe%")
+      .in("status", ["shared", "published"])
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error(
+        `Unable to find demo song by ${column}:`,
+        error.message,
+      );
+      continue;
+    }
+
+    if (data?.slug) {
+      const matchedSong =
+        await getSongBySlug(data.slug);
+
+      if (matchedSong) {
+        return matchedSong;
+      }
+    }
+  }
+
+  return null;
+}
+
 type MetricValue = number | string | null;
 
 type DemoMetrics = {
@@ -427,8 +495,7 @@ function ScoreCard({
 }
 
 export default async function DoYouBelieveDemoPage() {
-  const song =
-    await getSongBySlug(DEMO_SONG_SLUG);
+  const song = await findDemoSong();
 
   if (!song) {
     return (
@@ -444,13 +511,12 @@ export default async function DoYouBelieveDemoPage() {
             </h1>
 
             <p className="copy">
-              Set{" "}
-              <code>
-                IDREAMMUSIC_DEMO_SONG_SLUG
-              </code>{" "}
-              to the public slug for “Do You
-              Believe?” or confirm that its slug is{" "}
-              <code>do-you-believe</code>.
+              The demo page could not find a public or
+              shared song whose title contains “Do You
+              Believe.” Confirm that the song is marked
+              Shared or Published and that either its
+              working title or final title contains
+              those words.
             </p>
           </div>
         </div>
