@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { saveSongEdits } from './actions';
 import { SongIntelligencePanel } from '@/components/studio/SongIntelligencePanel';
+import { MuseChatPanel } from '@/components/studio/MuseChatPanel';
 
 export default async function EditSongPage({
   params,
@@ -141,6 +142,12 @@ export default async function EditSongPage({
         new Date(b.created_at).getTime() -
         new Date(a.created_at).getTime()
     )[0] ?? null;
+
+  const songTitle =
+    song.title_final ||
+    song.title_working ||
+    primaryVersion?.title ||
+    'Untitled song';
 
   return (
     <section className="section">
@@ -512,6 +519,13 @@ export default async function EditSongPage({
               )}
               transcripts={song.song_transcripts ?? []}
               audienceMetrics={audienceMetrics}
+            />
+          </div>
+
+          <div style={{ marginTop: '1.25rem' }}>
+            <MuseChatPanel
+              songId={song.id}
+              songTitle={songTitle}
             />
           </div>
         </div>
