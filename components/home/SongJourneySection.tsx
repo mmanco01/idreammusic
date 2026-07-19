@@ -16,7 +16,11 @@ const journeySteps: readonly JourneyStep[] = [
     subtitle: "Capture inspiration before it disappears.",
     body:
       "Save a voice memo, lyric, riff, dream, memory, title, or unfinished recording. Place it within the Muse that best reflects where the song came from.",
-    details: ["Voice memos", "Lyrics and hooks", "Spark → Draft → Final"],
+    details: [
+      "Voice memos",
+      "Lyrics and hooks",
+      "Spark → Draft → Final",
+    ],
   },
   {
     number: "02",
@@ -24,15 +28,24 @@ const journeySteps: readonly JourneyStep[] = [
     subtitle: "See what is working and what needs attention.",
     body:
       "Use Song Intelligence, ratings, sorting, filtering, and listener engagement to uncover strengths, identify opportunities, and decide what deserves your focus next.",
-    details: ["AI Song Intelligence", "Ratings and priorities", "Engagement insights"],
+    details: [
+      "AI Song Intelligence",
+      "Ratings and priorities",
+      "Engagement insights",
+    ],
   },
   {
     number: "03",
     title: "Collaborate with the Muses",
-    subtitle: "Develop the song through specialized creative lenses.",
+    subtitle:
+      "Develop the song through specialized creative lenses.",
     body:
       "Work directly with the song’s assigned Muse. Then invite another Muse to offer a different perspective on story, craft, rhythm, faith, love, emotion, or possibility.",
-    details: ["Active Muse guidance", "Second opinions", "Inter-Muse collaboration"],
+    details: [
+      "Active Muse guidance",
+      "Second opinions",
+      "Inter-Muse collaboration",
+    ],
     featured: true,
   },
   {
@@ -41,13 +54,20 @@ const journeySteps: readonly JourneyStep[] = [
     subtitle: "Let the song find its listeners.",
     body:
       "Publish developing or finished songs to the iDreamMusic Jukebox. Listeners can hear them, respond, rate them, and become part of the song’s continuing journey.",
-    details: ["Public Jukebox", "Listener comments", "Ratings and response"],
+    details: [
+      "Public Jukebox",
+      "Listener comments",
+      "Ratings and response",
+    ],
   },
 ];
 
 export function SongJourneySection() {
   return (
-    <section className="section" aria-labelledby="song-journey-heading">
+    <section
+      className="section"
+      aria-labelledby="song-journey-heading"
+    >
       <div className="container">
         <div
           className="card"
@@ -94,7 +114,9 @@ export function SongJourneySection() {
               </span>
             </div>
 
-            <div className="eyebrow">The complete song journey</div>
+            <div className="eyebrow">
+              The complete song journey
+            </div>
 
             <h2
               id="song-journey-heading"
@@ -118,10 +140,12 @@ export function SongJourneySection() {
                 lineHeight: 1.7,
               }}
             >
-              iDreamMusic accompanies a song through its entire creative
-              life—from the first spark, through intelligence and development,
-              into active collaboration with the Muses, and finally out to the
-              listeners who help reveal what the song may become next.
+              iDreamMusic accompanies a song through its entire
+              creative life—from the first spark, through
+              intelligence and development, into active
+              collaboration with the Muses, and finally out to the
+              listeners who help reveal what the song may become
+              next.
             </p>
           </div>
 
@@ -208,7 +232,9 @@ export function SongJourneySection() {
                     <span
                       key={detail}
                       className="pill"
-                      style={{ fontSize: "0.78rem" }}
+                      style={{
+                        fontSize: "0.78rem",
+                      }}
                     >
                       {detail}
                     </span>
@@ -222,7 +248,8 @@ export function SongJourneySection() {
             style={{
               position: "relative",
               display: "grid",
-              gridTemplateColumns: "1fr auto",
+              gridTemplateColumns:
+                "minmax(0, 1fr) auto",
               alignItems: "center",
               gap: "1rem",
               marginTop: "1.5rem",
@@ -233,7 +260,10 @@ export function SongJourneySection() {
             }}
           >
             <div>
-              <div className="eyebrow">The creative loop</div>
+              <div className="eyebrow">
+                The creative loop
+              </div>
+
               <p
                 className="copy"
                 style={{
@@ -241,10 +271,11 @@ export function SongJourneySection() {
                   maxWidth: 850,
                 }}
               >
-                The journey does not end when a song is shared. Listener
-                comments, ratings, and engagement return to the songwriter as
-                new intelligence—creating another reason to revisit, refine,
-                collaborate, and share again.
+                The journey does not end when a song is shared.
+                Listener comments, ratings, and engagement return
+                to the songwriter as new intelligence—creating
+                another reason to revisit, refine, collaborate, and
+                share again.
               </p>
             </div>
 
@@ -266,15 +297,24 @@ export function SongJourneySection() {
               marginTop: "1.35rem",
             }}
           >
-            <Link href="/studio" className="button primary">
+            <Link
+              href="/studio"
+              className="button primary"
+            >
               Enter Songcatcher Studio
             </Link>
 
-            <Link href="/nine-muses" className="button">
+            <Link
+              href="/muses"
+              className="button"
+            >
               Meet the Nine Muses
             </Link>
 
-            <Link href="/listen" className="button">
+            <Link
+              href="/listen"
+              className="button"
+            >
               Open the Jukebox
             </Link>
           </div>
