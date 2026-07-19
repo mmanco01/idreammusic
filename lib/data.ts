@@ -413,8 +413,8 @@ export const getMySongs = cache(async (userId: string): Promise<SongSummary[]> =
     .from('songs')
     .select('id, slug, title_working, title_final, current_stage, summary, hook_line, muse_id, song_origin, updated_at')
     .eq('owner_user_id', userId)
-    .order('updated_at', { ascending: false })
-    .limit(12);
+    .order('updated_at', { ascending: false });
+   
 
   if (error || !data?.length) return [];
 
