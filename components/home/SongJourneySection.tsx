@@ -1,6 +1,15 @@
 import Link from "next/link";
 
-const journeySteps = [
+type JourneyStep = {
+  number: string;
+  title: string;
+  subtitle: string;
+  body: string;
+  details: readonly string[];
+  featured?: boolean;
+};
+
+const journeySteps: readonly JourneyStep[] = [
   {
     number: "01",
     title: "Catch the Song",
@@ -34,7 +43,7 @@ const journeySteps = [
       "Publish developing or finished songs to the iDreamMusic Jukebox. Listeners can hear them, respond, rate them, and become part of the song’s continuing journey.",
     details: ["Public Jukebox", "Listener comments", "Ratings and response"],
   },
-] as const;
+];
 
 export function SongJourneySection() {
   return (
