@@ -4,15 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
-const DISPLAY_LIMIT = 100;
+const DISPLAY_LIMIT = 12;
 
 export type PriorityTier = "now" | "next" | "later" | "someday" | "archive";
 export type WorkflowStatus =
-  | "unreviewed"
-  | "active"
-  | "waiting"
-  | "completed"
-  | "archived";
+  "unreviewed" | "active" | "waiting" | "completed" | "archived";
 
 export type StudioPortfolioSong = {
   id: string;
@@ -189,7 +185,7 @@ function normalizedListenerRating(song: StudioPortfolioSong) {
     song.listener_rating_average === null ||
     song.listener_rating_count <= 0
   ) {
-    return 50;
+    return 0;
   }
 
   const rawScore = clampScore((song.listener_rating_average / 5) * 100);
@@ -203,11 +199,10 @@ function normalizedListenerRating(song: StudioPortfolioSong) {
 }
 
 function normalizedEngagement(song: StudioPortfolioSong, maxListens: number) {
-  if (maxListens <= 0) return 50;
-  if (song.audio_play_count <= 0) return 25;
+  if (maxListens <= 0 || song.audio_play_count <= 0) return 0;
 
   const relative = Math.log1p(song.audio_play_count) / Math.log1p(maxListens);
-  return clampScore(25 + relative * 75);
+  return clampScore(relative * 100);
 }
 
 function stageSignal(stage: string) {
@@ -281,14 +276,81 @@ function buildOpportunityAssessment(
   song: StudioPortfolioSong,
   maxListens: number,
 ): OpportunityAssessment {
+  const hasUsableAiAnalysis =
+    song.ai_overall_score !== null && song.ai_completed_at !== null;
+
+  const listenerResponse = normalizedListenerRating(song);
+  const engagement = normalizedEngagement(song, maxListens);
+  const momentum = momentumSignal(song);
+
+  if (!hasUsableAiAnalysis) {
+    const reasons: string[] = [];
+    const watchItems = [
+      "No usable AI Song Intelligence report is available.",
+      "Add or correct the transcript or lyrics, then run AI Song Intelligence.",
+    ];
+
+    if (song.audio_play_count > 0) {
+      reasons.push(
+        `${song.audio_play_count.toLocaleString()} recorded ${
+          song.audio_play_count === 1 ? "listen" : "listens"
+        } are visible, but engagement cannot substitute for song analysis.`,
+      );
+    }
+
+    if (
+      song.listener_rating_average !== null &&
+      song.listener_rating_count > 0
+    ) {
+      reasons.push(
+        `Listeners rate it ${song.listener_rating_average.toFixed(
+          1,
+        )} out of 5 across ${song.listener_rating_count} ${
+          song.listener_rating_count === 1 ? "rating" : "ratings"
+        }.`,
+      );
+    } else {
+      watchItems.push("No listener ratings have been recorded yet.");
+    }
+
+    if (song.personal_rating === null) {
+      watchItems.push("You have not personally rated this song yet.");
+    }
+
+    const measuredSignalCount = [
+      song.personal_rating,
+      song.listener_rating_count > 0 ? song.listener_rating_average : null,
+      song.audio_play_count > 0 ? song.audio_play_count : null,
+    ].filter((value) => value !== null).length;
+
+    return {
+      score: 0,
+      label: "Needs analysis",
+      recommendation:
+        "Add or correct the transcript or lyrics, then run AI Song Intelligence.",
+      reasons: reasons.slice(0, 5),
+      watchItems: watchItems.slice(0, 4),
+      breakdown: {
+        aiStrength: 0,
+        releaseReadiness: 0,
+        audienceFit: 0,
+        personalConviction: song.personal_rating ?? 0,
+        listenerResponse,
+        engagement,
+        momentum,
+      },
+      measuredSignalCount,
+    };
+  }
+
   const breakdown: OpportunityBreakdown = {
-    aiStrength: song.ai_overall_score ?? 45,
-    releaseReadiness: song.ai_ready_for_release_score ?? 40,
-    audienceFit: song.ai_audience_score ?? 45,
-    personalConviction: song.personal_rating ?? 50,
-    listenerResponse: normalizedListenerRating(song),
-    engagement: normalizedEngagement(song, maxListens),
-    momentum: momentumSignal(song),
+    aiStrength: song.ai_overall_score ?? 0,
+    releaseReadiness: song.ai_ready_for_release_score ?? 0,
+    audienceFit: song.ai_audience_score ?? 0,
+    personalConviction: song.personal_rating ?? 0,
+    listenerResponse,
+    engagement,
+    momentum,
   };
 
   const score = Math.round(
@@ -320,7 +382,9 @@ function buildOpportunityAssessment(
   }
 
   if ((song.personal_rating ?? 0) >= 80) {
-    reasons.push(`Your personal rating is ${Math.round(song.personal_rating!)}.`);
+    reasons.push(
+      `Your personal rating is ${Math.round(song.personal_rating!)}.`,
+    );
   }
 
   if (
@@ -353,12 +417,16 @@ function buildOpportunityAssessment(
     reasons.push("The current song stage is Final.");
   }
 
-  if (song.ai_overall_score === null) {
-    watchItems.push("No saved AI Song Intelligence report yet.");
+  if (song.ai_ready_for_release_score === null) {
+    watchItems.push("Release-readiness analysis is not available yet.");
   }
 
   if (song.ai_audience_score === null) {
     watchItems.push("Audience-fit analysis is not available yet.");
+  }
+
+  if (song.personal_rating === null) {
+    watchItems.push("You have not personally rated this song yet.");
   }
 
   if (song.listener_rating_count === 0) {
@@ -369,7 +437,10 @@ function buildOpportunityAssessment(
     watchItems.push("No listening activity has been recorded yet.");
   }
 
-  if ((song.ai_ready_for_release_score ?? 100) < 60) {
+  if (
+    song.ai_ready_for_release_score !== null &&
+    song.ai_ready_for_release_score < 60
+  ) {
     watchItems.push("Release readiness still needs meaningful development.");
   }
 
@@ -426,7 +497,10 @@ function MetricCard({
         {value}
       </div>
       {detail ? (
-        <div className="copy" style={{ fontSize: "0.84rem", marginTop: "0.2rem" }}>
+        <div
+          className="copy"
+          style={{ fontSize: "0.84rem", marginTop: "0.2rem" }}
+        >
           {detail}
         </div>
       ) : null}
@@ -504,7 +578,10 @@ function TopOpportunityCard({
       >
         <div style={{ minWidth: 0 }}>
           <div className="eyebrow">Today&apos;s top opportunity</div>
-          <h3 className="h2" style={{ marginTop: "0.3rem", marginBottom: "0.4rem" }}>
+          <h3
+            className="h2"
+            style={{ marginTop: "0.3rem", marginBottom: "0.4rem" }}
+          >
             {song.title}
           </h3>
           <p className="copy" style={{ maxWidth: 760 }}>
@@ -523,13 +600,19 @@ function TopOpportunityCard({
             }}
           >
             <div className="eyebrow">Recommended next move</div>
-            <div className="copy" style={{ marginTop: "0.3rem", fontWeight: 750 }}>
+            <div
+              className="copy"
+              style={{ marginTop: "0.3rem", fontWeight: 750 }}
+            >
               {assessment.recommendation}
             </div>
           </div>
 
           <div className="button-row" style={{ marginTop: "0.9rem" }}>
-            <Link className="button primary" href={`/studio/songs/${song.slug}/edit`}>
+            <Link
+              className="button primary"
+              href={`/studio/songs/${song.slug}/edit`}
+            >
               Work this song
             </Link>
             <Link className="button" href={`/songs/${song.slug}`}>
@@ -562,10 +645,16 @@ function TopOpportunityCard({
           >
             {assessment.score}
           </div>
-          <div className="copy" style={{ marginTop: "0.35rem", fontWeight: 750 }}>
+          <div
+            className="copy"
+            style={{ marginTop: "0.35rem", fontWeight: 750 }}
+          >
             {assessment.label}
           </div>
-          <div className="copy" style={{ marginTop: "0.55rem", fontSize: "0.84rem" }}>
+          <div
+            className="copy"
+            style={{ marginTop: "0.55rem", fontSize: "0.84rem" }}
+          >
             {assessment.measuredSignalCount} measured data signals
           </div>
         </div>
@@ -579,7 +668,10 @@ function TopOpportunityCard({
           marginTop: "1rem",
         }}
       >
-        <MetricCard label="AI overall" value={formatScore(song.ai_overall_score)} />
+        <MetricCard
+          label="AI overall"
+          value={formatScore(song.ai_overall_score)}
+        />
         <MetricCard
           label="Release ready"
           value={formatScore(song.ai_ready_for_release_score)}
@@ -588,8 +680,14 @@ function TopOpportunityCard({
           label="Audience fit"
           value={formatScore(song.ai_audience_score)}
         />
-        <MetricCard label="Your rating" value={formatScore(song.personal_rating)} />
-        <MetricCard label="Listens" value={song.audio_play_count.toLocaleString()} />
+        <MetricCard
+          label="Your rating"
+          value={formatScore(song.personal_rating)}
+        />
+        <MetricCard
+          label="Listens"
+          value={song.audio_play_count.toLocaleString()}
+        />
         <MetricCard
           label="Active tasks"
           value={song.open_task_count + song.in_progress_task_count}
@@ -617,7 +715,10 @@ function TopOpportunityCard({
           <div>
             <div className="eyebrow">What is helping</div>
             {assessment.reasons.length ? (
-              <ul className="copy" style={{ marginTop: "0.5rem", paddingLeft: "1.2rem" }}>
+              <ul
+                className="copy"
+                style={{ marginTop: "0.5rem", paddingLeft: "1.2rem" }}
+              >
                 {assessment.reasons.map((reason) => (
                   <li key={reason} style={{ marginBottom: "0.3rem" }}>
                     {reason}
@@ -625,14 +726,19 @@ function TopOpportunityCard({
                 ))}
               </ul>
             ) : (
-              <p className="copy">No dominant positive signal has emerged yet.</p>
+              <p className="copy">
+                No dominant positive signal has emerged yet.
+              </p>
             )}
           </div>
 
           <div>
             <div className="eyebrow">What to strengthen</div>
             {assessment.watchItems.length ? (
-              <ul className="copy" style={{ marginTop: "0.5rem", paddingLeft: "1.2rem" }}>
+              <ul
+                className="copy"
+                style={{ marginTop: "0.5rem", paddingLeft: "1.2rem" }}
+              >
                 {assessment.watchItems.map((item) => (
                   <li key={item} style={{ marginBottom: "0.3rem" }}>
                     {item}
@@ -872,7 +978,10 @@ function PortfolioControls({
         </select>
       </label>
 
-      <label className="copy" style={{ display: "block", marginTop: "0.65rem" }}>
+      <label
+        className="copy"
+        style={{ display: "block", marginTop: "0.65rem" }}
+      >
         Rank within priority
         <input
           className="input"
@@ -882,19 +991,26 @@ function PortfolioControls({
           placeholder="Optional"
           onChange={(event) =>
             updateLocalSong(song.id, {
-              priority_rank: event.target.value ? Number(event.target.value) : null,
+              priority_rank: event.target.value
+                ? Number(event.target.value)
+                : null,
             })
           }
           onBlur={(event) =>
             void saveWorkflow(song, {
-              priority_rank: event.target.value ? Number(event.target.value) : null,
+              priority_rank: event.target.value
+                ? Number(event.target.value)
+                : null,
             })
           }
           style={{ marginTop: "0.3rem" }}
         />
       </label>
 
-      <label className="copy" style={{ display: "block", marginTop: "0.65rem" }}>
+      <label
+        className="copy"
+        style={{ display: "block", marginTop: "0.65rem" }}
+      >
         My rating
         <input
           className="input"
@@ -906,19 +1022,26 @@ function PortfolioControls({
           placeholder="0–100"
           onChange={(event) =>
             updateLocalSong(song.id, {
-              personal_rating: event.target.value ? Number(event.target.value) : null,
+              personal_rating: event.target.value
+                ? Number(event.target.value)
+                : null,
             })
           }
           onBlur={(event) =>
             void saveWorkflow(song, {
-              personal_rating: event.target.value ? Number(event.target.value) : null,
+              personal_rating: event.target.value
+                ? Number(event.target.value)
+                : null,
             })
           }
           style={{ marginTop: "0.3rem" }}
         />
       </label>
 
-      <label className="copy" style={{ display: "block", marginTop: "0.65rem" }}>
+      <label
+        className="copy"
+        style={{ display: "block", marginTop: "0.65rem" }}
+      >
         Workflow status
         <select
           className="input"
@@ -1029,7 +1152,9 @@ function SongOpportunityCard({
           >
             Opportunity {assessment.score}
           </span>
-          {rank ? <span className="pill">#{rank} active opportunity</span> : null}
+          {rank ? (
+            <span className="pill">#{rank} active opportunity</span>
+          ) : null}
           <span className="pill">{formatLabel(song.current_stage)}</span>
           {song.muse_slug ? (
             <span className="pill">{formatLabel(song.muse_slug)}</span>
@@ -1044,17 +1169,23 @@ function SongOpportunityCard({
             {song.priority_rank ? ` #${song.priority_rank}` : ""}
           </span>
           <span className="pill">AI {formatScore(song.ai_overall_score)}</span>
-          <span className="pill">Audience {formatScore(song.ai_audience_score)}</span>
-          <span className="pill">My rating {formatScore(song.personal_rating)}</span>
+          <span className="pill">
+            Audience {formatScore(song.ai_audience_score)}
+          </span>
+          <span className="pill">
+            My rating {formatScore(song.personal_rating)}
+          </span>
           <span className="pill">{song.audio_play_count} listens</span>
           {song.listener_rating_count > 0 ? (
             <span className="pill">
-              ★ {song.listener_rating_average?.toFixed(1)} ({song.listener_rating_count})
+              ★ {song.listener_rating_average?.toFixed(1)} (
+              {song.listener_rating_count})
             </span>
           ) : null}
           {song.open_task_count + song.in_progress_task_count > 0 ? (
             <span className="pill">
-              {song.open_task_count + song.in_progress_task_count} active task(s)
+              {song.open_task_count + song.in_progress_task_count} active
+              task(s)
             </span>
           ) : null}
           {song.is_finished ? <span className="pill">Finished</span> : null}
@@ -1076,7 +1207,10 @@ function SongOpportunityCard({
           }}
         >
           <div className="eyebrow">Recommended next move</div>
-          <div className="copy" style={{ marginTop: "0.25rem", fontWeight: 750 }}>
+          <div
+            className="copy"
+            style={{ marginTop: "0.25rem", fontWeight: 750 }}
+          >
             {assessment.recommendation}
           </div>
         </div>
@@ -1166,13 +1300,15 @@ function SongOpportunityCard({
           <div>
             <div className="eyebrow">Engagement</div>
             <div className="copy">
-              {song.audio_play_count} listens · {song.video_click_count} video clicks
+              {song.audio_play_count} listens · {song.video_click_count} video
+              clicks
             </div>
           </div>
           <div>
             <div className="eyebrow">Tasks</div>
             <div className="copy">
-              {song.open_task_count} open · {song.in_progress_task_count} in progress
+              {song.open_task_count} open · {song.in_progress_task_count} in
+              progress
             </div>
           </div>
         </div>
@@ -1276,7 +1412,10 @@ function SongOpportunityCard({
         ) : null}
 
         <div className="button-row" style={{ marginTop: "0.9rem" }}>
-          <Link className="button primary" href={`/studio/songs/${song.slug}/edit`}>
+          <Link
+            className="button primary"
+            href={`/studio/songs/${song.slug}/edit`}
+          >
             Work this song
           </Link>
           <Link className="button" href={`/songs/${song.slug}`}>
@@ -1325,7 +1464,10 @@ export default function StudioPortfolio({ initialSongs }: Props) {
   );
 
   const opportunityModel = useMemo(() => {
-    const maxListens = Math.max(0, ...songs.map((song) => song.audio_play_count));
+    const maxListens = Math.max(
+      0,
+      ...songs.map((song) => song.audio_play_count),
+    );
     const assessments = new Map<string, OpportunityAssessment>();
 
     for (const song of songs) {
@@ -1337,7 +1479,8 @@ export default function StudioPortfolio({ initialSongs }: Props) {
         (song) =>
           !recalculateFinished(song) &&
           song.priority_tier !== "archive" &&
-          song.workflow_status !== "archived",
+          song.workflow_status !== "archived" &&
+          (assessments.get(song.id)?.score ?? 0) > 0,
       )
       .sort((a, b) => {
         const scoreDifference =
@@ -1365,7 +1508,7 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       assessments,
       rankBySong,
       topSong,
-      topAssessment: topSong ? assessments.get(topSong.id) ?? null : null,
+      topAssessment: topSong ? (assessments.get(topSong.id) ?? null) : null,
     };
   }, [songs]);
 
@@ -1375,7 +1518,8 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       (song) => song.priority_tier === "now" && !recalculateFinished(song),
     ).length;
     const openTasks = songs.reduce(
-      (total, song) => total + song.open_task_count + song.in_progress_task_count,
+      (total, song) =>
+        total + song.open_task_count + song.in_progress_task_count,
       0,
     );
     const releaseCandidates = songs.filter(
@@ -1392,7 +1536,6 @@ export default function StudioPortfolio({ initialSongs }: Props) {
       (total, song) => total + song.listener_rating_count,
       0,
     );
-const DISPLAY_LIMIT = 12;
     return {
       active,
       now,
@@ -1419,7 +1562,8 @@ const DISPLAY_LIMIT = 12;
         return false;
       }
       if (museFilter !== "all" && song.muse_slug !== museFilter) return false;
-      if (stageFilter !== "all" && song.current_stage !== stageFilter) return false;
+      if (stageFilter !== "all" && song.current_stage !== stageFilter)
+        return false;
       if (priorityFilter !== "all" && song.priority_tier !== priorityFilter) {
         return false;
       }
@@ -1516,7 +1660,7 @@ const DISPLAY_LIMIT = 12;
   ]);
 
   const displayedSongs = visibleSongs.slice(0, DISPLAY_LIMIT);
-  
+
   function updateLocalSong(
     songId: string,
     patch: Partial<StudioPortfolioSong>,
@@ -1575,7 +1719,9 @@ const DISPLAY_LIMIT = 12;
       requestBody.append("workflow_status", nextSong.workflow_status);
       requestBody.append(
         "personal_rating",
-        nextSong.personal_rating === null ? "" : String(nextSong.personal_rating),
+        nextSong.personal_rating === null
+          ? ""
+          : String(nextSong.personal_rating),
       );
 
       const response = await fetch("/api/studio/song-workflow", {
