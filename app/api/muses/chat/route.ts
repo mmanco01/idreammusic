@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
-import { calliope } from "@/lib/muses/calliope";
-import { calliopeSystemPrompt } from "@/lib/muses/prompts/calliope";
+import { getMuseBySlug, MUSE_OPTIONS } from "@/lib/muses";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -33,6 +32,8 @@ type SongContext = {
   summary: string | null;
   hook_line: string | null;
   current_stage: string | null;
+  assigned_muse_slug: string | null;
+  assigned_muse_name: string | null;
   versions: SongVersionContext[];
 };
 
@@ -65,6 +66,7 @@ async function getSongById(
       hook_line,
       current_stage,
       owner_user_id,
+      muse_id,
       song_versions (
         id,
         version_number,
@@ -90,6 +92,24 @@ async function getSongById(
     return null;
   }
 
+  let assignedMuseSlug: string | null = null;
+  let assignedMuseName: string | null = null;
+
+  if (data.muse_id) {
+    const { data: museRow, error: museError } = await (supabase as any)
+      .from("muses")
+      .select("slug, name")
+      .eq("id", data.muse_id)
+      .maybeSingle();
+
+    if (museError) {
+      console.error("Unable to load assigned Muse:", museError);
+    } else if (museRow) {
+      assignedMuseSlug = museRow.slug ?? null;
+      assignedMuseName = museRow.name ?? null;
+    }
+  }
+
   const versions = Array.isArray(data.song_versions)
     ? (data.song_versions as SongVersionContext[])
     : [];
@@ -113,54 +133,9 @@ async function getSongById(
     summary: data.summary ?? null,
     hook_line: data.hook_line ?? null,
     current_stage: data.current_stage ?? null,
+    assigned_muse_slug: assignedMuseSlug,
+    assigned_muse_name: assignedMuseName,
     versions,
-  };
-}
-
-function buildMuseContext(song: SongContext | null) {
-  return {
-    muse: {
-      slug: calliope.slug,
-      name: calliope.name,
-      domain: calliope.domain,
-      purpose: calliope.purpose,
-      personality: calliope.personality,
-      speakingStyle: calliope.speakingStyle,
-      songwritingStrengths: calliope.songwritingStrengths,
-      evaluationCriteria: calliope.evaluationCriteria,
-      questionsSheAsks: calliope.questionsSheAsks,
-      boundaries: calliope.boundaries,
-    },
-
-    song: song
-      ? {
-          id: song.id,
-          slug: song.slug,
-          title: song.title,
-          workingTitle: song.title_working,
-          finalTitle: song.title_final,
-          summary: song.summary,
-          hookLine: song.hook_line,
-          currentStage: song.current_stage,
-
-          versions: song.versions.slice(0, 6).map((version) => ({
-            versionNumber: version.version_number,
-            stage: version.stage,
-            title: version.title,
-            lyrics: version.lyrics,
-            arrangementNotes: version.arrangement_notes,
-            storyBehindSong: version.story_behind_song,
-            isPrimary: version.is_stage_primary,
-          })),
-        }
-      : null,
-
-    /*
-     * Muse-specific knowledge retrieval can be added here later.
-     * Keeping this as an empty array allows the route to compile
-     * before a muse_knowledge table or retrieval service exists.
-     */
-    knowledge: [],
   };
 }
 
@@ -178,15 +153,19 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as MuseChatRequest;
 
-    const museSlug = cleanString(body.museSlug, 50).toLowerCase();
-    const message = cleanString(body.message, 12000);
+    const requestedMuseSlug = cleanString(body.museSlug, 50);
+    const message = cleanString(body.message, 16000);
     const songId = cleanString(body.songId, 100);
 
-    if (museSlug !== "calliope") {
+    const muse = getMuseBySlug(requestedMuseSlug);
+
+    if (!muse) {
       return NextResponse.json(
         {
           status: "error",
-          message: "Calliope is currently the only supported Muse.",
+          message: `Unsupported Muse. Available Muses: ${MUSE_OPTIONS.map(
+            (option) => option.name,
+          ).join(", ")}.`,
         },
         { status: 400 },
       );
@@ -196,7 +175,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           status: "error",
-          message: "Please enter a message for Calliope.",
+          message: `Please enter a message for ${muse.name}.`,
         },
         { status: 400 },
       );
@@ -223,10 +202,6 @@ export async function POST(request: Request) {
       console.error("Muse chat authentication error:", authError);
     }
 
-    /*
-     * General Calliope chat may work without a song.
-     * Access to private song context requires the song owner to be signed in.
-     */
     if (songId && !user) {
       return NextResponse.json(
         {
@@ -252,7 +227,46 @@ export async function POST(request: Request) {
       );
     }
 
-    const context = buildMuseContext(song);
+    const isPrimaryMuse =
+      Boolean(song?.assigned_muse_slug) &&
+      song?.assigned_muse_slug === muse.slug;
+
+    const context = {
+      selectedMuse: {
+        slug: muse.slug,
+        name: muse.name,
+        domain: muse.domain,
+        role: isPrimaryMuse
+          ? "This is the song's assigned primary Muse."
+          : "This Muse has been invited as a specialist collaborator.",
+      },
+      song: song
+        ? {
+            id: song.id,
+            slug: song.slug,
+            title: song.title,
+            workingTitle: song.title_working,
+            finalTitle: song.title_final,
+            summary: song.summary,
+            hookLine: song.hook_line,
+            currentStage: song.current_stage,
+            assignedMuse: {
+              slug: song.assigned_muse_slug,
+              name: song.assigned_muse_name,
+            },
+            versions: song.versions.slice(0, 6).map((version) => ({
+              versionNumber: version.version_number,
+              stage: version.stage,
+              title: version.title,
+              lyrics: version.lyrics,
+              arrangementNotes: version.arrangement_notes,
+              storyBehindSong: version.story_behind_song,
+              isPrimary: version.is_stage_primary,
+            })),
+          }
+        : null,
+      knowledge: [],
+    };
 
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
@@ -263,9 +277,7 @@ export async function POST(request: Request) {
         process.env.OPENAI_MUSE_MODEL ||
         process.env.OPENAI_MODEL ||
         "gpt-5-mini",
-
-      instructions: calliopeSystemPrompt,
-
+      instructions: muse.systemPrompt,
       input: `
 Here is the current iDreamMusic context:
 
@@ -275,11 +287,12 @@ The songwriter says:
 
 ${message}
 
-Respond as Calliope. Use the song context when available. Do not pretend
-to have heard audio or seen lyrics that are not present. Preserve the
-songwriter's voice and focus on the most useful next creative step.
+Respond as ${muse.name}, Muse of ${muse.domain}. Use the available song
+context when relevant. Do not pretend to have heard audio or seen material
+that is not present. Preserve the songwriter's voice. Focus on the most
+useful next creative step through your own Muse specialty.
       `.trim(),
-
+      max_output_tokens: 1400,
       store: false,
     });
 
@@ -289,7 +302,7 @@ songwriter's voice and focus on the most useful next creative step.
       return NextResponse.json(
         {
           status: "error",
-          message: "Calliope did not return a response.",
+          message: `${muse.name} did not return a response.`,
         },
         { status: 502 },
       );
@@ -298,9 +311,10 @@ songwriter's voice and focus on the most useful next creative step.
     return NextResponse.json({
       status: "success",
       muse: {
-        slug: calliope.slug,
-        name: calliope.name,
-        domain: calliope.domain,
+        slug: muse.slug,
+        name: muse.name,
+        domain: muse.domain,
+        isPrimaryMuse,
       },
       song: song
         ? {
@@ -320,7 +334,7 @@ songwriter's voice and focus on the most useful next creative step.
         message:
           error instanceof Error
             ? error.message
-            : "Calliope could not respond.",
+            : "The Muse could not respond.",
       },
       { status: 500 },
     );
