@@ -364,10 +364,10 @@ export default async function EditSongPage({
             {[
               ["Overview", "#overview"],
               ["Song details", "#song-details"],
-              ["Credits", "#credits"],
               ["Intelligence", "#intelligence"],
               ["Creative council", "#muses"],
               ["Share", "#share"],
+              ["Credits", "#credits"],
             ].map(([label, href]) => (
               <a key={href} href={href} className="button">
                 {label}
@@ -756,26 +756,6 @@ export default async function EditSongPage({
           </form>
         </section>
 
-        {primaryVersion ? (
-          <ProductionCreditsEditor
-            songId={song.id}
-            songVersionId={primaryVersion.id}
-            slug={slug}
-            versionNumber={primaryVersion.version_number}
-            existingCredits={productionCredits}
-            defaultSongwriter={
-              song.songwriter_name || "Mike Mancour"
-            }
-          />
-        ) : (
-          <section id="credits" className="card">
-            <div className="eyebrow">Production credits</div>
-            <h2 className="h2">
-              Add a song version before adding credits
-            </h2>
-          </section>
-        )}
-
         <section id="intelligence">
           <div
             className="card"
@@ -912,6 +892,26 @@ export default async function EditSongPage({
             </Link>
           </div>
         </section>
+
+        {primaryVersion ? (
+          <ProductionCreditsEditor
+            songId={song.id}
+            songVersionId={primaryVersion.id}
+            slug={slug}
+            versionNumber={primaryVersion.version_number}
+            existingCredits={productionCredits}
+            defaultSongwriter={
+              song.songwriter_name || "Mike Mancour"
+            }
+          />
+        ) : (
+          <section id="credits" className="card">
+            <div className="eyebrow">Production credits</div>
+            <h2 className="h2">
+              Add a song version before adding credits
+            </h2>
+          </section>
+        )}
       </div>
     </section>
   );
