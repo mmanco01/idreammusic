@@ -4,8 +4,10 @@ import { notFound } from 'next/navigation';
 import { muses } from '@/content/site';
 import { getPublicSongsByMuse } from '@/lib/data';
 import { SongUploadForm } from '@/components/studio/SongUploadForm';
+import { MuseChatPanel } from '@/components/studio/MuseChatPanel';
 import { getMyMuseRepresentationTheme } from '@/lib/profile';
 import { resolveMuseImage } from '@/lib/muse-representation';
+import { MUSE_OPTIONS } from '@/lib/muses';
 
 type Props = {
   slug: string;
@@ -211,6 +213,14 @@ export async function MusePageShell({ slug }: Props) {
             </ul>
           </div>
         </div>
+
+        <div className="section-tight" />
+
+        <MuseChatPanel
+          defaultMuseSlug={muse.slug}
+          museOptions={MUSE_OPTIONS}
+          lockedMuse
+        />       
       </div>
     </section>
   );
