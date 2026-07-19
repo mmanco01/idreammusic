@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 export type PriorityTier = "now" | "next" | "later" | "someday" | "archive";
@@ -1293,6 +1294,7 @@ function SongOpportunityCard({
 }
 
 export default function StudioPortfolio({ initialSongs }: Props) {
+  const router = useRouter();
   const [songs, setSongs] = useState(initialSongs);
   const [search, setSearch] = useState("");
   const [museFilter, setMuseFilter] = useState("all");
@@ -1603,6 +1605,10 @@ export default function StudioPortfolio({ initialSongs }: Props) {
           message: "Saved",
         },
       }));
+
+      // Refresh the server-rendered Advance card so its recommendation
+      // reflects the newly saved priority or rating.
+      router.refresh();
     } catch (error) {
       updateLocalSong(song.id, {
         priority_tier: song.priority_tier,
