@@ -204,7 +204,7 @@ export function SongUploadForm({
 
       let songId = existingSongId;
       let songSlug: string | null = null;
-      let museName = selectedMuse?.name ?? "";
+      let resolvedMuseSlug = museSlug;
 
       if (existingSongId) {
         const { data: existingSong, error: existingSongError } =
@@ -236,16 +236,11 @@ export function SongUploadForm({
 
         songSlug = existingSong.slug;
 
-        museName = Array.isArray(existingSong.muses)
-          ? existingSong.muses[0]?.name || museName
-          : existingSong.muses?.name || museName;
+        const songMuse = existingSong.muses?.[0];
 
-        const museSlugFromSong = Array.isArray(existingSong.muses)
-          ? existingSong.muses[0]?.slug
-          : existingSong.muses?.slug;
-
-        if (museSlugFromSong) {
-          setMuseSlug(museSlugFromSong);
+        if (songMuse?.slug) {
+          resolvedMuseSlug = songMuse.slug;
+          setMuseSlug(songMuse.slug);
         }
 
         const { data: currentVersions, error: versionsError } =
@@ -296,7 +291,7 @@ export function SongUploadForm({
           );
         }
 
-        const storagePath = `${museSlug}/${user.id}/${existingSongId}/${Date.now()}-${sanitizeFileName(file.name)}`;
+        const storagePath = `${resolvedMuseSlug}/${user.id}/${existingSongId}/${Date.now()}-${sanitizeFileName(file.name)}`;
 
         const { error: uploadError } = await supabase.storage
           .from("song-assets")
@@ -388,8 +383,6 @@ export function SongUploadForm({
             "Could not find that Muse in Supabase. Run the seed file first.",
           );
         }
-
-        museName = muse.name;
 
         const baseSlug =
           slugify(title || file.name.replace(/\.[^.]+$/, "")) || "song";
