@@ -5,10 +5,17 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+type MuseChatMode = "chat" | "collaborate";
+
 type MuseChatRequest = {
+  mode?: unknown;
   museSlug?: unknown;
   message?: unknown;
   songId?: unknown;
+  originalQuestion?: unknown;
+  primaryMuseSlug?: unknown;
+  collaboratorMuseSlug?: unknown;
+  primaryResponse?: unknown;
 };
 
 type SongVersionContext = {
@@ -153,9 +160,19 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as MuseChatRequest;
 
-    const requestedMuseSlug = cleanString(body.museSlug, 50);
-    const message = cleanString(body.message, 16000);
+    const mode: MuseChatMode =
+      body.mode === "collaborate" ? "collaborate" : "chat";
+
     const songId = cleanString(body.songId, 100);
+    const message = cleanString(body.message, 16000);
+    const originalQuestion = cleanString(body.originalQuestion, 8000);
+    const primaryResponse = cleanString(body.primaryResponse, 24000);
+    const primaryMuseSlug = cleanString(body.primaryMuseSlug, 50);
+
+    const requestedMuseSlug =
+      mode === "collaborate"
+        ? cleanString(body.collaboratorMuseSlug, 50)
+        : cleanString(body.museSlug, 50);
 
     const muse = getMuseBySlug(requestedMuseSlug);
 
@@ -171,7 +188,42 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!message) {
+    let primaryMuse = null;
+
+    if (mode === "collaborate") {
+      primaryMuse = getMuseBySlug(primaryMuseSlug);
+
+      if (!primaryMuse) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message: "The primary Muse could not be identified.",
+          },
+          { status: 400 },
+        );
+      }
+
+      if (primaryMuse.slug === muse.slug) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message: "Choose a different Muse for collaboration.",
+          },
+          { status: 400 },
+        );
+      }
+
+      if (!originalQuestion || !primaryResponse) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message:
+              "The original question and first Muse response are required for collaboration.",
+          },
+          { status: 400 },
+        );
+      }
+    } else if (!message) {
       return NextResponse.json(
         {
           status: "error",
@@ -236,9 +288,12 @@ export async function POST(request: Request) {
         slug: muse.slug,
         name: muse.name,
         domain: muse.domain,
-        role: isPrimaryMuse
-          ? "This is the song's assigned primary Muse."
-          : "This Muse has been invited as a specialist collaborator.",
+        role:
+          mode === "collaborate"
+            ? "This Muse has been invited to offer a distinct second perspective."
+            : isPrimaryMuse
+              ? "This is the song's assigned primary Muse."
+              : "This Muse has been invited as a specialist collaborator.",
       },
       song: song
         ? {
@@ -272,13 +327,43 @@ export async function POST(request: Request) {
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const response = await openai.responses.create({
-      model:
-        process.env.OPENAI_MUSE_MODEL ||
-        process.env.OPENAI_MODEL ||
-        "gpt-5-mini",
-      instructions: muse.systemPrompt,
-      input: `
+    const collaborationPrompt =
+      mode === "collaborate" && primaryMuse
+        ? `
+Here is the current iDreamMusic context:
+
+${JSON.stringify(context, null, 2)}
+
+The songwriter originally asked:
+
+${originalQuestion}
+
+${primaryMuse.name}, Muse of ${primaryMuse.domain}, responded:
+
+${primaryResponse}
+
+You are now joining the conversation as ${muse.name}, Muse of ${muse.domain}.
+
+Give a genuinely different and useful second perspective through your own
+specialty. Do not simply agree with, summarize, or restate ${primaryMuse.name}.
+Point out what your lens notices that ${primaryMuse.name}'s lens may not
+emphasize.
+
+When song context is available, ground your observations in that material.
+When no song text is available, work only from the question and prior answer.
+Never pretend to have heard audio or seen material that is not present.
+
+Use this structure:
+
+1. A brief opening that names the most important thing your Muse notices.
+2. Your distinct analysis and practical recommendation.
+3. A final heading exactly titled:
+   "How my perspective differs from ${primaryMuse.name}"
+
+Under that heading, explain the difference clearly in two to four sentences.
+Preserve the songwriter's voice and keep the response focused.
+        `.trim()
+        : `
 Here is the current iDreamMusic context:
 
 ${JSON.stringify(context, null, 2)}
@@ -291,8 +376,16 @@ Respond as ${muse.name}, Muse of ${muse.domain}. Use the available song
 context when relevant. Do not pretend to have heard audio or seen material
 that is not present. Preserve the songwriter's voice. Focus on the most
 useful next creative step through your own Muse specialty.
-      `.trim(),
-      max_output_tokens: 1400,
+        `.trim();
+
+    const response = await openai.responses.create({
+      model:
+        process.env.OPENAI_MUSE_MODEL ||
+        process.env.OPENAI_MODEL ||
+        "gpt-5-mini",
+      instructions: muse.systemPrompt,
+      input: collaborationPrompt,
+      max_output_tokens: 1600,
       store: false,
     });
 
@@ -310,12 +403,21 @@ useful next creative step through your own Muse specialty.
 
     return NextResponse.json({
       status: "success",
+      mode,
       muse: {
         slug: muse.slug,
         name: muse.name,
         domain: muse.domain,
         isPrimaryMuse,
       },
+      primaryMuse:
+        mode === "collaborate" && primaryMuse
+          ? {
+              slug: primaryMuse.slug,
+              name: primaryMuse.name,
+              domain: primaryMuse.domain,
+            }
+          : null,
       song: song
         ? {
             id: song.id,
