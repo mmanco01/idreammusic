@@ -134,7 +134,11 @@ export function ProductionCreditsEditor({
                     defaultValue={defaultValue}
                     className="input"
                     placeholder={field.placeholder}
-                    list={field.listId}
+                    list={
+                      "listId" in field
+                        ? field.listId
+                        : undefined
+                    }
                   />
                 )}
 
