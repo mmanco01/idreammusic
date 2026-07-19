@@ -78,85 +78,102 @@ export default function AboutPage() {
               }}
             />
 
-            <div
-              style={{
-                position: "relative",
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(min(100%, 330px), 1fr))",
-                gap: "1.5rem",
-                alignItems: "end",
-              }}
-            >
-              <div>
-                <div className="eyebrow">About iDreamMusic</div>
+            <style>{`
+              @media (min-width: 900px) {
+                .about-hero-title {
+                  white-space: nowrap;
+                }
+              }
 
-                <h1
-                  className="display"
-                  style={{
-                    maxWidth: 780,
-                    marginBottom: "0.9rem",
-                  }}
-                >
-                  A human-centered home for songs in becoming
-                </h1>
+              @media (max-width: 899px) {
+                .about-hero-title {
+                  white-space: normal;
+                }
+              }
+            `}</style>
 
-                <p className="lead" style={{ maxWidth: 760 }}>
-                  iDreamMusic is built around a simple belief: songs are
-                  often caught before they are written.
-                </p>
+            <div style={{ position: "relative" }}>
+              <div className="eyebrow">About iDreamMusic</div>
 
-                <p className="copy" style={{ maxWidth: 780 }}>
-                  Some arrive through a dream. Some rise from heartbreak,
-                  faith, rhythm, memory, place, or story. Others begin as a
-                  title, a voice memo, a passing phrase, or a feeling that
-                  refuses to leave.
-                </p>
-
-                <p className="copy" style={{ maxWidth: 780 }}>
-                  iDreamMusic gives those beginnings a place to live, grow,
-                  be understood, and eventually reach listeners—without
-                  removing the human songwriter from the center.
-                </p>
-
-                <div className="button-row">
-                  <Link href="/studio" className="button primary">
-                    Enter Songcatcher Studio
-                  </Link>
-
-                  <Link href="/nine-muses" className="button">
-                    Meet the Nine Muses
-                  </Link>
-
-                  <Link href="/listen" className="button">
-                    Open the Jukebox
-                  </Link>
-                </div>
-              </div>
-
-              <div
-                className="card"
+              <h1
+                className="display about-hero-title"
                 style={{
-                  border: "1px solid rgba(220, 182, 92, 0.48)",
-                  background:
-                    "linear-gradient(155deg, rgba(151, 106, 40, 0.16), rgba(93, 76, 150, 0.08), rgba(255,255,255,0.025))",
+                  marginTop: "0.45rem",
+                  marginBottom: "1.1rem",
+                  fontSize: "clamp(2.6rem, 5.5vw, 5.2rem)",
+                  lineHeight: 0.98,
                 }}
               >
-                <div className="eyebrow">The central idea</div>
+                A shared home for songs in becoming
+              </h1>
 
-                <h2 className="h3" style={{ marginTop: "0.65rem" }}>
-                  Catch the song before it disappears
-                </h2>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(min(100%, 330px), 1fr))",
+                  gap: "1.5rem",
+                  alignItems: "end",
+                }}
+              >
+                <div>
+                  <p className="lead" style={{ maxWidth: 760, marginTop: 0 }}>
+                    iDreamMusic is built around a simple belief: songs are
+                    often caught before they are written.
+                  </p>
 
-                <p className="copy">
-                  Most creative tools begin after the songwriter already
-                  knows what the song is. iDreamMusic begins earlier—at the
-                  fragile moment when the song is still becoming.
-                </p>
+                  <p className="copy" style={{ maxWidth: 780 }}>
+                    Some arrive through a dream. Some rise from heartbreak,
+                    faith, rhythm, memory, place, or story. Others begin as a
+                    title, a voice memo, a passing phrase, or a feeling that
+                    refuses to leave.
+                  </p>
 
-                <div className="quote-panel">
-                  “Honor the mystery of becoming—not only the finished
-                  song.”
+                  <p className="copy" style={{ maxWidth: 780 }}>
+                    iDreamMusic gives those beginnings a place to live, grow,
+                    be understood, and eventually reach listeners—without
+                    removing the human songwriter from the center.
+                  </p>
+
+                  <div className="button-row">
+                    <Link href="/studio" className="button primary">
+                      Enter Songcatcher Studio
+                    </Link>
+
+                    <Link href="/nine-muses" className="button">
+                      Meet the Nine Muses
+                    </Link>
+
+                    <Link href="/listen" className="button">
+                      Open the Jukebox
+                    </Link>
+                  </div>
+                </div>
+
+                <div
+                  className="card"
+                  style={{
+                    border: "1px solid rgba(220, 182, 92, 0.48)",
+                    background:
+                      "linear-gradient(155deg, rgba(151, 106, 40, 0.16), rgba(93, 76, 150, 0.08), rgba(255,255,255,0.025))",
+                  }}
+                >
+                  <div className="eyebrow">The central idea</div>
+
+                  <h2 className="h3" style={{ marginTop: "0.65rem" }}>
+                    Catch the song before it disappears
+                  </h2>
+
+                  <p className="copy">
+                    Most creative tools begin after the songwriter already
+                    knows what the song is. iDreamMusic begins earlier—at the
+                    fragile moment when the song is still becoming.
+                  </p>
+
+                  <div className="quote-panel">
+                    “Honor the mystery of becoming—not only the finished
+                    song.”
+                  </div>
                 </div>
               </div>
             </div>
