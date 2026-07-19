@@ -346,6 +346,65 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
   } as SongDetail;
 });
 
+export type MySongStats = {
+  totalSongCount: number;
+  activeSongCount: number;
+  finishedSongCount: number;
+};
+
+export const getMySongStats = cache(
+  async (userId: string): Promise<MySongStats> => {
+    const emptyStats: MySongStats = {
+      totalSongCount: 0,
+      activeSongCount: 0,
+      finishedSongCount: 0,
+    };
+
+    const supabase = await createServerSupabaseClient();
+
+    if (!supabase || !userId) {
+      return emptyStats;
+    }
+
+    const [totalResult, finishedResult] = await Promise.all([
+      supabase
+        .from('songs')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_user_id', userId),
+
+      supabase
+        .from('songs')
+        .select('id', { count: 'exact', head: true })
+        .eq('owner_user_id', userId)
+        .eq('current_stage', 'final'),
+    ]);
+
+    if (totalResult.error) {
+      console.error('Unable to count all Studio songs:', totalResult.error);
+    }
+
+    if (finishedResult.error) {
+      console.error(
+        'Unable to count finished Studio songs:',
+        finishedResult.error,
+      );
+    }
+
+    const totalSongCount = totalResult.count ?? 0;
+    const finishedSongCount = finishedResult.count ?? 0;
+    const activeSongCount = Math.max(
+      totalSongCount - finishedSongCount,
+      0,
+    );
+
+    return {
+      totalSongCount,
+      activeSongCount,
+      finishedSongCount,
+    };
+  },
+);
+
 export const getMySongs = cache(async (userId: string): Promise<SongSummary[]> => {
   const supabase = await createServerSupabaseClient();
   if (!supabase || !userId) return [];
