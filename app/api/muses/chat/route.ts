@@ -1,4 +1,4 @@
-import { calliopeMuseProfile } from "@/lib/muses/calliope";
+import { calliope } from "@/lib/muses/calliope";
 import { calliopeSystemPrompt } from "@/lib/muses/prompts/calliope";
 
 export async function POST(request: Request) {
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   });
 
   const context = {
-    profile: calliopeMuseProfile,
+    profile: calliope,
     song,
     knowledge,
   };
