@@ -246,7 +246,8 @@ async function buildStudioPortfolio(
   const workflows = (workflowResult.data || []) as WorkflowRow[];
   const analyses = (analysisResult.data || []) as AnalysisRow[];
   const tasks = (tasksResult.data || []) as TaskRow[];
-  const engagementSummaries = (engagementResult.data || []) as EngagementSummaryRow[];
+  const engagementSummaries = (engagementResult.data ||
+    []) as EngagementSummaryRow[];
   const listenerRatingSummaries = (listenerRatingsResult.data ||
     []) as ListenerRatingSummaryRow[];
 
@@ -368,7 +369,8 @@ async function buildStudioPortfolio(
       ratingCount: 0,
     };
 
-    const allVersionsFinal = version.total > 0 && version.final === version.total;
+    const allVersionsFinal =
+      version.total > 0 && version.final === version.total;
     const workflowStatus = workflow?.workflow_status || "active";
 
     const isFinished =
@@ -421,7 +423,10 @@ async function buildStudioPortfolio(
         : [],
 
       ai_sync_opportunities: latestAnalysis
-        ? readNestedStringArray(rawResult, ["audience", "sync_opportunities"])
+        ? readNestedStringArray(rawResult, [
+            "audience",
+            "sync_opportunities",
+          ])
         : [],
 
       ai_radio_potential: latestAnalysis
@@ -443,75 +448,333 @@ async function buildStudioPortfolio(
   });
 }
 
+function countStage(
+  songs: StudioPortfolioSong[],
+  stage: "spark" | "draft" | "final",
+) {
+  return songs.filter(
+    (song) => String(song.current_stage || "").toLowerCase() === stage,
+  ).length;
+}
+
 export default async function StudioPage() {
   const { user, profile } = await getServerAuthContext();
   const rawMySongs = user ? await getMySongs(user.id) : [];
   const mySongs = Array.from(
     new Map(rawMySongs.map((song) => [song.id, song])).values(),
   );
+
   const portfolioSongs = user
     ? await buildStudioPortfolio(user.id, mySongs)
     : [];
 
+  const pipeline = {
+    total: portfolioSongs.length,
+    sparks: countStage(portfolioSongs, "spark"),
+    drafts: countStage(portfolioSongs, "draft"),
+    finals: countStage(portfolioSongs, "final"),
+    activeTasks: portfolioSongs.reduce(
+      (sum, song) =>
+        sum + song.open_task_count + song.in_progress_task_count,
+      0,
+    ),
+    totalListens: portfolioSongs.reduce(
+      (sum, song) => sum + song.audio_play_count,
+      0,
+    ),
+  };
+
   return (
     <section className="section">
       <div className="container pageStack">
-        <div className="page-intro">
-          <div>
-            <div className="eyebrow">Creator Studio</div>
-            <h1 className="h2">Songcatcher Studio</h1>
-            <p className="copy" style={{ maxWidth: 820 }}>
-              Capture ideas, develop songs with AI guidance, measure real listener
-              response, and use Song Opportunity Intelligence to decide what
-              deserves your time and attention next.
-            </p>
+        <section
+          className="card"
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            border: "1px solid rgba(220, 182, 92, 0.48)",
+            background:
+              "radial-gradient(circle at top right, rgba(151, 106, 40, 0.18), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
+          }}
+        >
+          <div className="eyebrow">Creator workspace</div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 330px), 1fr))",
+              alignItems: "end",
+              gap: "1.25rem",
+            }}
+          >
+            <div>
+              <h1
+                className="h2"
+                style={{
+                  marginBottom: "0.6rem",
+                  fontSize: "clamp(2.4rem, 6vw, 4.8rem)",
+                  lineHeight: 1,
+                }}
+              >
+                Songcatcher Studio
+              </h1>
+
+              <p
+                className="copy"
+                style={{
+                  maxWidth: 820,
+                  fontSize: "1.08rem",
+                  lineHeight: 1.7,
+                }}
+              >
+                Catch songs, understand what they need, work with the
+                Muses, and decide what deserves your creative attention
+                next.
+              </p>
+
+              <div className="button-row">
+                {user ? (
+                  <>
+                    <Link
+                      className="button primary"
+                      href="/studio/capture"
+                    >
+                      New song or recording
+                    </Link>
+
+                    <a className="button" href="#song-portfolio">
+                      Browse my songs
+                    </a>
+                  </>
+                ) : (
+                  <Link
+                    className="button primary"
+                    href="/auth/sign-in?next=/studio"
+                  >
+                    Sign in to begin
+                  </Link>
+                )}
+
+                <a className="button" href="#guided-demo">
+                  See the complete journey
+                </a>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(2, minmax(0, 1fr))",
+                gap: "0.7rem",
+              }}
+            >
+              {[
+                ["Catch", "Capture the spark"],
+                ["Understand", "Run Song Intelligence"],
+                ["Collaborate", "Work with the Muses"],
+                ["Share", "Reach real listeners"],
+              ].map(([title, description]) => (
+                <div
+                  key={title}
+                  style={{
+                    padding: "0.9rem",
+                    borderRadius: 14,
+                    border: "1px solid var(--line)",
+                    background: "rgba(0,0,0,0.12)",
+                  }}
+                >
+                  <div className="eyebrow">{title}</div>
+                  <p
+                    className="copy"
+                    style={{ margin: "0.35rem 0 0" }}
+                  >
+                    {description}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
-
-          {!user ? (
-            <Link className="button primary" href="/auth/sign-in?next=/studio">
-              Sign in to upload
-            </Link>
-          ) : (
-            <Link className="button primary" href="/studio/capture">
-              New song or recording
-            </Link>
-          )}
-        </div>
-
-        <StudioStageGrid
-          songs={portfolioSongs}
-          isSignedIn={Boolean(user)}
-        />
-
-        <FeaturedDemoCard />
+        </section>
 
         {user ? (
-          <div className="card" id="song-portfolio">
-            <div className="eyebrow">Signed in as</div>
-            <h2 className="h3">{profile?.display_name || user.email}</h2>
-            <p className="copy">
-              Your catalog ranked by explainable Song Opportunity Intelligence,
-              with priorities, AI scores, audience fit, listener ratings, plays,
-              versions, and development workload in one place.
+          <section className="card">
+            <div className="eyebrow">My creative pipeline</div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: "0.8rem",
+                marginTop: "0.8rem",
+              }}
+            >
+              {[
+                ["Songs", pipeline.total],
+                ["Sparks", pipeline.sparks],
+                ["Drafts", pipeline.drafts],
+                ["Final", pipeline.finals],
+                ["Active tasks", pipeline.activeTasks],
+                ["Listens", pipeline.totalListens],
+              ].map(([label, value]) => (
+                <div
+                  key={String(label)}
+                  style={{
+                    padding: "0.9rem",
+                    borderRadius: 14,
+                    border: "1px solid var(--line)",
+                    background: "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <div className="eyebrow">{label}</div>
+                  <div
+                    className="h3"
+                    style={{
+                      marginTop: "0.35rem",
+                      marginBottom: 0,
+                    }}
+                  >
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(3, minmax(0, 1fr))",
+                gap: "0.45rem",
+                alignItems: "center",
+                marginTop: "1rem",
+              }}
+              aria-label="Spark to Draft to Final pipeline"
+            >
+              {[
+                ["Spark", pipeline.sparks],
+                ["Draft", pipeline.drafts],
+                ["Final", pipeline.finals],
+              ].map(([label, value], index) => (
+                <div
+                  key={String(label)}
+                  style={{
+                    padding: "0.75rem",
+                    textAlign: "center",
+                    borderRadius: 999,
+                    border:
+                      index === 2
+                        ? "1px solid rgba(220, 182, 92, 0.55)"
+                        : "1px solid var(--line)",
+                    background:
+                      index === 2
+                        ? "rgba(151, 106, 40, 0.14)"
+                        : "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <strong>{label}</strong> · {value}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <section>
+          <div className="eyebrow">Today in the Studio</div>
+          <h2 className="h2">Choose the next meaningful move</h2>
+          <p className="copy" style={{ maxWidth: 850 }}>
+            Capture something new, continue developing a song, or use
+            opportunity intelligence to focus on the song most ready for
+            your attention.
+          </p>
+
+          <StudioStageGrid
+            songs={portfolioSongs}
+            isSignedIn={Boolean(user)}
+          />
+        </section>
+
+        <section id="guided-demo">
+          <div
+            className="card"
+            style={{
+              marginBottom: "0.9rem",
+              border: "1px solid rgba(220, 182, 92, 0.42)",
+              background:
+                "linear-gradient(145deg, rgba(151, 106, 40, 0.13), rgba(255,255,255,0.025))",
+            }}
+          >
+            <div className="eyebrow">Guided demonstration</div>
+            <h2 className="h2">
+              Follow one song through the full iDreamMusic experience
+            </h2>
+            <p className="copy" style={{ maxWidth: 900 }}>
+              See how “Do You Believe?” moves from a dream fragment into
+              capture, Song Intelligence, Muse collaboration, development,
+              sharing, and listener response.
+            </p>
+
+            <div className="pillRow" style={{ marginTop: "0.8rem" }}>
+              {[
+                "Arrival",
+                "Capture",
+                "Intelligence",
+                "Muse collaboration",
+                "Final song",
+                "Listener response",
+              ].map((step) => (
+                <span className="pill" key={step}>
+                  {step}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <FeaturedDemoCard />
+        </section>
+
+        {user ? (
+          <section className="card" id="song-portfolio">
+            <div className="eyebrow">My song portfolio</div>
+            <h2 className="h2">
+              {profile?.display_name || user.email}
+            </h2>
+
+            <p className="copy" style={{ maxWidth: 900 }}>
+              Sort and compare your catalog using Song Opportunity
+              Intelligence, Muse, stage, priorities, AI scores, audience
+              fit, listener ratings, plays, versions, and active work.
             </p>
 
             {portfolioSongs.length ? (
               <StudioPortfolio initialSongs={portfolioSongs} />
             ) : (
               <p className="copy" style={{ marginTop: "1rem" }}>
-                You have not uploaded a song yet. Start at the capture page or
-                any Muse page.
+                You have not uploaded a song yet. Begin with a new song,
+                voice memo, lyric, or recording.
               </p>
             )}
-          </div>
+          </section>
         ) : (
-          <div className="card" id="song-portfolio">
-            <h2 className="h3">Not signed in yet</h2>
+          <section className="card" id="song-portfolio">
+            <div className="eyebrow">Your private workspace</div>
+            <h2 className="h2">Sign in to build your song portfolio</h2>
             <p className="copy">
-              Sign in first, then use the Muse pages as direct upload entry
-              points for your songs.
+              Capture songs, track versions, run Song Intelligence, work
+              with the Muses, and measure listener response in one place.
             </p>
-          </div>
+
+            <div className="button-row">
+              <Link
+                className="button primary"
+                href="/auth/sign-in?next=/studio"
+              >
+                Sign in
+              </Link>
+            </div>
+          </section>
         )}
       </div>
     </section>
