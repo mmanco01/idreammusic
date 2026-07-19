@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { getSongBySlug } from '@/lib/data';
 import { submitSongResponse } from './actions';
+import { PublicProductionCredits } from '@/components/song/ProductionCredits';
 
 const SONG_ORIGIN_LABELS: Record<string, string> = {
   dream: 'Dreamborn',
@@ -214,7 +215,6 @@ function getVersionAudio(version: any) {
     title: audioAttachment.title || null,
   };
 }
-
 
 const SONG_LINK_LABELS: Record<string, string> = {
   official_video: 'Official video',
@@ -447,7 +447,7 @@ export default async function SongDetailPage({
 
           <div className="pillRow" style={{ marginTop: '1.2rem' }}>
             <Link href={`/studio/songs/${song.slug}/edit`} className="button">
-              Edit Song
+              Work the Song
             </Link>
 
             {!hasDraft ? (
@@ -533,6 +533,14 @@ export default async function SongDetailPage({
             )}
           </div>
         </div>
+
+        <div className="section-tight" />
+
+        <PublicProductionCredits
+          songId={song.id}
+          songVersionId={primaryVersion?.id ?? null}
+          versionNumber={primaryVersion?.version_number ?? null}
+        />
 
         <div className="section-tight" />
 
