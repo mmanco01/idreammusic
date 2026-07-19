@@ -249,9 +249,10 @@ export default async function EditSongPage({
             className="h2 work-song-title-one-line"
             style={{
               marginTop: "0.45rem",
-              marginBottom: "1rem",
-              fontSize: "clamp(2.35rem, 5vw, 4.45rem)",
+              marginBottom: "1.15rem",
+              fontSize: "clamp(2rem, 4vw, 3.45rem)",
               lineHeight: 1,
+              opacity: 0.96,
             }}
           >
             Work the Song
@@ -267,7 +268,17 @@ export default async function EditSongPage({
             }}
           >
             <div>
-              <h2 className="h3" style={{ marginTop: 0 }}>
+              <div className="eyebrow">Current song</div>
+
+              <h2
+                className="h2"
+                style={{
+                  marginTop: "0.35rem",
+                  marginBottom: "0.7rem",
+                  fontSize: "clamp(1.75rem, 3.2vw, 2.7rem)",
+                  lineHeight: 1.05,
+                }}
+              >
                 {songTitle}
               </h2>
 
