@@ -753,6 +753,26 @@ export default async function StudioPage() {
   return (
     <section className="section">
       <div className="container pageStack">
+        <style>{`
+          @media (min-width: 760px) {
+            .studio-title-one-line,
+            .demo-title-one-line {
+              white-space: nowrap;
+            }
+
+            .demo-title-one-line {
+              font-size: clamp(1.7rem, 3vw, 2.65rem) !important;
+            }
+          }
+
+          @media (max-width: 759px) {
+            .studio-title-one-line,
+            .demo-title-one-line {
+              white-space: normal;
+            }
+          }
+        `}</style>
+
         <section
           className="card"
           style={{
@@ -765,6 +785,18 @@ export default async function StudioPage() {
         >
           <div className="eyebrow">Creator workspace</div>
 
+          <h1
+            className="h2 studio-title-one-line"
+            style={{
+              marginTop: "0.45rem",
+              marginBottom: "1rem",
+              fontSize: "clamp(2.35rem, 5vw, 4.45rem)",
+              lineHeight: 1,
+            }}
+          >
+            Songcatcher Studio
+          </h1>
+
           <div
             style={{
               display: "grid",
@@ -775,23 +807,13 @@ export default async function StudioPage() {
             }}
           >
             <div>
-              <h1
-                className="h2"
-                style={{
-                  marginBottom: "0.6rem",
-                  fontSize: "clamp(2.4rem, 6vw, 4.8rem)",
-                  lineHeight: 1,
-                }}
-              >
-                Songcatcher Studio
-              </h1>
-
               <p
                 className="copy"
                 style={{
                   maxWidth: 820,
                   fontSize: "1.08rem",
                   lineHeight: 1.7,
+                  marginTop: 0,
                 }}
               >
                 Catch songs, understand what they need, work with the
@@ -973,6 +995,18 @@ export default async function StudioPage() {
         >
           <div className="eyebrow">Guided demonstration</div>
 
+          <h2
+            className="h2 demo-title-one-line"
+            style={{
+              marginTop: "0.45rem",
+              marginBottom: "1rem",
+              fontSize: "clamp(1.7rem, 3vw, 2.65rem)",
+              lineHeight: 1.04,
+            }}
+          >
+            Follow one song through the full iDreamMusic experience
+          </h2>
+
           <div
             style={{
               display: "grid",
@@ -983,11 +1017,13 @@ export default async function StudioPage() {
             }}
           >
             <div>
-              <h2 className="h2">
-                Follow one song through the full iDreamMusic experience
-              </h2>
-
-              <p className="copy" style={{ maxWidth: 900 }}>
+              <p
+                className="copy"
+                style={{
+                  maxWidth: 900,
+                  marginTop: 0,
+                }}
+              >
                 See how “Do You Believe?” moves from a dream fragment into
                 capture, Song Intelligence, Muse collaboration, development,
                 sharing, and listener response.
