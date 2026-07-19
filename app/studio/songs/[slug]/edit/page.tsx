@@ -6,6 +6,8 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { saveSongEdits } from "./actions";
 import { SongIntelligencePanel } from "@/components/studio/SongIntelligencePanel";
 import { MuseChatPanel } from "@/components/studio/MuseChatPanel";
+import { ProductionCreditsEditor } from "@/components/studio/ProductionCreditsEditor";
+import type { ProductionCreditRow } from "@/lib/production-credits";
 
 export default async function EditSongPage({
   params,
@@ -158,6 +160,30 @@ export default async function EditSongPage({
     versions.find((version: any) => version.is_stage_primary) ??
     versions[0] ??
     null;
+
+  let productionCredits: ProductionCreditRow[] = [];
+
+  if (primaryVersion?.id) {
+    const { data: creditRows, error: creditError } =
+      await (supabase as any)
+        .from("song_version_credits")
+        .select(
+          "id, song_id, song_version_id, role_key, credit_value, is_public, sort_order",
+        )
+        .eq("song_id", song.id)
+        .eq("song_version_id", primaryVersion.id)
+        .order("sort_order", { ascending: true });
+
+    if (creditError) {
+      console.error(
+        "Unable to load production credits:",
+        creditError.message,
+      );
+    } else {
+      productionCredits =
+        (creditRows ?? []) as ProductionCreditRow[];
+    }
+  }
 
   const latestNote =
     [...(song.writer_notes ?? [])].sort(
@@ -327,6 +353,7 @@ export default async function EditSongPage({
             {[
               ["Overview", "#overview"],
               ["Song details", "#song-details"],
+              ["Credits", "#credits"],
               ["Intelligence", "#intelligence"],
               ["Creative council", "#muses"],
               ["Share", "#share"],
@@ -717,6 +744,26 @@ export default async function EditSongPage({
             </div>
           </form>
         </section>
+
+        {primaryVersion ? (
+          <ProductionCreditsEditor
+            songId={song.id}
+            songVersionId={primaryVersion.id}
+            slug={slug}
+            versionNumber={primaryVersion.version_number}
+            existingCredits={productionCredits}
+            defaultSongwriter={
+              song.songwriter_name || "Mike Mancour"
+            }
+          />
+        ) : (
+          <section id="credits" className="card">
+            <div className="eyebrow">Production credits</div>
+            <h2 className="h2">
+              Add a song version before adding credits
+            </h2>
+          </section>
+        )}
 
         <section id="intelligence">
           <div
