@@ -105,6 +105,10 @@ export default async function EditSongPage({
     }
   }
 
+  const assignedMuse =
+    MUSE_OPTIONS.find((option) => option.slug === assignedMuseSlug) ??
+    MUSE_OPTIONS[0];
+
   const { data: engagementSummary } = await (supabase as any)
     .from("song_engagement_summaries")
     .select("audio_play_count, last_audio_play_at")
@@ -168,32 +172,215 @@ export default async function EditSongPage({
     primaryVersion?.title ||
     "Untitled song";
 
+  const audioAttachments = (song.attachments ?? []).filter(
+    (attachment: any) => attachment.file_type === "audio",
+  );
+
+  const transcriptCount = (song.song_transcripts ?? []).length;
+  const hasLyrics = Boolean(primaryVersion?.lyrics?.trim());
+
+  const recommendedNextMove = !audioAttachments.length
+    ? "Add a recording so the song can be heard and transcribed."
+    : !transcriptCount
+      ? "Generate a transcript, review it, and run Song Intelligence."
+      : !hasLyrics
+        ? "Separate the remembered or performed lyric from the transcript and save it as the working lyric."
+        : String(song.current_stage || "").toLowerCase() !== "final"
+          ? "Review Song Intelligence, choose one development task, and create the next version."
+          : "Review Muse guidance and listener response before deciding whether the song needs another revision.";
+
   return (
     <section className="section">
-      <div className="container">
-        <div className="card">
-          <div className="eyebrow">Owner edit</div>
-
-          <h1 className="h2">Edit Song</h1>
-
-          <p className="copy" style={{ maxWidth: 820 }}>
-            Update song metadata, stage, visibility, origin, version details,
-            and writer notes.
-          </p>
+      <div className="container pageStack">
+        <section
+          id="overview"
+          className="card"
+          style={{
+            position: "relative",
+            overflow: "hidden",
+            border: "1px solid rgba(220, 182, 92, 0.5)",
+            background:
+              "radial-gradient(circle at top right, rgba(151, 106, 40, 0.16), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
+          }}
+        >
+          <div className="eyebrow">Song workbench</div>
 
           <div
-            className="button-row"
             style={{
-              marginTop: "1rem",
-              marginBottom: "1rem",
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 310px), 1fr))",
+              gap: "1.25rem",
+              alignItems: "end",
             }}
           >
-            <Link href={`/songs/${slug}`} className="button">
-              Back to song
-            </Link>
+            <div>
+              <h1
+                className="h2"
+                style={{
+                  marginBottom: "0.5rem",
+                  fontSize: "clamp(2.5rem, 6vw, 4.8rem)",
+                  lineHeight: 1,
+                }}
+              >
+                Work the Song
+              </h1>
+
+              <h2 className="h3" style={{ marginTop: "0.8rem" }}>
+                {songTitle}
+              </h2>
+
+              <div className="pillRow" style={{ marginTop: "0.7rem" }}>
+                <span className="pill">
+                  {assignedMuse?.name ?? "Muse"} —{" "}
+                  {assignedMuse?.domain ?? "Creative partner"}
+                </span>
+                <span className="pill">
+                  {song.current_stage ?? "spark"}
+                </span>
+                <span className="pill">{song.status ?? "private"}</span>
+                {primaryVersion ? (
+                  <span className="pill">
+                    Version {primaryVersion.version_number}
+                  </span>
+                ) : null}
+              </div>
+
+              {song.summary ? (
+                <p
+                  className="copy"
+                  style={{ marginTop: "0.9rem", maxWidth: 780 }}
+                >
+                  {song.summary}
+                </p>
+              ) : null}
+            </div>
+
+            <div
+              style={{
+                padding: "1rem",
+                borderRadius: 16,
+                border: "1px solid rgba(220, 182, 92, 0.4)",
+                background: "rgba(0,0,0,0.14)",
+              }}
+            >
+              <div className="eyebrow">Recommended next move</div>
+              <p
+                className="copy"
+                style={{
+                  marginTop: "0.5rem",
+                  marginBottom: 0,
+                  fontWeight: 700,
+                }}
+              >
+                {recommendedNextMove}
+              </p>
+            </div>
           </div>
 
-          <form action={saveSongEdits} className="card-grid">
+          <div className="button-row" style={{ marginTop: "1rem" }}>
+            <Link href="/studio" className="button">
+              Back to Studio
+            </Link>
+
+            <Link href={`/songs/${slug}`} className="button">
+              View public song page
+            </Link>
+          </div>
+        </section>
+
+        <nav
+          aria-label="Song workbench sections"
+          className="card"
+          style={{
+            position: "sticky",
+            top: 72,
+            zIndex: 20,
+            padding: "0.65rem",
+            border: "1px solid rgba(220, 182, 92, 0.32)",
+            background: "rgba(9, 19, 35, 0.94)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.5rem",
+            }}
+          >
+            {[
+              ["Overview", "#overview"],
+              ["Song details", "#song-details"],
+              ["Intelligence", "#intelligence"],
+              ["Creative council", "#muses"],
+              ["Share", "#share"],
+            ].map(([label, href]) => (
+              <a key={href} href={href} className="button">
+                {label}
+              </a>
+            ))}
+          </div>
+        </nav>
+
+        <section className="card">
+          <div className="eyebrow">At a glance</div>
+          <h2 className="h2">Current creative state</h2>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: "0.8rem",
+              marginTop: "0.8rem",
+            }}
+          >
+            {[
+              ["Assigned Muse", assignedMuse?.name ?? "Unassigned"],
+              ["Origin", song.song_origin ?? "Not recorded"],
+              ["Stage", song.current_stage ?? "spark"],
+              ["Versions", versions.length],
+              ["Recordings", audioAttachments.length],
+              ["Transcripts", transcriptCount],
+              ["Listens", audienceMetrics.totalListens],
+              ["Unique listeners", audienceMetrics.uniqueListeners],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                style={{
+                  padding: "0.9rem",
+                  borderRadius: 14,
+                  border: "1px solid var(--line)",
+                  background: "rgba(255,255,255,0.025)",
+                }}
+              >
+                <div className="eyebrow">{label}</div>
+                <div
+                  className="h3"
+                  style={{
+                    marginTop: "0.35rem",
+                    marginBottom: 0,
+                    fontSize: "1.15rem",
+                  }}
+                >
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section id="song-details" className="card">
+          <div className="eyebrow">Song details</div>
+          <h2 className="h2">Words, versions, notes, and status</h2>
+
+          <p className="copy" style={{ maxWidth: 850 }}>
+            Keep the creative workspace focused. Open only the area you
+            need, make the change, and save the song.
+          </p>
+
+          <form action={saveSongEdits}>
             <input type="hidden" name="slug" value={slug} />
             <input type="hidden" name="song_id" value={song.id} />
             <input
@@ -207,150 +394,100 @@ export default async function EditSongPage({
               value={latestNote?.id ?? ""}
             />
 
-            <div className="card">
-              <div className="eyebrow">Song</div>
-              <h2 className="h2">Song metadata</h2>
-
-              <label className="copy" htmlFor="title_working">
-                Working title
-              </label>
-              <input
-                id="title_working"
-                name="title_working"
-                defaultValue={song.title_working ?? ""}
-                className="input"
-              />
-
-              <label className="copy" htmlFor="title_final">
-                Final title
-              </label>
-              <input
-                id="title_final"
-                name="title_final"
-                defaultValue={song.title_final ?? ""}
-                className="input"
-              />
-
-              <label className="copy" htmlFor="hook_line">
-                Hook line
-              </label>
-              <input
-                id="hook_line"
-                name="hook_line"
-                defaultValue={song.hook_line ?? ""}
-                className="input"
-              />
-
-              <label className="copy" htmlFor="summary">
-                Summary
-              </label>
-              <textarea
-                id="summary"
-                name="summary"
-                defaultValue={song.summary ?? ""}
-                className="textarea"
-                rows={4}
-              />
-
-              <label className="copy" htmlFor="songwriter_name">
-                Songwriter
-              </label>
-              <input
-                id="songwriter_name"
-                name="songwriter_name"
-                defaultValue={song.songwriter_name ?? ""}
-                className="input"
-                placeholder="Mike Mancour"
-              />
-
-              <label className="copy" htmlFor="genre">
-                Genre
-              </label>
-              <input
-                id="genre"
-                name="genre"
-                defaultValue={song.genre ?? ""}
-                className="input"
-                placeholder="Blues, Rock, Country..."
-              />
-
-              <label className="copy" htmlFor="current_stage">
-                Current stage
-              </label>
-              <select
-                id="current_stage"
-                name="current_stage"
-                defaultValue={song.current_stage ?? "spark"}
-                className="input"
+            <details
+              open
+              className="card"
+              style={{ marginTop: "1rem" }}
+            >
+              <summary
+                className="h3"
+                style={{ cursor: "pointer" }}
               >
-                <option value="spark">Spark</option>
-                <option value="draft">Draft</option>
-                <option value="final">Final</option>
-              </select>
+                Song identity and status
+              </summary>
 
-              <label className="copy" htmlFor="song_origin">
-                How It Arrived
-              </label>
-              <select
-                id="song_origin"
-                name="song_origin"
-                defaultValue={song.song_origin ?? "other"}
-                className="input"
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                  gap: "1rem",
+                  marginTop: "1rem",
+                }}
               >
-                <option value="dream">Dream</option>
-                <option value="comment">Comment</option>
-                <option value="thought">Thought</option>
-                <option value="road">Road</option>
-                <option value="conversation">Conversation</option>
-                <option value="prayer">Prayer</option>
-                <option value="memory">Memory</option>
-                <option value="image">Image</option>
-                <option value="riff">Riff</option>
-                <option value="title">Title</option>
-                <option value="journal">Journal</option>
-                <option value="performance">Performance</option>
-                <option value="other">Other</option>
-              </select>
+                <div>
+                  <label className="copy" htmlFor="title_working">
+                    Working title
+                  </label>
+                  <input
+                    id="title_working"
+                    name="title_working"
+                    defaultValue={song.title_working ?? ""}
+                    className="input"
+                  />
 
-              <label className="copy" htmlFor="status">
-                Visibility / status
-              </label>
-              <select
-                id="status"
-                name="status"
-                defaultValue={song.status ?? "private"}
-                className="input"
-              >
-                <option value="private">Private</option>
-                <option value="shared">Shared</option>
-                <option value="published">Published</option>
-                <option value="archived">Archived</option>
-              </select>
-            </div>
+                  <label className="copy" htmlFor="title_final">
+                    Final title
+                  </label>
+                  <input
+                    id="title_final"
+                    name="title_final"
+                    defaultValue={song.title_final ?? ""}
+                    className="input"
+                  />
 
-            <div className="card">
-              <div className="eyebrow">Primary version</div>
-              <h2 className="h2">Version details</h2>
+                  <label className="copy" htmlFor="hook_line">
+                    Hook line
+                  </label>
+                  <input
+                    id="hook_line"
+                    name="hook_line"
+                    defaultValue={song.hook_line ?? ""}
+                    className="input"
+                  />
 
-              {primaryVersion ? (
-                <>
-                  <div className="pillRow" style={{ marginBottom: "1rem" }}>
-                    <span className="pill">
-                      Version {primaryVersion.version_number}
-                    </span>
-                    <span className="pill">{primaryVersion.stage}</span>
-                    {primaryVersion.is_stage_primary ? (
-                      <span className="pill">primary</span>
-                    ) : null}
-                  </div>
+                  <label className="copy" htmlFor="summary">
+                    Summary
+                  </label>
+                  <textarea
+                    id="summary"
+                    name="summary"
+                    defaultValue={song.summary ?? ""}
+                    className="textarea"
+                    rows={5}
+                  />
+                </div>
 
-                  <label className="copy" htmlFor="version_stage">
-                    Version stage
+                <div>
+                  <label className="copy" htmlFor="songwriter_name">
+                    Songwriter
+                  </label>
+                  <input
+                    id="songwriter_name"
+                    name="songwriter_name"
+                    defaultValue={song.songwriter_name ?? ""}
+                    className="input"
+                    placeholder="Mike Mancour"
+                  />
+
+                  <label className="copy" htmlFor="genre">
+                    Genre
+                  </label>
+                  <input
+                    id="genre"
+                    name="genre"
+                    defaultValue={song.genre ?? ""}
+                    className="input"
+                    placeholder="Blues, Rock, Country..."
+                  />
+
+                  <label className="copy" htmlFor="current_stage">
+                    Current stage
                   </label>
                   <select
-                    id="version_stage"
-                    name="version_stage"
-                    defaultValue={primaryVersion.stage ?? "spark"}
+                    id="current_stage"
+                    name="current_stage"
+                    defaultValue={song.current_stage ?? "spark"}
                     className="input"
                   >
                     <option value="spark">Spark</option>
@@ -358,126 +495,350 @@ export default async function EditSongPage({
                     <option value="final">Final</option>
                   </select>
 
-                  <label className="copy" htmlFor="version_title">
-                    Version title
+                  <label className="copy" htmlFor="song_origin">
+                    How it arrived
                   </label>
-                  <input
-                    id="version_title"
-                    name="version_title"
-                    defaultValue={primaryVersion.title ?? ""}
+                  <select
+                    id="song_origin"
+                    name="song_origin"
+                    defaultValue={song.song_origin ?? "other"}
                     className="input"
-                  />
+                  >
+                    <option value="dream">Dream</option>
+                    <option value="comment">Comment</option>
+                    <option value="thought">Thought</option>
+                    <option value="road">Road</option>
+                    <option value="conversation">Conversation</option>
+                    <option value="prayer">Prayer</option>
+                    <option value="memory">Memory</option>
+                    <option value="image">Image</option>
+                    <option value="riff">Riff</option>
+                    <option value="title">Title</option>
+                    <option value="journal">Journal</option>
+                    <option value="performance">Performance</option>
+                    <option value="other">Other</option>
+                  </select>
 
-                  <label className="copy" htmlFor="lyrics">
-                    Lyrics
+                  <label className="copy" htmlFor="status">
+                    Visibility / status
                   </label>
-                  <textarea
-                    id="lyrics"
-                    name="lyrics"
-                    defaultValue={primaryVersion.lyrics ?? ""}
-                    className="textarea"
-                    rows={10}
-                  />
-
-                  <label className="copy" htmlFor="arrangement_notes">
-                    Arrangement notes
-                  </label>
-                  <textarea
-                    id="arrangement_notes"
-                    name="arrangement_notes"
-                    defaultValue={primaryVersion.arrangement_notes ?? ""}
-                    className="textarea"
-                    rows={6}
-                  />
-
-                  <label className="copy" htmlFor="story_behind_song">
-                    Story behind the song
-                  </label>
-                  <textarea
-                    id="story_behind_song"
-                    name="story_behind_song"
-                    defaultValue={primaryVersion.story_behind_song ?? ""}
-                    className="textarea"
-                    rows={6}
-                  />
-                </>
-              ) : (
-                <p className="copy">No version found for this song yet.</p>
-              )}
-            </div>
-
-            <div className="card" style={{ gridColumn: "1 / -1" }}>
-              <div className="eyebrow">Writer note</div>
-              <h2 className="h2">Comments / process notes</h2>
-
-              <label className="copy" htmlFor="note_title">
-                Note title
-              </label>
-              <input
-                id="note_title"
-                name="note_title"
-                defaultValue={latestNote?.title ?? ""}
-                className="input"
-              />
-
-              <label className="copy" htmlFor="note_body">
-                Note body
-              </label>
-              <textarea
-                id="note_body"
-                name="note_body"
-                defaultValue={latestNote?.body ?? ""}
-                className="textarea"
-                rows={8}
-              />
-
-              <label className="copy" htmlFor="note_visibility">
-                Note visibility
-              </label>
-              <select
-                id="note_visibility"
-                name="note_visibility"
-                defaultValue={latestNote?.visibility ?? "private"}
-                className="input"
-              >
-                <option value="private">Private</option>
-                <option value="public">Public</option>
-              </select>
-            </div>
-
-            <div style={{ gridColumn: "1 / -1" }}>
-              <div className="button-row">
-                <button type="submit" className="button primary">
-                  Save changes
-                </button>
-                <Link href={`/songs/${slug}`} className="button">
-                  Cancel
-                </Link>
+                  <select
+                    id="status"
+                    name="status"
+                    defaultValue={song.status ?? "private"}
+                    className="input"
+                  >
+                    <option value="private">Private</option>
+                    <option value="shared">Shared</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
               </div>
+            </details>
+
+            <details className="card" style={{ marginTop: "1rem" }}>
+              <summary
+                className="h3"
+                style={{ cursor: "pointer" }}
+              >
+                Primary version, lyrics, and arrangement
+              </summary>
+
+              <div style={{ marginTop: "1rem" }}>
+                {primaryVersion ? (
+                  <>
+                    <div
+                      className="pillRow"
+                      style={{ marginBottom: "1rem" }}
+                    >
+                      <span className="pill">
+                        Version {primaryVersion.version_number}
+                      </span>
+                      <span className="pill">
+                        {primaryVersion.stage}
+                      </span>
+                      {primaryVersion.is_stage_primary ? (
+                        <span className="pill">primary</span>
+                      ) : null}
+                    </div>
+
+                    <label className="copy" htmlFor="version_stage">
+                      Version stage
+                    </label>
+                    <select
+                      id="version_stage"
+                      name="version_stage"
+                      defaultValue={primaryVersion.stage ?? "spark"}
+                      className="input"
+                    >
+                      <option value="spark">Spark</option>
+                      <option value="draft">Draft</option>
+                      <option value="final">Final</option>
+                    </select>
+
+                    <label className="copy" htmlFor="version_title">
+                      Version title
+                    </label>
+                    <input
+                      id="version_title"
+                      name="version_title"
+                      defaultValue={primaryVersion.title ?? ""}
+                      className="input"
+                    />
+
+                    <label className="copy" htmlFor="lyrics">
+                      Lyrics
+                    </label>
+                    <textarea
+                      id="lyrics"
+                      name="lyrics"
+                      defaultValue={primaryVersion.lyrics ?? ""}
+                      className="textarea"
+                      rows={14}
+                    />
+
+                    <label
+                      className="copy"
+                      htmlFor="arrangement_notes"
+                    >
+                      Arrangement notes
+                    </label>
+                    <textarea
+                      id="arrangement_notes"
+                      name="arrangement_notes"
+                      defaultValue={
+                        primaryVersion.arrangement_notes ?? ""
+                      }
+                      className="textarea"
+                      rows={7}
+                    />
+
+                    <label
+                      className="copy"
+                      htmlFor="story_behind_song"
+                    >
+                      Story behind the song
+                    </label>
+                    <textarea
+                      id="story_behind_song"
+                      name="story_behind_song"
+                      defaultValue={
+                        primaryVersion.story_behind_song ?? ""
+                      }
+                      className="textarea"
+                      rows={7}
+                    />
+                  </>
+                ) : (
+                  <p className="copy">
+                    No version found for this song yet.
+                  </p>
+                )}
+              </div>
+            </details>
+
+            <details className="card" style={{ marginTop: "1rem" }}>
+              <summary
+                className="h3"
+                style={{ cursor: "pointer" }}
+              >
+                Writer note and process history
+              </summary>
+
+              <div style={{ marginTop: "1rem" }}>
+                <label className="copy" htmlFor="note_title">
+                  Note title
+                </label>
+                <input
+                  id="note_title"
+                  name="note_title"
+                  defaultValue={latestNote?.title ?? ""}
+                  className="input"
+                />
+
+                <label className="copy" htmlFor="note_body">
+                  Note body
+                </label>
+                <textarea
+                  id="note_body"
+                  name="note_body"
+                  defaultValue={latestNote?.body ?? ""}
+                  className="textarea"
+                  rows={9}
+                />
+
+                <label
+                  className="copy"
+                  htmlFor="note_visibility"
+                >
+                  Note visibility
+                </label>
+                <select
+                  id="note_visibility"
+                  name="note_visibility"
+                  defaultValue={
+                    latestNote?.visibility ?? "private"
+                  }
+                  className="input"
+                >
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                </select>
+              </div>
+            </details>
+
+            <div
+              className="button-row"
+              style={{ marginTop: "1rem" }}
+            >
+              <button type="submit" className="button primary">
+                Save song details
+              </button>
+
+              <Link href={`/songs/${slug}`} className="button">
+                Cancel changes
+              </Link>
             </div>
           </form>
+        </section>
 
-          <div style={{ marginTop: "1.25rem" }}>
-            <SongIntelligencePanel
-              songId={song.id}
-              slug={slug}
-              audioAttachments={(song.attachments ?? []).filter(
-                (attachment: any) => attachment.file_type === "audio",
-              )}
-              transcripts={song.song_transcripts ?? []}
-              audienceMetrics={audienceMetrics}
-            />
+        <section id="intelligence">
+          <div
+            className="card"
+            style={{
+              marginBottom: "1rem",
+              border:
+                "1px solid rgba(220, 182, 92, 0.38)",
+              background:
+                "linear-gradient(145deg, rgba(151, 106, 40, 0.12), rgba(255,255,255,0.025))",
+            }}
+          >
+            <div className="eyebrow">Understand the song</div>
+            <h2 className="h2">
+              Recording, transcript, intelligence, audience, and tasks
+            </h2>
+
+            <p className="copy" style={{ maxWidth: 900 }}>
+              Move from the source recording to a reviewed transcript,
+              then use Song Intelligence to identify strengths,
+              development opportunities, audience fit, and practical
+              next steps.
+            </p>
           </div>
 
-          <div style={{ marginTop: "1.25rem" }}>
-            <MuseChatPanel
-              songId={song.id}
-              songTitle={songTitle}
-              defaultMuseSlug={assignedMuseSlug}
-              museOptions={MUSE_OPTIONS}
-            />
+          <SongIntelligencePanel
+            songId={song.id}
+            slug={slug}
+            audioAttachments={audioAttachments}
+            transcripts={song.song_transcripts ?? []}
+            audienceMetrics={audienceMetrics}
+          />
+        </section>
+
+        <section id="muses">
+          <div
+            className="card"
+            style={{
+              marginBottom: "1rem",
+              border:
+                "1px solid rgba(156, 137, 220, 0.46)",
+              background:
+                "linear-gradient(145deg, rgba(86, 67, 145, 0.15), rgba(255,255,255,0.025))",
+            }}
+          >
+            <div className="eyebrow">Collaborate</div>
+            <h2 className="h2">Your Creative Council</h2>
+
+            <p className="copy" style={{ maxWidth: 900 }}>
+              Begin with {assignedMuse?.name ?? "the assigned Muse"},{" "}
+              the song’s primary creative partner. Then invite another
+              Muse to reveal how a different specialty changes the
+              recommendation.
+            </p>
           </div>
-        </div>
+
+          <MuseChatPanel
+            songId={song.id}
+            songTitle={songTitle}
+            defaultMuseSlug={assignedMuseSlug}
+            museOptions={MUSE_OPTIONS}
+          />
+        </section>
+
+        <section
+          id="share"
+          className="card"
+          style={{
+            border: "1px solid rgba(220, 182, 92, 0.42)",
+            background:
+              "linear-gradient(145deg, rgba(151, 106, 40, 0.12), rgba(255,255,255,0.025))",
+          }}
+        >
+          <div className="eyebrow">Share and listen</div>
+          <h2 className="h2">Let the song meet its listeners</h2>
+
+          <p className="copy" style={{ maxWidth: 900 }}>
+            This song is currently <strong>{song.status}</strong>. Use
+            the song details section to change its visibility, then
+            preview the public page and review how listeners respond.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(160px, 1fr))",
+              gap: "0.8rem",
+              marginTop: "0.9rem",
+            }}
+          >
+            {[
+              ["Total listens", audienceMetrics.totalListens],
+              ["Unique listeners", audienceMetrics.uniqueListeners],
+              ["Last 7 days", audienceMetrics.recentListens],
+              [
+                "Last listened",
+                audienceMetrics.lastListenedAt
+                  ? new Date(
+                      audienceMetrics.lastListenedAt,
+                    ).toLocaleDateString()
+                  : "Not yet",
+              ],
+            ].map(([label, value]) => (
+              <div
+                key={String(label)}
+                style={{
+                  padding: "0.9rem",
+                  borderRadius: 14,
+                  border: "1px solid var(--line)",
+                  background: "rgba(0,0,0,0.12)",
+                }}
+              >
+                <div className="eyebrow">{label}</div>
+                <div
+                  className="h3"
+                  style={{ margin: "0.35rem 0 0" }}
+                >
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="button-row" style={{ marginTop: "1rem" }}>
+            <Link
+              href={`/songs/${slug}`}
+              className="button primary"
+            >
+              Preview public song page
+            </Link>
+
+            <Link href="/listen" className="button">
+              Open the Jukebox
+            </Link>
+          </div>
+        </section>
       </div>
     </section>
   );
