@@ -1,9 +1,11 @@
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { saveSongEdits } from './actions';
-import { SongIntelligencePanel } from '@/components/studio/SongIntelligencePanel';
-import { MuseChatPanel } from '@/components/studio/MuseChatPanel';
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { getServerAuthContext } from "@/lib/auth";
+import { MUSE_OPTIONS } from "@/lib/muses";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { saveSongEdits } from "./actions";
+import { SongIntelligencePanel } from "@/components/studio/SongIntelligencePanel";
+import { MuseChatPanel } from "@/components/studio/MuseChatPanel";
 
 export default async function EditSongPage({
   params,
@@ -11,6 +13,11 @@ export default async function EditSongPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const { user } = await getServerAuthContext();
+
+  if (!user) {
+    notFound();
+  }
 
   const supabase = await createServerSupabaseClient();
 
@@ -18,16 +25,8 @@ export default async function EditSongPage({
     notFound();
   }
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    notFound();
-  }
-
-  const { data: song, error: songError } = await supabase
-    .from('songs')
+  const { data: song, error: songError } = await (supabase as any)
+    .from("songs")
     .select(`
       id,
       slug,
@@ -41,6 +40,7 @@ export default async function EditSongPage({
       status,
       song_origin,
       owner_user_id,
+      muse_id,
       song_versions (
         id,
         version_number,
@@ -78,25 +78,44 @@ export default async function EditSongPage({
         created_at
       )
     `)
-    .eq('slug', slug)
-    .eq('owner_user_id', user.id)
+    .eq("slug", slug)
+    .eq("owner_user_id", user.id)
     .maybeSingle();
 
   if (songError || !song) {
     notFound();
   }
 
-  const { data: engagementSummary } = await supabase
-    .from('song_engagement_summaries')
-    .select('audio_play_count, last_audio_play_at')
-    .eq('song_id', song.id)
+  let assignedMuseSlug = "calliope";
+
+  if (song.muse_id) {
+    const { data: assignedMuse, error: museError } = await (supabase as any)
+      .from("muses")
+      .select("slug")
+      .eq("id", song.muse_id)
+      .maybeSingle();
+
+    if (museError) {
+      console.error("Unable to load assigned Muse:", museError);
+    } else if (
+      assignedMuse?.slug &&
+      MUSE_OPTIONS.some((option) => option.slug === assignedMuse.slug)
+    ) {
+      assignedMuseSlug = assignedMuse.slug;
+    }
+  }
+
+  const { data: engagementSummary } = await (supabase as any)
+    .from("song_engagement_summaries")
+    .select("audio_play_count, last_audio_play_at")
+    .eq("song_id", song.id)
     .maybeSingle();
 
-  const { data: audioPlayEvents } = await supabase
-    .from('song_engagement_events')
-    .select('user_id, anonymous_session_id, occurred_at')
-    .eq('song_id', song.id)
-    .eq('event_type', 'audio_play');
+  const { data: audioPlayEvents } = await (supabase as any)
+    .from("song_engagement_events")
+    .select("user_id, anonymous_session_id, occurred_at")
+    .eq("song_id", song.id)
+    .eq("event_type", "audio_play");
 
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
@@ -113,7 +132,7 @@ export default async function EditSongPage({
 
         return null;
       })
-      .filter((value): value is string => Boolean(value))
+      .filter((value: string | null): value is string => Boolean(value)),
   );
 
   const audienceMetrics = {
@@ -128,7 +147,7 @@ export default async function EditSongPage({
   };
 
   const versions = [...(song.song_versions ?? [])].sort(
-    (a: any, b: any) => a.version_number - b.version_number
+    (a: any, b: any) => a.version_number - b.version_number,
   );
 
   const primaryVersion =
@@ -140,14 +159,14 @@ export default async function EditSongPage({
     [...(song.writer_notes ?? [])].sort(
       (a: any, b: any) =>
         new Date(b.created_at).getTime() -
-        new Date(a.created_at).getTime()
+        new Date(a.created_at).getTime(),
     )[0] ?? null;
 
   const songTitle =
     song.title_final ||
     song.title_working ||
     primaryVersion?.title ||
-    'Untitled song';
+    "Untitled song";
 
   return (
     <section className="section">
@@ -165,8 +184,8 @@ export default async function EditSongPage({
           <div
             className="button-row"
             style={{
-              marginTop: '1rem',
-              marginBottom: '1rem',
+              marginTop: "1rem",
+              marginBottom: "1rem",
             }}
           >
             <Link href={`/songs/${slug}`} className="button">
@@ -176,71 +195,59 @@ export default async function EditSongPage({
 
           <form action={saveSongEdits} className="card-grid">
             <input type="hidden" name="slug" value={slug} />
-
-            <input
-              type="hidden"
-              name="song_id"
-              value={song.id}
-            />
-
+            <input type="hidden" name="song_id" value={song.id} />
             <input
               type="hidden"
               name="version_id"
-              value={primaryVersion?.id ?? ''}
+              value={primaryVersion?.id ?? ""}
             />
-
             <input
               type="hidden"
               name="writer_note_id"
-              value={latestNote?.id ?? ''}
+              value={latestNote?.id ?? ""}
             />
 
             <div className="card">
               <div className="eyebrow">Song</div>
-
               <h2 className="h2">Song metadata</h2>
 
               <label className="copy" htmlFor="title_working">
                 Working title
               </label>
-
               <input
                 id="title_working"
                 name="title_working"
-                defaultValue={song.title_working ?? ''}
+                defaultValue={song.title_working ?? ""}
                 className="input"
               />
 
               <label className="copy" htmlFor="title_final">
                 Final title
               </label>
-
               <input
                 id="title_final"
                 name="title_final"
-                defaultValue={song.title_final ?? ''}
+                defaultValue={song.title_final ?? ""}
                 className="input"
               />
 
               <label className="copy" htmlFor="hook_line">
                 Hook line
               </label>
-
               <input
                 id="hook_line"
                 name="hook_line"
-                defaultValue={song.hook_line ?? ''}
+                defaultValue={song.hook_line ?? ""}
                 className="input"
               />
 
               <label className="copy" htmlFor="summary">
                 Summary
               </label>
-
               <textarea
                 id="summary"
                 name="summary"
-                defaultValue={song.summary ?? ''}
+                defaultValue={song.summary ?? ""}
                 className="textarea"
                 rows={4}
               />
@@ -248,11 +255,10 @@ export default async function EditSongPage({
               <label className="copy" htmlFor="songwriter_name">
                 Songwriter
               </label>
-
               <input
                 id="songwriter_name"
                 name="songwriter_name"
-                defaultValue={song.songwriter_name ?? ''}
+                defaultValue={song.songwriter_name ?? ""}
                 className="input"
                 placeholder="Mike Mancour"
               />
@@ -260,11 +266,10 @@ export default async function EditSongPage({
               <label className="copy" htmlFor="genre">
                 Genre
               </label>
-
               <input
                 id="genre"
                 name="genre"
-                defaultValue={song.genre ?? ''}
+                defaultValue={song.genre ?? ""}
                 className="input"
                 placeholder="Blues, Rock, Country..."
               />
@@ -272,11 +277,10 @@ export default async function EditSongPage({
               <label className="copy" htmlFor="current_stage">
                 Current stage
               </label>
-
               <select
                 id="current_stage"
                 name="current_stage"
-                defaultValue={song.current_stage ?? 'spark'}
+                defaultValue={song.current_stage ?? "spark"}
                 className="input"
               >
                 <option value="spark">Spark</option>
@@ -287,11 +291,10 @@ export default async function EditSongPage({
               <label className="copy" htmlFor="song_origin">
                 How It Arrived
               </label>
-
               <select
                 id="song_origin"
                 name="song_origin"
-                defaultValue={song.song_origin ?? 'other'}
+                defaultValue={song.song_origin ?? "other"}
                 className="input"
               >
                 <option value="dream">Dream</option>
@@ -312,11 +315,10 @@ export default async function EditSongPage({
               <label className="copy" htmlFor="status">
                 Visibility / status
               </label>
-
               <select
                 id="status"
                 name="status"
-                defaultValue={song.status ?? 'private'}
+                defaultValue={song.status ?? "private"}
                 className="input"
               >
                 <option value="private">Private</option>
@@ -328,39 +330,27 @@ export default async function EditSongPage({
 
             <div className="card">
               <div className="eyebrow">Primary version</div>
-
               <h2 className="h2">Version details</h2>
 
               {primaryVersion ? (
                 <>
-                  <div
-                    className="pillRow"
-                    style={{ marginBottom: '1rem' }}
-                  >
+                  <div className="pillRow" style={{ marginBottom: "1rem" }}>
                     <span className="pill">
                       Version {primaryVersion.version_number}
                     </span>
-
-                    <span className="pill">
-                      {primaryVersion.stage}
-                    </span>
-
+                    <span className="pill">{primaryVersion.stage}</span>
                     {primaryVersion.is_stage_primary ? (
                       <span className="pill">primary</span>
                     ) : null}
                   </div>
 
-                  <label
-                    className="copy"
-                    htmlFor="version_stage"
-                  >
+                  <label className="copy" htmlFor="version_stage">
                     Version stage
                   </label>
-
                   <select
                     id="version_stage"
                     name="version_stage"
-                    defaultValue={primaryVersion.stage ?? 'spark'}
+                    defaultValue={primaryVersion.stage ?? "spark"}
                     className="input"
                   >
                     <option value="spark">Spark</option>
@@ -368,119 +358,86 @@ export default async function EditSongPage({
                     <option value="final">Final</option>
                   </select>
 
-                  <label
-                    className="copy"
-                    htmlFor="version_title"
-                  >
+                  <label className="copy" htmlFor="version_title">
                     Version title
                   </label>
-
                   <input
                     id="version_title"
                     name="version_title"
-                    defaultValue={primaryVersion.title ?? ''}
+                    defaultValue={primaryVersion.title ?? ""}
                     className="input"
                   />
 
                   <label className="copy" htmlFor="lyrics">
                     Lyrics
                   </label>
-
                   <textarea
                     id="lyrics"
                     name="lyrics"
-                    defaultValue={primaryVersion.lyrics ?? ''}
+                    defaultValue={primaryVersion.lyrics ?? ""}
                     className="textarea"
                     rows={10}
                   />
 
-                  <label
-                    className="copy"
-                    htmlFor="arrangement_notes"
-                  >
+                  <label className="copy" htmlFor="arrangement_notes">
                     Arrangement notes
                   </label>
-
                   <textarea
                     id="arrangement_notes"
                     name="arrangement_notes"
-                    defaultValue={
-                      primaryVersion.arrangement_notes ?? ''
-                    }
+                    defaultValue={primaryVersion.arrangement_notes ?? ""}
                     className="textarea"
                     rows={6}
                   />
 
-                  <label
-                    className="copy"
-                    htmlFor="story_behind_song"
-                  >
+                  <label className="copy" htmlFor="story_behind_song">
                     Story behind the song
                   </label>
-
                   <textarea
                     id="story_behind_song"
                     name="story_behind_song"
-                    defaultValue={
-                      primaryVersion.story_behind_song ?? ''
-                    }
+                    defaultValue={primaryVersion.story_behind_song ?? ""}
                     className="textarea"
                     rows={6}
                   />
                 </>
               ) : (
-                <p className="copy">
-                  No version found for this song yet.
-                </p>
+                <p className="copy">No version found for this song yet.</p>
               )}
             </div>
 
-            <div
-              className="card"
-              style={{ gridColumn: '1 / -1' }}
-            >
+            <div className="card" style={{ gridColumn: "1 / -1" }}>
               <div className="eyebrow">Writer note</div>
-
-              <h2 className="h2">
-                Comments / process notes
-              </h2>
+              <h2 className="h2">Comments / process notes</h2>
 
               <label className="copy" htmlFor="note_title">
                 Note title
               </label>
-
               <input
                 id="note_title"
                 name="note_title"
-                defaultValue={latestNote?.title ?? ''}
+                defaultValue={latestNote?.title ?? ""}
                 className="input"
               />
 
               <label className="copy" htmlFor="note_body">
                 Note body
               </label>
-
               <textarea
                 id="note_body"
                 name="note_body"
-                defaultValue={latestNote?.body ?? ''}
+                defaultValue={latestNote?.body ?? ""}
                 className="textarea"
                 rows={8}
               />
 
-              <label
-                className="copy"
-                htmlFor="note_visibility"
-              >
+              <label className="copy" htmlFor="note_visibility">
                 Note visibility
               </label>
-
               <select
                 id="note_visibility"
                 name="note_visibility"
-                defaultValue={
-                  latestNote?.visibility ?? 'private'
-                }
+                defaultValue={latestNote?.visibility ?? "private"}
                 className="input"
               >
                 <option value="private">Private</option>
@@ -488,44 +445,36 @@ export default async function EditSongPage({
               </select>
             </div>
 
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ gridColumn: "1 / -1" }}>
               <div className="button-row">
-                <button
-                  type="submit"
-                  className="button primary"
-                >
+                <button type="submit" className="button primary">
                   Save changes
                 </button>
-
-                <Link
-                  href={`/songs/${slug}`}
-                  className="button"
-                >
+                <Link href={`/songs/${slug}`} className="button">
                   Cancel
                 </Link>
               </div>
             </div>
           </form>
 
-          <div style={{ marginTop: '1.25rem' }}>
+          <div style={{ marginTop: "1.25rem" }}>
             <SongIntelligencePanel
               songId={song.id}
               slug={slug}
-              audioAttachments={(
-                song.attachments ?? []
-              ).filter(
-                (attachment: any) =>
-                  attachment.file_type === 'audio'
+              audioAttachments={(song.attachments ?? []).filter(
+                (attachment: any) => attachment.file_type === "audio",
               )}
               transcripts={song.song_transcripts ?? []}
               audienceMetrics={audienceMetrics}
             />
           </div>
 
-          <div style={{ marginTop: '1.25rem' }}>
+          <div style={{ marginTop: "1.25rem" }}>
             <MuseChatPanel
               songId={song.id}
               songTitle={songTitle}
+              defaultMuseSlug={assignedMuseSlug}
+              museOptions={MUSE_OPTIONS}
             />
           </div>
         </div>
