@@ -457,6 +457,263 @@ function countStage(
   ).length;
 }
 
+
+function normalizeSongTitle(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function displayScore(value: number | null) {
+  return value === null ? "—" : Math.round(value).toString();
+}
+
+function displayListenerRating(
+  average: number | null,
+  count: number,
+) {
+  if (average === null || count <= 0) {
+    return "—";
+  }
+
+  return `${average.toFixed(1)} / 5`;
+}
+
+function FeaturedPortfolioSong({
+  song,
+}: {
+  song: StudioPortfolioSong;
+}) {
+  const activeTasks =
+    song.open_task_count + song.in_progress_task_count;
+
+  const metrics = [
+    {
+      label: "AI overall",
+      value: displayScore(song.ai_overall_score),
+      detail:
+        song.ai_overall_score === null
+          ? "Not analyzed"
+          : "Creative strength",
+    },
+    {
+      label: "Release ready",
+      value: displayScore(song.ai_ready_for_release_score),
+      detail:
+        song.ai_ready_for_release_score === null
+          ? "Not analyzed"
+          : "Release readiness",
+    },
+    {
+      label: "Audience fit",
+      value: displayScore(song.ai_audience_score),
+      detail:
+        song.ai_audience_score === null
+          ? "Not analyzed"
+          : "Audience score",
+    },
+    {
+      label: "Your rating",
+      value: displayScore(song.personal_rating),
+      detail:
+        song.personal_rating === null
+          ? "Not rated"
+          : "Human judgment",
+    },
+    {
+      label: "Listener rating",
+      value: displayListenerRating(
+        song.listener_rating_average,
+        song.listener_rating_count,
+      ),
+      detail:
+        song.listener_rating_count > 0
+          ? `${song.listener_rating_count} ${
+              song.listener_rating_count === 1
+                ? "rating"
+                : "ratings"
+            }`
+          : "No ratings yet",
+    },
+    {
+      label: "Listens",
+      value: song.audio_play_count.toLocaleString(),
+      detail: "Recorded audio plays",
+    },
+    {
+      label: "Versions",
+      value: song.version_count,
+      detail: `${song.final_version_count} final`,
+    },
+    {
+      label: "Active tasks",
+      value: activeTasks,
+      detail: `${song.open_task_count} open · ${song.in_progress_task_count} in progress`,
+    },
+  ];
+
+  return (
+    <section
+      style={{
+        marginTop: "1rem",
+        marginBottom: "1.25rem",
+        padding: "1.15rem",
+        borderRadius: 20,
+        border: "1px solid rgba(220, 182, 92, 0.62)",
+        background:
+          "radial-gradient(circle at top right, rgba(151, 106, 40, 0.18), transparent 34%), linear-gradient(145deg, rgba(151, 106, 40, 0.13), rgba(255,255,255,0.025))",
+        boxShadow: "0 18px 46px rgba(0,0,0,0.16)",
+      }}
+    >
+      <div className="eyebrow">
+        Featured demonstration song
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+          gap: "1rem",
+          alignItems: "end",
+          marginTop: "0.35rem",
+        }}
+      >
+        <div>
+          <h3
+            className="h2"
+            style={{
+              marginTop: 0,
+              marginBottom: "0.45rem",
+            }}
+          >
+            {song.title}
+          </h3>
+
+          <p className="copy" style={{ maxWidth: 780 }}>
+            This featured song remains at the top of the
+            portfolio so the complete iDreamMusic journey can be
+            demonstrated without changing the honest Opportunity
+            Intelligence ranking of the rest of the catalog.
+          </p>
+
+          <div className="pillRow" style={{ marginTop: "0.75rem" }}>
+            <span className="pill">
+              {song.current_stage}
+            </span>
+
+            {song.muse_slug ? (
+              <span className="pill">
+                {song.muse_slug}
+              </span>
+            ) : null}
+
+            <span className="pill">
+              Priority {song.priority_tier}
+            </span>
+
+            <span className="pill">
+              {song.workflow_status}
+            </span>
+
+            {song.ai_completed_at ? (
+              <span className="pill">
+                Intelligence saved
+              </span>
+            ) : (
+              <span className="pill">
+                Needs intelligence
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="button-row">
+          <Link
+            className="button primary"
+            href={`/studio/songs/${song.slug}/edit`}
+          >
+            Work this song
+          </Link>
+
+          <Link
+            className="button"
+            href={`/songs/${song.slug}`}
+          >
+            View song
+          </Link>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(135px, 1fr))",
+          gap: "0.7rem",
+          marginTop: "1rem",
+        }}
+      >
+        {metrics.map((metric) => (
+          <div
+            key={metric.label}
+            style={{
+              padding: "0.85rem",
+              borderRadius: 14,
+              border: "1px solid var(--line)",
+              background: "rgba(0,0,0,0.14)",
+            }}
+          >
+            <div className="eyebrow">
+              {metric.label}
+            </div>
+
+            <div
+              className="h3"
+              style={{
+                marginTop: "0.3rem",
+                marginBottom: 0,
+                fontSize: "1.55rem",
+              }}
+            >
+              {metric.value}
+            </div>
+
+            <p
+              className="copy"
+              style={{
+                margin: "0.2rem 0 0",
+                fontSize: "0.82rem",
+                opacity: 0.82,
+              }}
+            >
+              {metric.detail}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {song.summary ? (
+        <div
+          style={{
+            marginTop: "0.9rem",
+            padding: "0.85rem",
+            borderRadius: 14,
+            border: "1px solid rgba(220, 182, 92, 0.32)",
+            background: "rgba(0,0,0,0.1)",
+          }}
+        >
+          <div className="eyebrow">Song summary</div>
+          <p className="copy" style={{ marginBottom: 0 }}>
+            {song.summary}
+          </p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export default async function StudioPage() {
   const { user, profile } = await getServerAuthContext();
   const rawMySongs = user ? await getMySongs(user.id) : [];
@@ -467,6 +724,19 @@ export default async function StudioPage() {
   const portfolioSongs = user
     ? await buildStudioPortfolio(user.id, mySongs)
     : [];
+
+  const featuredPortfolioSong =
+    portfolioSongs.find(
+      (song) =>
+        normalizeSongTitle(song.title) === "do you believe",
+    ) ??
+    portfolioSongs.find(
+      (song) =>
+        normalizeSongTitle(song.title).includes(
+          "do you believe",
+        ),
+    ) ??
+    null;
 
   const pipeline = {
     total: portfolioSongs.length,
@@ -749,7 +1019,31 @@ export default async function StudioPage() {
             </p>
 
             {portfolioSongs.length ? (
-              <StudioPortfolio initialSongs={portfolioSongs} />
+              <>
+                {featuredPortfolioSong ? (
+                  <FeaturedPortfolioSong
+                    song={featuredPortfolioSong}
+                  />
+                ) : (
+                  <div
+                    className="card"
+                    style={{ marginTop: "1rem" }}
+                  >
+                    <div className="eyebrow">
+                      Featured demonstration song
+                    </div>
+                    <p className="copy">
+                      “Do You Believe?” was not found in the
+                      current portfolio. Confirm that its song title
+                      contains “Do You Believe”.
+                    </p>
+                  </div>
+                )}
+
+                <StudioPortfolio
+                  initialSongs={portfolioSongs}
+                />
+              </>
             ) : (
               <p className="copy" style={{ marginTop: "1rem" }}>
                 You have not uploaded a song yet. Begin with a new song,
