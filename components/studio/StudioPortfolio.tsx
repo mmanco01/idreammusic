@@ -1436,7 +1436,7 @@ const DISPLAY_LIMIT = 12;
 
       return true;
     });
-const displayedSongs = visibleSongs.slice(0, DISPLAY_LIMIT);
+
     return [...filtered].sort((a, b) => {
       if (sortMode === "opportunity") {
         return (
@@ -1513,6 +1513,8 @@ const displayedSongs = visibleSongs.slice(0, DISPLAY_LIMIT);
     stageFilter,
   ]);
 
+  const displayedSongs = visibleSongs.slice(0, DISPLAY_LIMIT);
+  
   function updateLocalSong(
     songId: string,
     patch: Partial<StudioPortfolioSong>,
