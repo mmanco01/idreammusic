@@ -5,7 +5,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import StudioPortfolio, {
   type StudioPortfolioSong,
 } from "@/components/studio/StudioPortfolio";
-import { FeaturedDemoCard } from "@/components/studio/FeaturedDemoCard";
 import StudioStageGrid from "@/components/studio/StudioStageGrid";
 
 type VersionRow = {
@@ -518,7 +517,7 @@ function FeaturedPortfolioSong({
       value: displayScore(song.personal_rating),
       detail:
         song.personal_rating === null
-          ? "Not rated"
+          ? "Set in portfolio controls below"
           : "Human judgment",
     },
     {
@@ -592,10 +591,9 @@ function FeaturedPortfolioSong({
           </h3>
 
           <p className="copy" style={{ maxWidth: 780 }}>
-            This featured song remains at the top of the
-            portfolio so the complete iDreamMusic journey can be
-            demonstrated without changing the honest Opportunity
-            Intelligence ranking of the rest of the catalog.
+            Born from a dream of an outdoor performance, “Do You Believe?”
+            grew from a repeated question and the memory of three voices
+            joining in communal harmony.
           </p>
 
           <div className="pillRow" style={{ marginTop: "0.75rem" }}>
@@ -603,11 +601,9 @@ function FeaturedPortfolioSong({
               {song.current_stage}
             </span>
 
-            {song.muse_slug ? (
-              <span className="pill">
-                {song.muse_slug}
-              </span>
-            ) : null}
+            <span className="pill">
+              Polyhymnia — Faith
+            </span>
 
             <span className="pill">
               Priority {song.priority_tier}
@@ -694,22 +690,22 @@ function FeaturedPortfolioSong({
         ))}
       </div>
 
-      {song.summary ? (
-        <div
-          style={{
-            marginTop: "0.9rem",
-            padding: "0.85rem",
-            borderRadius: 14,
-            border: "1px solid rgba(220, 182, 92, 0.32)",
-            background: "rgba(0,0,0,0.1)",
-          }}
-        >
-          <div className="eyebrow">Song summary</div>
-          <p className="copy" style={{ marginBottom: 0 }}>
-            {song.summary}
-          </p>
-        </div>
-      ) : null}
+      <div
+        style={{
+          marginTop: "0.9rem",
+          padding: "0.85rem",
+          borderRadius: 14,
+          border: "1px solid rgba(220, 182, 92, 0.32)",
+          background: "rgba(0,0,0,0.1)",
+        }}
+      >
+        <div className="eyebrow">Song summary</div>
+        <p className="copy" style={{ marginBottom: 0 }}>
+          Born from a dream of an outdoor performance, “Do You Believe?”
+          grew from a repeated question and the memory of three voices
+          joining in communal harmony.
+        </p>
+      </div>
     </section>
   );
 }
@@ -966,56 +962,94 @@ export default async function StudioPage() {
           />
         </section>
 
-        <section id="guided-demo">
+        <section
+          id="guided-demo"
+          className="card"
+          style={{
+            border: "1px solid rgba(220, 182, 92, 0.48)",
+            background:
+              "radial-gradient(circle at top right, rgba(151, 106, 40, 0.16), transparent 34%), linear-gradient(145deg, rgba(151, 106, 40, 0.12), rgba(255,255,255,0.025))",
+          }}
+        >
+          <div className="eyebrow">Guided demonstration</div>
+
           <div
-            className="card"
             style={{
-              marginBottom: "0.9rem",
-              border: "1px solid rgba(220, 182, 92, 0.42)",
-              background:
-                "linear-gradient(145deg, rgba(151, 106, 40, 0.13), rgba(255,255,255,0.025))",
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
+              gap: "1rem",
+              alignItems: "end",
             }}
           >
-            <div className="eyebrow">Guided demonstration</div>
-            <h2 className="h2">
-              Follow one song through the full iDreamMusic experience
-            </h2>
-            <p className="copy" style={{ maxWidth: 900 }}>
-              See how “Do You Believe?” moves from a dream fragment into
-              capture, Song Intelligence, Muse collaboration, development,
-              sharing, and listener response.
-            </p>
+            <div>
+              <h2 className="h2">
+                Follow one song through the full iDreamMusic experience
+              </h2>
 
-            <div className="pillRow" style={{ marginTop: "0.8rem" }}>
-              {[
-                "Arrival",
-                "Capture",
-                "Intelligence",
-                "Muse collaboration",
-                "Final song",
-                "Listener response",
-              ].map((step) => (
-                <span className="pill" key={step}>
-                  {step}
-                </span>
-              ))}
+              <p className="copy" style={{ maxWidth: 900 }}>
+                See how “Do You Believe?” moves from a dream fragment into
+                capture, Song Intelligence, Muse collaboration, development,
+                sharing, and listener response.
+              </p>
+
+              <div className="pillRow" style={{ marginTop: "0.8rem" }}>
+                {[
+                  "Arrival",
+                  "Capture",
+                  "Intelligence",
+                  "Muse collaboration",
+                  "Final song",
+                  "Listener response",
+                ].map((step) => (
+                  <span className="pill" key={step}>
+                    {step}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="button-row">
+              <Link
+                href="/studio/demo/do-you-believe"
+                className="button primary"
+              >
+                Take the Song Journey
+              </Link>
+
+              {featuredPortfolioSong ? (
+                <Link
+                  href={`/studio/songs/${featuredPortfolioSong.slug}/edit`}
+                  className="button"
+                >
+                  Work the Song
+                </Link>
+              ) : null}
             </div>
           </div>
-
-          <FeaturedDemoCard />
         </section>
 
         {user ? (
           <section className="card" id="song-portfolio">
-            <div className="eyebrow">My song portfolio</div>
-            <h2 className="h2">
-              {profile?.display_name || user.email}
-            </h2>
+            <div className="eyebrow">My creative catalog</div>
+            <h2 className="h2">My Song Portfolio</h2>
+
+            <p
+              className="copy"
+              style={{
+                marginTop: "-0.15rem",
+                marginBottom: "0.65rem",
+                opacity: 0.82,
+              }}
+            >
+              Signed in as {profile?.display_name || user.email}
+            </p>
 
             <p className="copy" style={{ maxWidth: 900 }}>
-              Sort and compare your catalog using Song Opportunity
-              Intelligence, Muse, stage, priorities, AI scores, audience
-              fit, listener ratings, plays, versions, and active work.
+              Sort and compare your catalog using one consistent Song
+              Opportunity Intelligence ranking, along with Muse, stage,
+              priorities, AI scores, audience fit, listener ratings, plays,
+              versions, and active work.
             </p>
 
             {portfolioSongs.length ? (
