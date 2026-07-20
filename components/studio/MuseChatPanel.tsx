@@ -7,6 +7,14 @@ import {
   useMemo,
   useState,
 } from "react";
+import {
+  isMuseIntelligenceResult,
+  type MuseIntelligenceResult,
+} from "@/lib/muses/intelligence";
+import {
+  MuseIntelligenceDetails,
+  type MuseTaskActionState,
+} from "@/components/studio/MuseIntelligenceDetails";
 
 export type MuseChatOption = {
   slug: string;
@@ -32,7 +40,11 @@ type MemoryCandidate = {
   reason: string | null;
   importance: number;
   confidence: number | null;
-  status: "proposed" | "accepted" | "rejected" | "superseded";
+  status:
+    | "proposed"
+    | "accepted"
+    | "rejected"
+    | "superseded";
   source_message_id?: string | null;
 };
 
@@ -46,6 +58,8 @@ type ChatMessage = {
   question?: string;
   comparisonWith?: string;
   memories?: MemoryCandidate[];
+  intelligence?: MuseIntelligenceResult;
+  taskAction?: MuseTaskActionState;
 };
 
 type MuseChatResponse = {
@@ -54,6 +68,7 @@ type MuseChatResponse = {
   reply?: string;
   mode?: "chat" | "collaborate";
   conversationId?: string | null;
+  messageId?: string | null;
   muse?: {
     slug?: string;
     name?: string;
@@ -65,7 +80,9 @@ type MuseChatResponse = {
     name?: string;
     domain?: string;
   } | null;
+  intelligence?: unknown;
   memories?: MemoryCandidate[];
+  taskAction?: MuseTaskActionState;
 };
 
 type MuseHistoryResponse = {
@@ -85,12 +102,16 @@ type MuseHistoryResponse = {
     kind?: "primary" | "collaborator";
     question?: string | null;
     comparisonWith?: string | null;
+    structuredResult?: unknown;
     memories?: MemoryCandidate[];
+    taskAction?: MuseTaskActionState;
   }>;
 };
 
 function createMessageId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
 }
 
 function memoryLabel(type: string) {
@@ -118,49 +139,68 @@ export function MuseChatPanel({
   lockedMuse = false,
 }: Props) {
   const safeDefaultMuse =
-    museOptions.find((option) => option.slug === defaultMuseSlug) ??
-    museOptions[0];
+    museOptions.find(
+      (option) => option.slug === defaultMuseSlug,
+    ) ?? museOptions[0];
 
-  const [selectedMuseSlug, setSelectedMuseSlug] = useState(
-    safeDefaultMuse?.slug ?? "calliope",
-  );
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [selectedMuseSlug, setSelectedMuseSlug] =
+    useState(
+      safeDefaultMuse?.slug ?? "calliope",
+    );
+  const [conversationId, setConversationId] =
+    useState<string | null>(null);
+  const [messages, setMessages] =
+    useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "error">(
-    "idle",
-  );
-  const [historyStatus, setHistoryStatus] = useState<
-    "idle" | "loading" | "error"
-  >("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [memoryActionIds, setMemoryActionIds] = useState<string[]>([]);
-  const [collaborationSourceId, setCollaborationSourceId] = useState<
-    string | null
-  >(null);
-  const [collaboratorMuseSlug, setCollaboratorMuseSlug] = useState("");
-  const [collaborationStatus, setCollaborationStatus] = useState<
+  const [status, setStatus] = useState<
     "idle" | "sending" | "error"
   >("idle");
-  const [collaborationError, setCollaborationError] = useState("");
+  const [historyStatus, setHistoryStatus] =
+    useState<
+      "idle" | "loading" | "error"
+    >("idle");
+  const [errorMessage, setErrorMessage] =
+    useState("");
+  const [memoryActionIds, setMemoryActionIds] =
+    useState<string[]>([]);
+  const [taskActionMessageIds, setTaskActionMessageIds] =
+    useState<string[]>([]);
+  const [collaborationSourceId, setCollaborationSourceId] =
+    useState<string | null>(null);
+  const [collaboratorMuseSlug, setCollaboratorMuseSlug] =
+    useState("");
+  const [collaborationStatus, setCollaborationStatus] =
+    useState<
+      "idle" | "sending" | "error"
+    >("idle");
+  const [collaborationError, setCollaborationError] =
+    useState("");
 
   const selectedMuse =
-    museOptions.find((option) => option.slug === selectedMuseSlug) ??
-    safeDefaultMuse;
+    museOptions.find(
+      (option) => option.slug === selectedMuseSlug,
+    ) ?? safeDefaultMuse;
 
   const museNameBySlug = useMemo(
     () =>
-      new Map(museOptions.map((option) => [option.slug, option.name])),
+      new Map(
+        museOptions.map((option) => [
+          option.slug,
+          option.name,
+        ]),
+      ),
     [museOptions],
   );
 
   const isSongConversation = Boolean(songId);
-  const isPrimaryMuse = selectedMuse?.slug === safeDefaultMuse?.slug;
+  const isPrimaryMuse =
+    selectedMuse?.slug === safeDefaultMuse?.slug;
   const isBusy =
     status === "sending" ||
     collaborationStatus === "sending" ||
     historyStatus === "loading";
-  const canSend = input.trim().length > 0 && !isBusy;
+  const canSend =
+    input.trim().length > 0 && !isBusy;
 
   const conversationContext = useMemo(
     () =>
@@ -170,7 +210,9 @@ export function MuseChatPanel({
           const speaker =
             message.role === "user"
               ? "Songwriter"
-              : message.museName || selectedMuse?.name || "Muse";
+              : message.museName ||
+                selectedMuse?.name ||
+                "Muse";
 
           return `${speaker}: ${message.content}`;
         })
@@ -179,7 +221,9 @@ export function MuseChatPanel({
   );
 
   useEffect(() => {
-    if (!songId || !selectedMuseSlug) return;
+    if (!songId || !selectedMuseSlug) {
+      return;
+    }
 
     const activeSongId = songId;
     let cancelled = false;
@@ -196,42 +240,80 @@ export function MuseChatPanel({
           museSlug: selectedMuseSlug,
         });
 
-        const response = await fetch(`/api/muses/chat?${params.toString()}`, {
-          method: "GET",
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/muses/chat?${params.toString()}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
 
-        const result = (await response.json().catch(() => null)) as
-          | MuseHistoryResponse
-          | null;
+        const result =
+          (await response
+            .json()
+            .catch(() => null)) as
+            | MuseHistoryResponse
+            | null;
 
-        if (!response.ok || result?.status !== "success") {
+        if (
+          !response.ok ||
+          result?.status !== "success"
+        ) {
           throw new Error(
-            result?.message || "The saved Muse conversation could not be loaded.",
+            result?.message ||
+              "The saved Muse conversation could not be loaded.",
           );
         }
 
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
 
-        setConversationId(result.conversation?.id ?? null);
-        setMessages(
-          (result.messages ?? []).map((message) => ({
-            id: message.id,
-            role: message.role,
-            content: message.content,
-            museSlug: message.museSlug ?? undefined,
-            museName: message.museSlug
-              ? museNameBySlug.get(message.museSlug)
-              : undefined,
-            kind: message.kind,
-            question: message.question ?? undefined,
-            comparisonWith: message.comparisonWith ?? undefined,
-            memories: message.memories ?? [],
-          })),
+        setConversationId(
+          result.conversation?.id ?? null,
         );
+
+        setMessages(
+          (result.messages ?? []).map(
+            (message) => {
+              const intelligence =
+                isMuseIntelligenceResult(
+                  message.structuredResult,
+                )
+                  ? message.structuredResult
+                  : undefined;
+
+              return {
+                id: message.id,
+                role: message.role,
+                content: message.content,
+                museSlug:
+                  message.museSlug ?? undefined,
+                museName: message.museSlug
+                  ? museNameBySlug.get(
+                      message.museSlug,
+                    )
+                  : undefined,
+                kind: message.kind,
+                question:
+                  message.question ?? undefined,
+                comparisonWith:
+                  message.comparisonWith ?? undefined,
+                memories: message.memories ?? [],
+                intelligence,
+                taskAction:
+                  message.taskAction ?? null,
+              };
+            },
+          ),
+        );
+
         setHistoryStatus("idle");
       } catch (error) {
-        if (cancelled) return;
+        if (cancelled) {
+          return;
+        }
+
         setHistoryStatus("error");
         setErrorMessage(
           error instanceof Error
@@ -246,7 +328,11 @@ export function MuseChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [songId, selectedMuseSlug, museNameBySlug]);
+  }, [
+    songId,
+    selectedMuseSlug,
+    museNameBySlug,
+  ]);
 
   function clearInteractionState() {
     setInput("");
@@ -266,21 +352,38 @@ export function MuseChatPanel({
   }
 
   async function startNewConversation() {
-    if (isBusy) return;
+    if (isBusy) {
+      return;
+    }
 
     if (songId && conversationId) {
       try {
-        const params = new URLSearchParams({ conversationId });
-        const response = await fetch(`/api/muses/chat?${params.toString()}`, {
-          method: "DELETE",
+        const params = new URLSearchParams({
+          conversationId,
         });
-        const result = (await response.json().catch(() => null)) as
-          | { status?: string; message?: string }
-          | null;
 
-        if (!response.ok || result?.status !== "success") {
+        const response = await fetch(
+          `/api/muses/chat?${params.toString()}`,
+          { method: "DELETE" },
+        );
+
+        const result =
+          (await response
+            .json()
+            .catch(() => null)) as
+            | {
+                status?: string;
+                message?: string;
+              }
+            | null;
+
+        if (
+          !response.ok ||
+          result?.status !== "success"
+        ) {
           throw new Error(
-            result?.message || "The previous conversation could not be archived.",
+            result?.message ||
+              "The previous conversation could not be archived.",
           );
         }
       } catch (error) {
@@ -290,6 +393,7 @@ export function MuseChatPanel({
             ? error.message
             : "The previous conversation could not be archived.",
         );
+
         return;
       }
     }
@@ -299,34 +403,59 @@ export function MuseChatPanel({
     setMessages([]);
   }
 
-  function getFirstAvailableCollaborator(primaryMuseSlug: string) {
+  function getFirstAvailableCollaborator(
+    primaryMuseSlug: string,
+  ) {
     return (
-      museOptions.find((option) => option.slug !== primaryMuseSlug)?.slug ?? ""
+      museOptions.find(
+        (option) =>
+          option.slug !== primaryMuseSlug,
+      )?.slug ?? ""
     );
   }
 
-  function openCollaboration(message: ChatMessage) {
-    if (!message.museSlug) return;
+  function openCollaboration(
+    message: ChatMessage,
+  ) {
+    if (!message.museSlug) {
+      return;
+    }
+
     setCollaborationSourceId(message.id);
     setCollaboratorMuseSlug(
-      getFirstAvailableCollaborator(message.museSlug),
+      getFirstAvailableCollaborator(
+        message.museSlug,
+      ),
     );
     setCollaborationStatus("idle");
     setCollaborationError("");
   }
 
   function closeCollaboration() {
-    if (collaborationStatus === "sending") return;
+    if (
+      collaborationStatus === "sending"
+    ) {
+      return;
+    }
+
     setCollaborationSourceId(null);
     setCollaboratorMuseSlug("");
     setCollaborationStatus("idle");
     setCollaborationError("");
   }
 
-  async function sendMessage(rawMessage: string) {
+  async function sendMessage(
+    rawMessage: string,
+  ) {
     const message = rawMessage.trim();
 
-    if (!message || isBusy || !selectedMuse) return;
+    if (
+      !message ||
+      isBusy ||
+      !selectedMuse
+    ) {
+      return;
+    }
 
     const userMessage: ChatMessage = {
       id: createMessageId(),
@@ -335,7 +464,10 @@ export function MuseChatPanel({
       question: message,
     };
 
-    setMessages((current) => [...current, userMessage]);
+    setMessages((current) => [
+      ...current,
+      userMessage,
+    ]);
     setInput("");
     setStatus("sending");
     setErrorMessage("");
@@ -348,21 +480,32 @@ export function MuseChatPanel({
           ? `Continue this songwriting conversation:\n\n${conversationContext}\n\nSongwriter: ${message}`
           : message;
 
-      const response = await fetch("/api/muses/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "chat",
-          museSlug: selectedMuse.slug,
-          message: requestMessage,
-          ...(songId ? { songId } : {}),
-          ...(conversationId ? { conversationId } : {}),
-        }),
-      });
+      const response = await fetch(
+        "/api/muses/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            mode: "chat",
+            museSlug: selectedMuse.slug,
+            message: requestMessage,
+            ...(songId ? { songId } : {}),
+            ...(conversationId
+              ? { conversationId }
+              : {}),
+          }),
+        },
+      );
 
-      const result = (await response.json().catch(() => null)) as
-        | MuseChatResponse
-        | null;
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | MuseChatResponse
+          | null;
 
       if (
         !response.ok ||
@@ -375,20 +518,41 @@ export function MuseChatPanel({
         );
       }
 
-      setConversationId(result.conversationId ?? conversationId);
+      const intelligence =
+        isMuseIntelligenceResult(
+          result.intelligence,
+        )
+          ? result.intelligence
+          : undefined;
+
+      setConversationId(
+        result.conversationId ??
+          conversationId,
+      );
+
       setMessages((current) => [
         ...current,
         {
-          id: createMessageId(),
+          id:
+            result.messageId ||
+            createMessageId(),
           role: "assistant",
           content: result.reply!.trim(),
-          museSlug: result.muse?.slug || selectedMuse.slug,
-          museName: result.muse?.name || selectedMuse.name,
+          museSlug:
+            result.muse?.slug ||
+            selectedMuse.slug,
+          museName:
+            result.muse?.name ||
+            selectedMuse.name,
           kind: "primary",
           question: message,
           memories: result.memories ?? [],
+          intelligence,
+          taskAction:
+            result.taskAction ?? null,
         },
       ]);
+
       setStatus("idle");
     } catch (error) {
       setStatus("error");
@@ -400,48 +564,80 @@ export function MuseChatPanel({
     }
   }
 
-  async function requestCollaboration(sourceMessage: ChatMessage) {
+  async function requestCollaboration(
+    sourceMessage: ChatMessage,
+    requestedMuseSlug?: string,
+  ) {
+    const targetMuseSlug =
+      requestedMuseSlug ||
+      collaboratorMuseSlug;
+
     if (
       !sourceMessage.museSlug ||
       !sourceMessage.museName ||
       !sourceMessage.question ||
-      !collaboratorMuseSlug ||
+      !targetMuseSlug ||
       collaborationStatus === "sending"
     ) {
       return;
     }
 
-    const collaborator = museOptions.find(
-      (option) => option.slug === collaboratorMuseSlug,
-    );
+    const collaborator =
+      museOptions.find(
+        (option) =>
+          option.slug === targetMuseSlug,
+      );
 
     if (!collaborator) {
       setCollaborationStatus("error");
-      setCollaborationError("Choose a Muse to invite.");
+      setCollaborationError(
+        "Choose a Muse to invite.",
+      );
       return;
     }
 
+    setCollaborationSourceId(
+      sourceMessage.id,
+    );
+    setCollaboratorMuseSlug(
+      collaborator.slug,
+    );
     setCollaborationStatus("sending");
     setCollaborationError("");
 
     try {
-      const response = await fetch("/api/muses/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "collaborate",
-          primaryMuseSlug: sourceMessage.museSlug,
-          collaboratorMuseSlug: collaborator.slug,
-          originalQuestion: sourceMessage.question,
-          primaryResponse: sourceMessage.content,
-          ...(songId ? { songId } : {}),
-          ...(conversationId ? { conversationId } : {}),
-        }),
-      });
+      const response = await fetch(
+        "/api/muses/chat",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            mode: "collaborate",
+            primaryMuseSlug:
+              sourceMessage.museSlug,
+            collaboratorMuseSlug:
+              collaborator.slug,
+            originalQuestion:
+              sourceMessage.question,
+            primaryResponse:
+              sourceMessage.content,
+            ...(songId ? { songId } : {}),
+            ...(conversationId
+              ? { conversationId }
+              : {}),
+          }),
+        },
+      );
 
-      const result = (await response.json().catch(() => null)) as
-        | MuseChatResponse
-        | null;
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | MuseChatResponse
+          | null;
 
       if (
         !response.ok ||
@@ -454,21 +650,44 @@ export function MuseChatPanel({
         );
       }
 
-      setConversationId(result.conversationId ?? conversationId);
+      const intelligence =
+        isMuseIntelligenceResult(
+          result.intelligence,
+        )
+          ? result.intelligence
+          : undefined;
+
+      setConversationId(
+        result.conversationId ??
+          conversationId,
+      );
+
       setMessages((current) => [
         ...current,
         {
-          id: createMessageId(),
+          id:
+            result.messageId ||
+            createMessageId(),
           role: "assistant",
           content: result.reply!.trim(),
-          museSlug: result.muse?.slug || collaborator.slug,
-          museName: result.muse?.name || collaborator.name,
+          museSlug:
+            result.muse?.slug ||
+            collaborator.slug,
+          museName:
+            result.muse?.name ||
+            collaborator.name,
           kind: "collaborator",
-          question: sourceMessage.question,
-          comparisonWith: sourceMessage.museName,
+          question:
+            sourceMessage.question,
+          comparisonWith:
+            sourceMessage.museName,
           memories: result.memories ?? [],
+          intelligence,
+          taskAction:
+            result.taskAction ?? null,
         },
       ]);
+
       setCollaborationStatus("idle");
       setCollaborationSourceId(null);
       setCollaboratorMuseSlug("");
@@ -486,7 +705,9 @@ export function MuseChatPanel({
     memoryId: string,
     nextStatus: "accepted" | "rejected",
   ) {
-    if (memoryActionIds.includes(memoryId)) {
+    if (
+      memoryActionIds.includes(memoryId)
+    ) {
       return;
     }
 
@@ -497,38 +718,35 @@ export function MuseChatPanel({
     setErrorMessage("");
 
     try {
-      const response = await fetch("/api/muses/chat", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        "/api/muses/chat",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            memoryId,
+            status: nextStatus,
+          }),
         },
-        body: JSON.stringify({
-          memoryId,
-          status: nextStatus,
-        }),
-      });
+      );
 
-      const responseText = await response.text();
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | {
+              status?: string;
+              message?: string;
+            }
+          | null;
 
-      let result:
-        | {
-            status?: string;
-            message?: string;
-          }
-        | null = null;
-
-      if (responseText) {
-        try {
-          result = JSON.parse(responseText) as {
-            status?: string;
-            message?: string;
-          };
-        } catch {
-          result = null;
-        }
-      }
-
-      if (!response.ok || result?.status !== "success") {
+      if (
+        !response.ok ||
+        result?.status !== "success"
+      ) {
         throw new Error(
           result?.message ||
             `The Muse memory update failed with status ${response.status}.`,
@@ -539,13 +757,14 @@ export function MuseChatPanel({
         current.map((message) => ({
           ...message,
           memories:
-            message.memories?.map((memory) =>
-              memory.id === memoryId
-                ? {
-                    ...memory,
-                    status: nextStatus,
-                  }
-                : memory,
+            message.memories?.map(
+              (memory) =>
+                memory.id === memoryId
+                  ? {
+                      ...memory,
+                      status: nextStatus,
+                    }
+                  : memory,
             ) ?? [],
         })),
       );
@@ -558,30 +777,130 @@ export function MuseChatPanel({
       );
     } finally {
       setMemoryActionIds((current) =>
-        current.filter((id) => id !== memoryId),
+        current.filter(
+          (id) => id !== memoryId,
+        ),
       );
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleTaskAction(
+    messageId: string,
+    action:
+      | "create_task"
+      | "dismiss_task",
+  ) {
+    if (
+      taskActionMessageIds.includes(
+        messageId,
+      )
+    ) {
+      return;
+    }
+
+    setTaskActionMessageIds((current) => [
+      ...current,
+      messageId,
+    ]);
+    setErrorMessage("");
+
+    try {
+      const response = await fetch(
+        "/api/muses/actions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            action,
+            messageId,
+          }),
+        },
+      );
+
+      const result =
+        (await response
+          .json()
+          .catch(() => null)) as
+          | {
+              status?: string;
+              message?: string;
+              taskAction?: MuseTaskActionState;
+            }
+          | null;
+
+      if (
+        !response.ok ||
+        result?.status !== "success" ||
+        !result.taskAction
+      ) {
+        throw new Error(
+          result?.message ||
+            `The Muse task action failed with status ${response.status}.`,
+        );
+      }
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                taskAction:
+                  result.taskAction ?? null,
+              }
+            : message,
+        ),
+      );
+    } catch (error) {
+      setStatus("error");
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "The Muse task action could not be completed.",
+      );
+    } finally {
+      setTaskActionMessageIds((current) =>
+        current.filter(
+          (id) => id !== messageId,
+        ),
+      );
+    }
+  }
+
+  function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
     void sendMessage(input);
   }
 
-  function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+  function handleKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ) {
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key === "Enter"
+    ) {
       event.preventDefault();
-      if (canSend) void sendMessage(input);
+
+      if (canSend) {
+        void sendMessage(input);
+      }
     }
   }
 
-  if (!selectedMuse) return null;
+  if (!selectedMuse) {
+    return null;
+  }
 
   return (
     <section
       className="card"
       style={{
-        border: "1px solid rgba(220, 182, 92, 0.55)",
+        border:
+          "1px solid rgba(220, 182, 92, 0.55)",
         background:
           "linear-gradient(145deg, rgba(137, 96, 31, 0.16), rgba(255,255,255,0.025))",
       }}
@@ -594,18 +913,30 @@ export function MuseChatPanel({
           : `Conversation with the Muse of ${selectedMuse.domain}`}
       </div>
 
-      <h2 className="h2" style={{ marginBottom: "0.35rem" }}>
+      <h2
+        className="h2"
+        style={{ marginBottom: "0.35rem" }}
+      >
         Ask {selectedMuse.name}
       </h2>
 
-      <p className="copy" style={{ maxWidth: 850 }}>
-        <strong>{selectedMuse.name}</strong> is the Muse of{" "}
-        <strong>{selectedMuse.domain}</strong>. {selectedMuse.label}.
+      <p
+        className="copy"
+        style={{ maxWidth: 850 }}
+      >
+        <strong>{selectedMuse.name}</strong> is
+        the Muse of{" "}
+        <strong>{selectedMuse.domain}</strong>.{" "}
+        {selectedMuse.label}.
         {isSongConversation && songTitle ? (
           <>
-            {" "}She will work with the saved material for{" "}
-            <strong>{songTitle}</strong>, remember the conversation, and notice
-            meaningful changes between sessions.
+            {" "}
+            She will work with the saved
+            material for{" "}
+            <strong>{songTitle}</strong>,
+            remember approved creative
+            decisions, compare versions, and
+            expose her structured reasoning.
           </>
         ) : (
           " Ask about songwriting, creative direction, a new idea, or a song you are developing."
@@ -622,7 +953,10 @@ export function MuseChatPanel({
             background: "rgba(0,0,0,0.12)",
           }}
         >
-          <label className="copy" htmlFor="muse-selector">
+          <label
+            className="copy"
+            htmlFor="muse-selector"
+          >
             Creative partner
           </label>
           <select
@@ -630,25 +964,36 @@ export function MuseChatPanel({
             className="input"
             value={selectedMuse.slug}
             disabled={isBusy}
-            onChange={(event) => changeMuse(event.target.value)}
+            onChange={(event) =>
+              changeMuse(event.target.value)
+            }
             style={{ marginTop: "0.35rem" }}
           >
             {museOptions.map((option) => (
-              <option key={option.slug} value={option.slug}>
+              <option
+                key={option.slug}
+                value={option.slug}
+              >
                 {option.name} — {option.domain}
-                {option.slug === safeDefaultMuse?.slug
+                {option.slug ===
+                safeDefaultMuse?.slug
                   ? " (Primary Muse)"
                   : ""}
               </option>
             ))}
           </select>
 
-          {!isPrimaryMuse && isSongConversation ? (
+          {!isPrimaryMuse &&
+          isSongConversation ? (
             <p
               className="copy"
-              style={{ marginTop: "0.45rem", fontSize: "0.86rem" }}
+              style={{
+                marginTop: "0.45rem",
+                fontSize: "0.86rem",
+              }}
             >
-              {selectedMuse.name} is joining as a specialist. The song remains
+              {selectedMuse.name} is joining as
+              a specialist. The song remains
               assigned to {safeDefaultMuse?.name}.
             </p>
           ) : null}
@@ -661,50 +1006,75 @@ export function MuseChatPanel({
           style={{
             marginTop: "1rem",
             padding: "0.85rem 1rem",
-            border: "1px solid rgba(220, 182, 92, 0.4)",
+            border:
+              "1px solid rgba(220, 182, 92, 0.4)",
             borderRadius: 16,
             width: "fit-content",
           }}
         >
-          Restoring {selectedMuse.name}&apos;s conversation…
+          Restoring {selectedMuse.name}&apos;s
+          conversation…
         </div>
       ) : messages.length === 0 ? (
         <div style={{ marginTop: "1rem" }}>
-          <p className="copy" style={{ fontStyle: "italic" }}>
+          <p
+            className="copy"
+            style={{ fontStyle: "italic" }}
+          >
             “{selectedMuse.greeting}”
           </p>
-          <div className="eyebrow" style={{ marginTop: "0.85rem" }}>
+          <div
+            className="eyebrow"
+            style={{ marginTop: "0.85rem" }}
+          >
             Start with a question
           </div>
-          <div className="button-row" style={{ marginTop: "0.55rem" }}>
-            {selectedMuse.starterQuestions.map((question) => (
-              <button
-                key={question}
-                type="button"
-                className="button"
-                disabled={isBusy}
-                onClick={() => void sendMessage(question)}
-              >
-                {question}
-              </button>
-            ))}
+          <div
+            className="button-row"
+            style={{ marginTop: "0.55rem" }}
+          >
+            {selectedMuse.starterQuestions.map(
+              (question) => (
+                <button
+                  key={question}
+                  type="button"
+                  className="button"
+                  disabled={isBusy}
+                  onClick={() =>
+                    void sendMessage(question)
+                  }
+                >
+                  {question}
+                </button>
+              ),
+            )}
           </div>
         </div>
       ) : (
         <div
           aria-live="polite"
-          style={{ display: "grid", gap: "0.75rem", marginTop: "1rem" }}
+          style={{
+            display: "grid",
+            gap: "0.75rem",
+            marginTop: "1rem",
+          }}
         >
           {messages.map((message) => {
-            const isAssistant = message.role === "assistant";
-            const isCollaborationOpen = collaborationSourceId === message.id;
+            const isAssistant =
+              message.role === "assistant";
+            const isCollaborationOpen =
+              collaborationSourceId ===
+              message.id;
 
             return (
               <div
                 key={message.id}
                 style={{
-                  justifySelf: message.role === "user" ? "end" : "start",
-                  width: "min(100%, 850px)",
+                  justifySelf:
+                    message.role === "user"
+                      ? "end"
+                      : "start",
+                  width: "min(100%, 900px)",
                 }}
               >
                 <div
@@ -712,12 +1082,14 @@ export function MuseChatPanel({
                     padding: "0.9rem 1rem",
                     borderRadius: 16,
                     border: isAssistant
-                      ? message.kind === "collaborator"
+                      ? message.kind ===
+                        "collaborator"
                         ? "1px solid rgba(154, 134, 220, 0.65)"
                         : "1px solid rgba(220, 182, 92, 0.5)"
                       : "1px solid var(--line)",
                     background: isAssistant
-                      ? message.kind === "collaborator"
+                      ? message.kind ===
+                        "collaborator"
                         ? "rgba(105, 85, 170, 0.13)"
                         : "rgba(137, 96, 31, 0.14)"
                       : "rgba(255,255,255,0.04)",
@@ -725,13 +1097,15 @@ export function MuseChatPanel({
                 >
                   <div className="eyebrow">
                     {message.role === "assistant"
-                      ? message.kind === "collaborator"
+                      ? message.kind ===
+                        "collaborator"
                         ? `${message.museName} — another Muse's perspective`
                         : message.museName
                       : "You"}
                   </div>
 
-                  {message.kind === "collaborator" &&
+                  {message.kind ===
+                    "collaborator" &&
                   message.comparisonWith ? (
                     <p
                       className="copy"
@@ -742,7 +1116,8 @@ export function MuseChatPanel({
                         opacity: 0.8,
                       }}
                     >
-                      A different lens from {message.comparisonWith}
+                      A different lens from{" "}
+                      {message.comparisonWith}
                     </p>
                   ) : null}
 
@@ -758,20 +1133,62 @@ export function MuseChatPanel({
                   </div>
                 </div>
 
+                {isAssistant &&
+                message.intelligence ? (
+                  <MuseIntelligenceDetails
+                    intelligence={
+                      message.intelligence
+                    }
+                    messageId={message.id}
+                    museName={
+                      message.museName || "Muse"
+                    }
+                    museOptions={museOptions}
+                    taskAction={
+                      message.taskAction ?? null
+                    }
+                    taskBusy={
+                      taskActionMessageIds.includes(
+                        message.id,
+                      )
+                    }
+                    collaborationBusy={
+                      collaborationStatus ===
+                        "sending" &&
+                      collaborationSourceId ===
+                        message.id
+                    }
+                    onTaskAction={(action) =>
+                      void handleTaskAction(
+                        message.id,
+                        action,
+                      )
+                    }
+                    onInviteMuse={(museSlug) =>
+                      void requestCollaboration(
+                        message,
+                        museSlug,
+                      )
+                    }
+                  />
+                ) : null}
+
                 {message.memories?.length ? (
                   <div
                     style={{
                       marginTop: "0.65rem",
                       padding: "0.9rem",
-                      border: "1px solid rgba(220, 182, 92, 0.34)",
+                      border:
+                        "1px solid rgba(220, 182, 92, 0.34)",
                       borderRadius: 15,
-                      background: "rgba(0,0,0,0.12)",
+                      background:
+                        "rgba(0,0,0,0.12)",
                     }}
                   >
                     <div className="eyebrow">
-                      What {message.museName || "the Muse"} proposes remembering
+                      What {message.museName || "the Muse"}{" "}
+                      proposes remembering
                     </div>
-
                     <p
                       className="copy"
                       style={{
@@ -780,9 +1197,11 @@ export function MuseChatPanel({
                         opacity: 0.82,
                       }}
                     >
-                      The full conversation and response are already saved.
-                      These are only distilled takeaways that may guide future
-                      sessions. Keep only the ones that feel true and useful.
+                      The full conversation and
+                      structured intelligence are
+                      already saved. These are only
+                      distilled takeaways that may
+                      guide future sessions.
                     </p>
 
                     <div
@@ -795,23 +1214,30 @@ export function MuseChatPanel({
                       {[...message.memories]
                         .sort(
                           (a, b) =>
-                            Number(b.importance ?? 0) -
-                            Number(a.importance ?? 0),
+                            Number(
+                              b.importance ?? 0,
+                            ) -
+                            Number(
+                              a.importance ?? 0,
+                            ),
                         )
-                        .slice(0, 2)
                         .map((memory, index) => {
                           const isUpdating =
-                            memoryActionIds.includes(memory.id);
+                            memoryActionIds.includes(
+                              memory.id,
+                            );
 
                           return (
                             <div
                               key={memory.id}
                               style={{
-                                padding: "0.8rem 0.85rem",
+                                padding:
+                                  "0.8rem 0.85rem",
                                 border:
                                   "1px solid rgba(220, 182, 92, 0.28)",
                                 borderRadius: 13,
-                                background: "rgba(255,255,255,0.025)",
+                                background:
+                                  "rgba(255,255,255,0.025)",
                               }}
                             >
                               <div
@@ -819,21 +1245,26 @@ export function MuseChatPanel({
                                   display: "flex",
                                   flexWrap: "wrap",
                                   gap: "0.45rem",
-                                  alignItems: "center",
+                                  alignItems:
+                                    "center",
                                 }}
                               >
                                 <span className="pill">
-                                  Proposed memory {index + 1}
+                                  Proposed memory{" "}
+                                  {index + 1}
                                 </span>
                                 <span className="eyebrow">
-                                  {memoryLabel(memory.memory_type)}
+                                  {memoryLabel(
+                                    memory.memory_type,
+                                  )}
                                 </span>
                               </div>
 
                               <p
                                 className="copy"
                                 style={{
-                                  margin: "0.45rem 0 0",
+                                  margin:
+                                    "0.45rem 0 0",
                                   fontSize: "1rem",
                                 }}
                               >
@@ -844,19 +1275,26 @@ export function MuseChatPanel({
                                 <p
                                   className="copy"
                                   style={{
-                                    margin: "0.3rem 0 0",
-                                    fontSize: "0.82rem",
+                                    margin:
+                                      "0.3rem 0 0",
+                                    fontSize:
+                                      "0.82rem",
                                     opacity: 0.76,
                                   }}
                                 >
-                                  Why it may help later: {memory.reason}
+                                  Why it may help later:{" "}
+                                  {memory.reason}
                                 </p>
                               ) : null}
 
-                              {memory.status === "proposed" ? (
+                              {memory.status ===
+                              "proposed" ? (
                                 <div
                                   className="button-row"
-                                  style={{ marginTop: "0.65rem" }}
+                                  style={{
+                                    marginTop:
+                                      "0.65rem",
+                                  }}
                                 >
                                   <button
                                     type="button"
@@ -873,7 +1311,6 @@ export function MuseChatPanel({
                                       ? "Saving…"
                                       : "Keep for future sessions"}
                                   </button>
-
                                   <button
                                     type="button"
                                     className="button"
@@ -892,11 +1329,14 @@ export function MuseChatPanel({
                                 <span
                                   className="pill"
                                   style={{
-                                    display: "inline-flex",
-                                    marginTop: "0.65rem",
+                                    display:
+                                      "inline-flex",
+                                    marginTop:
+                                      "0.65rem",
                                   }}
                                 >
-                                  {memory.status === "accepted"
+                                  {memory.status ===
+                                  "accepted"
                                     ? "Kept for future sessions"
                                     : "Skipped"}
                                 </span>
@@ -905,121 +1345,22 @@ export function MuseChatPanel({
                           );
                         })}
                     </div>
-
-                    {message.memories.length > 2 ? (
-                      <details style={{ marginTop: "0.65rem" }}>
-                        <summary
-                          className="copy"
-                          style={{ cursor: "pointer" }}
-                        >
-                          Show {message.memories.length - 2} additional possible
-                          {message.memories.length - 2 === 1
-                            ? " memory"
-                            : " memories"}
-                        </summary>
-
-                        <div
-                          style={{
-                            display: "grid",
-                            gap: "0.55rem",
-                            marginTop: "0.6rem",
-                          }}
-                        >
-                          {[...message.memories]
-                            .sort(
-                              (a, b) =>
-                                Number(b.importance ?? 0) -
-                                Number(a.importance ?? 0),
-                            )
-                            .slice(2)
-                            .map((memory) => {
-                              const isUpdating =
-                                memoryActionIds.includes(memory.id);
-
-                              return (
-                                <div
-                                  key={memory.id}
-                                  style={{
-                                    padding: "0.7rem 0.75rem",
-                                    border: "1px solid var(--line)",
-                                    borderRadius: 12,
-                                  }}
-                                >
-                                  <div className="eyebrow">
-                                    {memoryLabel(memory.memory_type)}
-                                  </div>
-
-                                  <p
-                                    className="copy"
-                                    style={{ margin: "0.3rem 0 0" }}
-                                  >
-                                    {memory.content}
-                                  </p>
-
-                                  {memory.status === "proposed" ? (
-                                    <div
-                                      className="button-row"
-                                      style={{ marginTop: "0.55rem" }}
-                                    >
-                                      <button
-                                        type="button"
-                                        className="button primary"
-                                        disabled={isUpdating}
-                                        onClick={() =>
-                                          void updateMemory(
-                                            memory.id,
-                                            "accepted",
-                                          )
-                                        }
-                                      >
-                                        {isUpdating ? "Saving…" : "Keep"}
-                                      </button>
-
-                                      <button
-                                        type="button"
-                                        className="button"
-                                        disabled={isUpdating}
-                                        onClick={() =>
-                                          void updateMemory(
-                                            memory.id,
-                                            "rejected",
-                                          )
-                                        }
-                                      >
-                                        Skip
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <span
-                                      className="pill"
-                                      style={{
-                                        display: "inline-flex",
-                                        marginTop: "0.55rem",
-                                      }}
-                                    >
-                                      {memory.status === "accepted"
-                                        ? "Kept"
-                                        : "Skipped"}
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </details>
-                    ) : null}
                   </div>
                 ) : null}
 
-
-                {message.role === "assistant" && message.kind === "primary" ? (
-                  <div style={{ marginTop: "0.55rem" }}>
+                {message.role === "assistant" &&
+                message.kind === "primary" ? (
+                  <div
+                    style={{ marginTop: "0.55rem" }}
+                  >
                     {!isCollaborationOpen ? (
                       <button
                         type="button"
                         className="button"
                         disabled={isBusy}
-                        onClick={() => openCollaboration(message)}
+                        onClick={() =>
+                          openCollaboration(message)
+                        }
                       >
                         Invite another Muse
                       </button>
@@ -1027,9 +1368,11 @@ export function MuseChatPanel({
                       <div
                         style={{
                           padding: "0.85rem",
-                          border: "1px solid var(--line)",
+                          border:
+                            "1px solid var(--line)",
                           borderRadius: 14,
-                          background: "rgba(0,0,0,0.12)",
+                          background:
+                            "rgba(0,0,0,0.12)",
                         }}
                       >
                         <div className="eyebrow">
@@ -1038,7 +1381,10 @@ export function MuseChatPanel({
                         <label
                           className="copy"
                           htmlFor={`collaborator-${message.id}`}
-                          style={{ display: "block", marginTop: "0.45rem" }}
+                          style={{
+                            display: "block",
+                            marginTop: "0.45rem",
+                          }}
                         >
                           Invite a different perspective
                         </label>
@@ -1046,47 +1392,71 @@ export function MuseChatPanel({
                           id={`collaborator-${message.id}`}
                           className="input"
                           value={collaboratorMuseSlug}
-                          disabled={collaborationStatus === "sending"}
-                          onChange={(event) =>
-                            setCollaboratorMuseSlug(event.target.value)
+                          disabled={
+                            collaborationStatus ===
+                            "sending"
                           }
-                          style={{ marginTop: "0.35rem" }}
+                          onChange={(event) =>
+                            setCollaboratorMuseSlug(
+                              event.target.value,
+                            )
+                          }
+                          style={{
+                            marginTop: "0.35rem",
+                          }}
                         >
                           {museOptions
                             .filter(
-                              (option) => option.slug !== message.museSlug,
+                              (option) =>
+                                option.slug !==
+                                message.museSlug,
                             )
                             .map((option) => (
-                              <option key={option.slug} value={option.slug}>
-                                {option.name} — {option.domain}
+                              <option
+                                key={option.slug}
+                                value={option.slug}
+                              >
+                                {option.name} —{" "}
+                                {option.domain}
                               </option>
                             ))}
                         </select>
 
                         <div
                           className="button-row"
-                          style={{ marginTop: "0.65rem" }}
+                          style={{
+                            marginTop: "0.65rem",
+                          }}
                         >
                           <button
                             type="button"
                             className="button primary"
                             disabled={
-                              collaborationStatus === "sending" ||
+                              collaborationStatus ===
+                                "sending" ||
                               !collaboratorMuseSlug
                             }
                             onClick={() =>
-                              void requestCollaboration(message)
+                              void requestCollaboration(
+                                message,
+                              )
                             }
                           >
-                            {collaborationStatus === "sending"
+                            {collaborationStatus ===
+                            "sending"
                               ? "Inviting Muse…"
                               : "Compare perspectives"}
                           </button>
                           <button
                             type="button"
                             className="button"
-                            disabled={collaborationStatus === "sending"}
-                            onClick={closeCollaboration}
+                            disabled={
+                              collaborationStatus ===
+                              "sending"
+                            }
+                            onClick={
+                              closeCollaboration
+                            }
                           >
                             Cancel
                           </button>
@@ -1096,7 +1466,9 @@ export function MuseChatPanel({
                           <div
                             role="alert"
                             className="statusMessage statusError"
-                            style={{ marginTop: "0.65rem" }}
+                            style={{
+                              marginTop: "0.65rem",
+                            }}
                           >
                             {collaborationError}
                           </div>
@@ -1114,19 +1486,28 @@ export function MuseChatPanel({
               className="copy"
               style={{
                 padding: "0.85rem 1rem",
-                border: "1px solid rgba(220, 182, 92, 0.4)",
+                border:
+                  "1px solid rgba(220, 182, 92, 0.4)",
                 borderRadius: 16,
                 width: "fit-content",
               }}
             >
-              {selectedMuse.name} is considering your question…
+              {selectedMuse.name} is considering
+              your question through her complete
+              creative lenses…
             </div>
           ) : null}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} style={{ marginTop: "1rem" }}>
-        <label className="copy" htmlFor="muse-message">
+      <form
+        onSubmit={handleSubmit}
+        style={{ marginTop: "1rem" }}
+      >
+        <label
+          className="copy"
+          htmlFor="muse-message"
+        >
           Your question for {selectedMuse.name}
         </label>
         <textarea
@@ -1136,19 +1517,26 @@ export function MuseChatPanel({
           value={input}
           disabled={isBusy}
           placeholder={`Ask ${selectedMuse.name} about ${selectedMuse.domain.toLowerCase()}...`}
-          onChange={(event) => setInput(event.target.value)}
+          onChange={(event) =>
+            setInput(event.target.value)
+          }
           onKeyDown={handleKeyDown}
           style={{ marginTop: "0.4rem" }}
         />
 
-        <div className="button-row" style={{ marginTop: "0.75rem" }}>
+        <div
+          className="button-row"
+          style={{ marginTop: "0.75rem" }}
+        >
           <button
             type="submit"
             className="button primary"
             disabled={!canSend}
             style={{
               opacity: canSend ? 1 : 0.6,
-              cursor: canSend ? "pointer" : "not-allowed",
+              cursor: canSend
+                ? "pointer"
+                : "not-allowed",
             }}
           >
             {status === "sending"
@@ -1161,7 +1549,9 @@ export function MuseChatPanel({
               type="button"
               className="button"
               disabled={isBusy}
-              onClick={() => void startNewConversation()}
+              onClick={() =>
+                void startNewConversation()
+              }
             >
               Start new conversation
             </button>
@@ -1170,11 +1560,19 @@ export function MuseChatPanel({
 
         <p
           className="copy"
-          style={{ marginTop: "0.5rem", fontSize: "0.84rem", opacity: 0.8 }}
+          style={{
+            marginTop: "0.5rem",
+            fontSize: "0.84rem",
+            opacity: 0.8,
+          }}
         >
-          Press Ctrl+Enter or Command+Enter to send. The conversation is
-          saved automatically. Proposed memories are optional distilled takeaways;
-          only the ones you keep become long-term guidance for future sessions.
+          Press Ctrl+Enter or Command+Enter to
+          send. The conversation and structured
+          intelligence are saved automatically.
+          Only memories you keep become durable
+          guidance. Proposed tasks require your
+          approval before they enter Songcatcher
+          Studio.
         </p>
       </form>
 
