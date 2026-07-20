@@ -518,22 +518,79 @@ export function isMuseIntelligenceResult(
   );
 }
 
+function structuredJsonCandidates(
+  outputText: string,
+): string[] {
+  const trimmed = outputText.trim();
+  const candidates = new Set<string>();
+
+  if (trimmed) {
+    candidates.add(trimmed);
+  }
+
+  const withoutFence = trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  if (withoutFence) {
+    candidates.add(withoutFence);
+  }
+
+  const firstBrace = withoutFence.indexOf("{");
+  const lastBrace = withoutFence.lastIndexOf("}");
+
+  if (
+    firstBrace >= 0 &&
+    lastBrace > firstBrace
+  ) {
+    candidates.add(
+      withoutFence.slice(
+        firstBrace,
+        lastBrace + 1,
+      ),
+    );
+  }
+
+  return [...candidates];
+}
+
 export function parseMuseIntelligenceOutput(
   outputText: string,
 ): MuseIntelligenceResult {
-  const parsed = JSON.parse(outputText) as unknown;
+  let lastParseError: unknown = null;
 
-  if (!isMuseIntelligenceResult(parsed)) {
-    throw new Error(
-      "The Muse returned an invalid intelligence result.",
-    );
+  for (const candidate of structuredJsonCandidates(
+    outputText,
+  )) {
+    try {
+      const parsed =
+        JSON.parse(candidate) as unknown;
+
+      if (!isMuseIntelligenceResult(parsed)) {
+        throw new Error(
+          "The structured response did not match the Muse intelligence contract.",
+        );
+      }
+
+      if (!parsed.reply.trim()) {
+        throw new Error(
+          "The Muse response did not contain a reply.",
+        );
+      }
+
+      return parsed;
+    } catch (error) {
+      lastParseError = error;
+    }
   }
 
-  if (!parsed.reply.trim()) {
-    throw new Error(
-      "The Muse response did not contain a reply.",
-    );
-  }
+  const detail =
+    lastParseError instanceof Error
+      ? lastParseError.message
+      : "Unknown structured JSON error.";
 
-  return parsed;
+  throw new Error(
+    `The Muse returned incomplete or malformed structured JSON: ${detail}`,
+  );
 }
