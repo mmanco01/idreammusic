@@ -1,6 +1,9 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
-import { getMuseBySlug, MUSE_OPTIONS } from "@/lib/muses";
+import {
+  getMuseBySlug,
+  MUSE_OPTIONS,
+} from "@/lib/muses";
 import {
   MUSE_INTELLIGENCE_TEXT_FORMAT,
   parseMuseIntelligenceOutput,
@@ -33,20 +36,33 @@ type MuseMemoryActionRequest = {
   status?: unknown;
 };
 
-function cleanString(value: unknown, maxLength: number): string {
-  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+function cleanString(
+  value: unknown,
+  maxLength: number,
+): string {
+  return typeof value === "string"
+    ? value.trim().slice(0, maxLength)
+    : "";
 }
 
-async function getOwnedSong(supabase: any, songId: string, userId: string) {
+async function getOwnedSong(
+  supabase: any,
+  songId: string,
+  userId: string,
+) {
   const { data, error } = await supabase
     .from("songs")
-    .select("id, slug, title_working, title_final, owner_user_id")
+    .select(
+      "id, slug, title_working, title_final, owner_user_id",
+    )
     .eq("id", songId)
     .eq("owner_user_id", userId)
     .maybeSingle();
 
   if (error) {
-    throw new Error(`Could not load the song: ${error.message}`);
+    throw new Error(
+      `Could not load the song: ${error.message}`,
+    );
   }
 
   return data;
@@ -74,8 +90,13 @@ async function findConversation({
       .eq("status", "active")
       .maybeSingle();
 
-    if (error) throw new Error(error.message);
-    if (data) return data;
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (data) {
+      return data;
+    }
   }
 
   const { data, error } = await supabase
@@ -85,11 +106,16 @@ async function findConversation({
     .eq("song_id", songId)
     .eq("primary_muse_slug", museSlug)
     .eq("status", "active")
-    .order("last_message_at", { ascending: false })
+    .order("last_message_at", {
+      ascending: false,
+    })
     .limit(1)
     .maybeSingle();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    throw new Error(error.message);
+  }
+
   return data;
 }
 
@@ -114,9 +140,14 @@ async function ensureConversation({
     conversationId,
   });
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
-  const title = song.title_final || song.title_working || "Untitled song";
+  const title =
+    song.title_final ||
+    song.title_working ||
+    "Untitled song";
   const muse = getMuseBySlug(museSlug);
 
   const { data, error } = await supabase
@@ -132,7 +163,10 @@ async function ensureConversation({
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message || "Could not create the Muse conversation.");
+    throw new Error(
+      error?.message ||
+        "Could not create the Muse conversation.",
+    );
   }
 
   return data;
@@ -158,7 +192,11 @@ async function insertMessage({
   songId: string;
   museSlug?: string | null;
   role: "user" | "assistant" | "system";
-  kind: "primary" | "collaborator" | "synthesis" | "system";
+  kind:
+    | "primary"
+    | "collaborator"
+    | "synthesis"
+    | "system";
   content: string;
   questionText?: string | null;
   comparisonWith?: string | null;
@@ -184,7 +222,10 @@ async function insertMessage({
     .single();
 
   if (error || !data) {
-    throw new Error(error?.message || "Could not save the Muse message.");
+    throw new Error(
+      error?.message ||
+        "Could not save the Muse message.",
+    );
   }
 
   return data;
@@ -207,21 +248,25 @@ async function saveMemoryCandidates({
   museSlug: string;
   sourceMessageId: string;
 }) {
-  if (!result.memoryCandidates.length) return [];
+  if (!result.memoryCandidates.length) {
+    return [];
+  }
 
-  const rows = result.memoryCandidates.map((memory) => ({
-    conversation_id: conversationId,
-    owner_user_id: userId,
-    song_id: songId,
-    muse_slug: museSlug,
-    memory_type: memory.type,
-    content: memory.content,
-    reason: memory.reason,
-    importance: memory.importance,
-    confidence: memory.confidence,
-    status: "proposed",
-    source_message_id: sourceMessageId,
-  }));
+  const rows = result.memoryCandidates.map(
+    (memory) => ({
+      conversation_id: conversationId,
+      owner_user_id: userId,
+      song_id: songId,
+      muse_slug: museSlug,
+      memory_type: memory.type,
+      content: memory.content,
+      reason: memory.reason,
+      importance: memory.importance,
+      confidence: memory.confidence,
+      status: "proposed",
+      source_message_id: sourceMessageId,
+    }),
+  );
 
   const { data, error } = await supabase
     .from("muse_memories")
@@ -231,7 +276,11 @@ async function saveMemoryCandidates({
     );
 
   if (error) {
-    console.error("Unable to save Muse memory candidates:", error.message);
+    console.error(
+      "Unable to save Muse memory candidates:",
+      error.message,
+    );
+
     return [];
   }
 
@@ -257,7 +306,9 @@ async function saveUnresolvedQuestions({
   museSlug: string;
   sourceMessageId: string;
 }) {
-  if (!result.unresolvedQuestions.length) return;
+  if (!result.unresolvedQuestions.length) {
+    return;
+  }
 
   const { data: existing } = await supabase
     .from("muse_unresolved_questions")
@@ -269,13 +320,18 @@ async function saveUnresolvedQuestions({
 
   const existingQuestions = new Set(
     (existing ?? []).map((row: any) =>
-      String(row.question).trim().toLowerCase(),
+      String(row.question)
+        .trim()
+        .toLowerCase(),
     ),
   );
 
   const rows = result.unresolvedQuestions
     .filter(
-      (question) => !existingQuestions.has(question.trim().toLowerCase()),
+      (question) =>
+        !existingQuestions.has(
+          question.trim().toLowerCase(),
+        ),
     )
     .map((question) => ({
       conversation_id: conversationId,
@@ -289,14 +345,75 @@ async function saveUnresolvedQuestions({
       source_message_id: sourceMessageId,
     }));
 
-  if (!rows.length) return;
+  if (!rows.length) {
+    return;
+  }
 
   const { error } = await supabase
     .from("muse_unresolved_questions")
     .insert(rows);
 
   if (error) {
-    console.error("Unable to save unresolved Muse questions:", error.message);
+    console.error(
+      "Unable to save unresolved Muse questions:",
+      error.message,
+    );
+  }
+}
+
+async function saveDiagnosticFindings({
+  supabase,
+  result,
+  conversationId,
+  messageId,
+  userId,
+  songId,
+  songVersionId,
+  museSlug,
+}: {
+  supabase: any;
+  result: MuseIntelligenceResult;
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  songId: string;
+  songVersionId?: string | null;
+  museSlug: string;
+}) {
+  if (!result.diagnostics.length) {
+    return;
+  }
+
+  const rows = result.diagnostics.map(
+    (diagnostic) => ({
+      conversation_id: conversationId,
+      message_id: messageId,
+      owner_user_id: userId,
+      song_id: songId,
+      song_version_id: songVersionId ?? null,
+      muse_slug: museSlug,
+      diagnostic_key: diagnostic.key,
+      diagnostic_label: diagnostic.label,
+      score: diagnostic.score,
+      finding: diagnostic.finding,
+      evidence: diagnostic.evidence,
+      confidence: diagnostic.confidence,
+      change_direction:
+        diagnostic.changeFromPrevious,
+    }),
+  );
+
+  const { error } = await supabase
+    .from("muse_diagnostic_findings")
+    .upsert(rows, {
+      onConflict: "message_id,diagnostic_key",
+    });
+
+  if (error) {
+    console.error(
+      "Unable to save Muse diagnostic findings:",
+      error.message,
+    );
   }
 }
 
@@ -312,16 +429,111 @@ async function updateConversationState({
   const { error } = await supabase
     .from("muse_conversations")
     .update({
-      current_song_version_id: context.currentVersion?.id ?? null,
-      current_transcript_id: context.latestTranscript?.id ?? null,
-      current_analysis_run_id: context.latestAnalysis?.id ?? null,
+      current_song_version_id:
+        context.currentVersion?.id ?? null,
+      current_transcript_id:
+        context.latestTranscript?.id ?? null,
+      current_analysis_run_id:
+        context.latestAnalysis?.id ?? null,
       last_message_at: new Date().toISOString(),
     })
     .eq("id", conversationId);
 
   if (error) {
-    console.error("Unable to update Muse conversation state:", error.message);
+    console.error(
+      "Unable to update Muse conversation state:",
+      error.message,
+    );
   }
+}
+
+async function promoteAcceptedMemoryToDecision({
+  supabase,
+  memory,
+  userId,
+}: {
+  supabase: any;
+  memory: any;
+  userId: string;
+}) {
+  const promotableTypes = new Set([
+    "decision",
+    "accepted_suggestion",
+    "rejected_suggestion",
+    "songwriter_preference",
+    "lyric_choice",
+    "form_choice",
+  ]);
+
+  if (!promotableTypes.has(memory.memory_type)) {
+    return null;
+  }
+
+  const { data: conversation } = await supabase
+    .from("muse_conversations")
+    .select("current_song_version_id")
+    .eq("id", memory.conversation_id)
+    .eq("owner_user_id", userId)
+    .maybeSingle();
+
+  const { data: existing } = await supabase
+    .from("muse_creative_decisions")
+    .select("id")
+    .eq("owner_user_id", userId)
+    .eq("song_id", memory.song_id)
+    .eq("source_message_id", memory.source_message_id)
+    .eq("decision_text", memory.content)
+    .maybeSingle();
+
+  if (existing) {
+    return existing;
+  }
+
+  const status =
+    memory.memory_type === "rejected_suggestion"
+      ? "rejected"
+      : "accepted";
+
+  const decisionTypeByMemory: Record<string, string> = {
+    decision: "creative",
+    accepted_suggestion: "accepted_idea",
+    rejected_suggestion: "rejected_idea",
+    songwriter_preference: "preference",
+    lyric_choice: "lyric",
+    form_choice: "form",
+  };
+
+  const { data, error } = await supabase
+    .from("muse_creative_decisions")
+    .insert({
+      conversation_id: memory.conversation_id,
+      owner_user_id: userId,
+      song_id: memory.song_id,
+      song_version_id:
+        conversation?.current_song_version_id ?? null,
+      muse_slug: memory.muse_slug,
+      decision_type:
+        decisionTypeByMemory[memory.memory_type] ??
+        "creative",
+      decision_text: memory.content,
+      reason: memory.reason,
+      status,
+      source_message_id: memory.source_message_id,
+      decided_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error(
+      "Unable to promote accepted Muse memory to a creative decision:",
+      error.message,
+    );
+
+    return null;
+  }
+
+  return data;
 }
 
 function makeStructuredPrompt({
@@ -383,34 +595,69 @@ Return the required structured Muse intelligence result.
 Guidance for the structured fields:
 - reply: the complete graceful response shown to the songwriter.
 - primaryObservation: the single most important grounded observation.
+  Its category should normally match one of your named diagnostic keys.
+- diagnostics: assess each named diagnostic area that can be grounded in
+  the supplied material, up to five areas. Give a 0–100 working score,
+  evidence, confidence, and changeFromPrevious. Use unknown when there is
+  no trustworthy earlier diagnostic comparison.
+- lensAssessments: separately assess lyric, form, melody, performance, and
+  audience. Use null when the supplied material does not support that lens.
+  Never infer melody or performance from lyrics alone.
+- versionComparison: include only when at least two song versions are
+  available. Identify meaningful changes and elements worth protecting.
 - recommendations: no more than three focused recommendations.
 - unresolvedQuestions: questions worth carrying into a future session.
 - memoryCandidates: return no more than two. Include only a durable
-  decision, preference, lyric/form choice, unresolved issue, or next step
-  that would genuinely improve a future session. Do not save casual wording,
-  repeated observations, or speculative claims.
+  decision, preference, lyric/form choice, rejected idea, unresolved issue,
+  or next step that would genuinely improve a future session.
 - proposedTask: include only when one concrete task would clearly help.
 - suggestedCollaborator: include only when another Muse has a specific,
-  distinct contribution.
-- lyricWork: include only when the songwriter asks about lyrics,
-  transcription, reconstruction, or lyric alternatives. Clearly mark
-  newly proposed language as muse_suggestion.
-- formWork: include only when the songwriter asks about structure or
-  when form is central to the recommendation.
-- Ground evidence in the provided context. Never invent audio evidence.
-- Distinguish the original transcript, existing lyrics, writer notes,
-  analysis, prior decisions, and new Muse suggestions.
+  distinct contribution tied to a detected need.
+- lyricWork: include only when lyrics, transcription, reconstruction, or
+  lyric alternatives are central. Mark newly proposed language as
+  muse_suggestion.
+- formWork: include only when structure is central to the question or finding.
+- Ground evidence in the supplied context. Never invent audio evidence.
+- Distinguish transcript, existing lyrics, writer notes, analysis, accepted
+  decisions, and new Muse suggestions.
+- Scores are directional creative judgments, not objective grades.
   `.trim();
 }
 
-function mapHistoryMessages(messages: any[], memories: any[]) {
+function mapHistoryMessages(
+  messages: any[],
+  memories: any[],
+  taskActions: any[],
+) {
   const memoriesByMessage = new Map<string, any[]>();
+  const taskActionByMessage = new Map<string, any>();
 
   for (const memory of memories) {
-    if (!memory.source_message_id) continue;
-    const current = memoriesByMessage.get(memory.source_message_id) ?? [];
+    if (!memory.source_message_id) {
+      continue;
+    }
+
+    const current =
+      memoriesByMessage.get(
+        memory.source_message_id,
+      ) ?? [];
+
     current.push(memory);
-    memoriesByMessage.set(memory.source_message_id, current);
+
+    memoriesByMessage.set(
+      memory.source_message_id,
+      current,
+    );
+  }
+
+  for (const action of taskActions) {
+    taskActionByMessage.set(
+      action.source_message_id,
+      {
+        status: action.status,
+        taskId: action.task_id,
+      },
+    );
   }
 
   return messages.map((message) => ({
@@ -423,7 +670,10 @@ function mapHistoryMessages(messages: any[], memories: any[]) {
     comparisonWith: message.comparison_with,
     createdAt: message.created_at,
     structuredResult: message.structured_result,
-    memories: memoriesByMessage.get(message.id) ?? [],
+    memories:
+      memoriesByMessage.get(message.id) ?? [],
+    taskAction:
+      taskActionByMessage.get(message.id) ?? null,
   }));
 }
 
@@ -435,7 +685,9 @@ async function createMuseResponse({
 }: {
   openai: OpenAI;
   model: string;
-  muse: NonNullable<ReturnType<typeof getMuseBySlug>>;
+  muse: NonNullable<
+    ReturnType<typeof getMuseBySlug>
+  >;
   prompt: string;
 }) {
   const response = await openai.responses.create({
@@ -443,26 +695,38 @@ async function createMuseResponse({
     instructions: muse.systemPrompt,
     input: prompt,
     text: {
-      format: MUSE_INTELLIGENCE_TEXT_FORMAT as any,
+      format:
+        MUSE_INTELLIGENCE_TEXT_FORMAT as any,
     },
-    max_output_tokens: 2400,
+    max_output_tokens: 3600,
     store: false,
   });
 
-  const outputText = response.output_text?.trim();
+  const outputText =
+    response.output_text?.trim();
 
   if (!outputText) {
-    throw new Error(`${muse.name} did not return a response.`);
+    throw new Error(
+      `${muse.name} did not return a response.`,
+    );
   }
 
-  return parseMuseIntelligenceOutput(outputText);
+  return parseMuseIntelligenceOutput(
+    outputText,
+  );
 }
 
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const songId = cleanString(url.searchParams.get("songId"), 100);
-    const museSlug = cleanString(url.searchParams.get("museSlug"), 50);
+    const songId = cleanString(
+      url.searchParams.get("songId"),
+      100,
+    );
+    const museSlug = cleanString(
+      url.searchParams.get("museSlug"),
+      50,
+    );
 
     if (!songId || !museSlug) {
       return NextResponse.json({
@@ -476,16 +740,24 @@ export async function GET(request: Request) {
 
     if (!muse) {
       return NextResponse.json(
-        { status: "error", message: "Unsupported Muse." },
+        {
+          status: "error",
+          message: "Unsupported Muse.",
+        },
         { status: 400 },
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase =
+      await createServerSupabaseClient();
 
     if (!supabase) {
       return NextResponse.json(
-        { status: "error", message: "Supabase is not available." },
+        {
+          status: "error",
+          message:
+            "Supabase is not available.",
+        },
         { status: 500 },
       );
     }
@@ -498,30 +770,37 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           status: "error",
-          message: "Please sign in to load this Muse conversation.",
+          message:
+            "Please sign in to load this Muse conversation.",
         },
         { status: 401 },
       );
     }
 
-    const song = await getOwnedSong(supabase, songId, user.id);
+    const song = await getOwnedSong(
+      supabase,
+      songId,
+      user.id,
+    );
 
     if (!song) {
       return NextResponse.json(
         {
           status: "error",
-          message: "The song was not found or does not belong to you.",
+          message:
+            "The song was not found or does not belong to you.",
         },
         { status: 404 },
       );
     }
 
-    const conversation = await findConversation({
-      supabase,
-      userId: user.id,
-      songId,
-      museSlug: muse.slug,
-    });
+    const conversation =
+      await findConversation({
+        supabase,
+        userId: user.id,
+        songId,
+        museSlug: muse.slug,
+      });
 
     if (!conversation) {
       return NextResponse.json({
@@ -531,42 +810,87 @@ export async function GET(request: Request) {
       });
     }
 
-    const [messageResult, memoryResult] = await Promise.all([
+    const [
+      messageResult,
+      memoryResult,
+      taskActionResult,
+    ] = await Promise.all([
       (supabase as any)
         .from("muse_messages")
         .select(
           "id, role, kind, muse_slug, content, question_text, comparison_with, structured_result, created_at",
         )
-        .eq("conversation_id", conversation.id)
-        .order("created_at", { ascending: true }),
+        .eq(
+          "conversation_id",
+          conversation.id,
+        )
+        .order("created_at", {
+          ascending: true,
+        }),
 
       (supabase as any)
         .from("muse_memories")
         .select(
           "id, memory_type, content, reason, importance, confidence, status, source_message_id",
         )
-        .eq("conversation_id", conversation.id)
-        .order("created_at", { ascending: true }),
+        .eq(
+          "conversation_id",
+          conversation.id,
+        )
+        .order("created_at", {
+          ascending: true,
+        }),
+
+      (supabase as any)
+        .from("muse_task_actions")
+        .select(
+          "source_message_id, status, task_id",
+        )
+        .eq(
+          "conversation_id",
+          conversation.id,
+        ),
     ]);
 
-    if (messageResult.error) throw new Error(messageResult.error.message);
-    if (memoryResult.error) throw new Error(memoryResult.error.message);
+    if (messageResult.error) {
+      throw new Error(
+        messageResult.error.message,
+      );
+    }
+
+    if (memoryResult.error) {
+      throw new Error(
+        memoryResult.error.message,
+      );
+    }
+
+    if (taskActionResult.error) {
+      throw new Error(
+        taskActionResult.error.message,
+      );
+    }
 
     return NextResponse.json({
       status: "success",
       conversation: {
         id: conversation.id,
         title: conversation.title,
-        museSlug: conversation.primary_muse_slug,
-        lastMessageAt: conversation.last_message_at,
+        museSlug:
+          conversation.primary_muse_slug,
+        lastMessageAt:
+          conversation.last_message_at,
       },
       messages: mapHistoryMessages(
         messageResult.data ?? [],
         memoryResult.data ?? [],
+        taskActionResult.data ?? [],
       ),
     });
   } catch (error) {
-    console.error("Muse chat history error:", error);
+    console.error(
+      "Muse chat history error:",
+      error,
+    );
 
     return NextResponse.json(
       {
@@ -581,26 +905,39 @@ export async function GET(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(
+  request: Request,
+) {
   try {
     const url = new URL(request.url);
     const conversationId = cleanString(
-      url.searchParams.get("conversationId"),
+      url.searchParams.get(
+        "conversationId",
+      ),
       100,
     );
 
     if (!conversationId) {
       return NextResponse.json(
-        { status: "error", message: "A conversation ID is required." },
+        {
+          status: "error",
+          message:
+            "A conversation ID is required.",
+        },
         { status: 400 },
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase =
+      await createServerSupabaseClient();
 
     if (!supabase) {
       return NextResponse.json(
-        { status: "error", message: "Supabase is not available." },
+        {
+          status: "error",
+          message:
+            "Supabase is not available.",
+        },
         { status: 500 },
       );
     }
@@ -613,23 +950,35 @@ export async function DELETE(request: Request) {
       return NextResponse.json(
         {
           status: "error",
-          message: "Please sign in to archive this Muse conversation.",
+          message:
+            "Please sign in to archive this Muse conversation.",
         },
         { status: 401 },
       );
     }
 
-    const { error } = await (supabase as any)
+    const { error } = await (
+      supabase as any
+    )
       .from("muse_conversations")
-      .update({ status: "archived" })
+      .update({
+        status: "archived",
+      })
       .eq("id", conversationId)
       .eq("owner_user_id", user.id);
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      throw new Error(error.message);
+    }
 
-    return NextResponse.json({ status: "success" });
+    return NextResponse.json({
+      status: "success",
+    });
   } catch (error) {
-    console.error("Muse conversation archive error:", error);
+    console.error(
+      "Muse conversation archive error:",
+      error,
+    );
 
     return NextResponse.json(
       {
@@ -653,7 +1002,6 @@ export async function PATCH(request: Request) {
       body.memoryId,
       100,
     );
-
     const nextStatus = cleanString(
       body.status,
       30,
@@ -727,7 +1075,7 @@ export async function PATCH(request: Request) {
     } = await (supabase as any)
       .from("muse_memories")
       .select(
-        "id, owner_user_id, memory_type, content, reason, importance, confidence, status",
+        "id, conversation_id, owner_user_id, song_id, muse_slug, memory_type, content, reason, importance, confidence, status, source_message_id",
       )
       .eq("id", memoryId)
       .eq("owner_user_id", user.id)
@@ -785,9 +1133,20 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const promotedDecision =
+      nextStatus === "accepted"
+        ? await promoteAcceptedMemoryToDecision({
+            supabase,
+            memory: existingMemory,
+            userId: user.id,
+          })
+        : null;
+
     return NextResponse.json({
       status: "success",
       memory: data,
+      promotedDecisionId:
+        promotedDecision?.id ?? null,
     });
   } catch (error) {
     console.error(
@@ -812,26 +1171,62 @@ export async function POST(request: Request) {
   try {
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
-        { status: "error", message: "OPENAI_API_KEY is not configured." },
+        {
+          status: "error",
+          message:
+            "OPENAI_API_KEY is not configured.",
+        },
         { status: 500 },
       );
     }
 
-    const body = (await request.json()) as MuseChatRequest;
+    const body =
+      (await request.json()) as MuseChatRequest;
+
     const mode: MuseChatMode =
-      body.mode === "collaborate" ? "collaborate" : "chat";
-    const songId = cleanString(body.songId, 100);
-    const conversationId = cleanString(body.conversationId, 100);
-    const message = cleanString(body.message, 16000);
-    const originalQuestion = cleanString(body.originalQuestion, 8000);
-    const primaryResponse = cleanString(body.primaryResponse, 24000);
-    const primaryMuseSlug = cleanString(body.primaryMuseSlug, 50);
+      body.mode === "collaborate"
+        ? "collaborate"
+        : "chat";
+
+    const songId = cleanString(
+      body.songId,
+      100,
+    );
+    const conversationId = cleanString(
+      body.conversationId,
+      100,
+    );
+    const message = cleanString(
+      body.message,
+      16000,
+    );
+    const originalQuestion = cleanString(
+      body.originalQuestion,
+      8000,
+    );
+    const primaryResponse = cleanString(
+      body.primaryResponse,
+      24000,
+    );
+    const primaryMuseSlug = cleanString(
+      body.primaryMuseSlug,
+      50,
+    );
+
     const requestedMuseSlug =
       mode === "collaborate"
-        ? cleanString(body.collaboratorMuseSlug, 50)
-        : cleanString(body.museSlug, 50);
+        ? cleanString(
+            body.collaboratorMuseSlug,
+            50,
+          )
+        : cleanString(
+            body.museSlug,
+            50,
+          );
 
-    const muse = getMuseBySlug(requestedMuseSlug);
+    const muse = getMuseBySlug(
+      requestedMuseSlug,
+    );
 
     if (!muse) {
       return NextResponse.json(
@@ -845,16 +1240,23 @@ export async function POST(request: Request) {
       );
     }
 
-    let primaryMuse: ReturnType<typeof getMuseBySlug> = null;
+    let primaryMuse:
+      | ReturnType<
+          typeof getMuseBySlug
+        >
+      | null = null;
 
     if (mode === "collaborate") {
-      primaryMuse = getMuseBySlug(primaryMuseSlug);
+      primaryMuse = getMuseBySlug(
+        primaryMuseSlug,
+      );
 
       if (!primaryMuse) {
         return NextResponse.json(
           {
             status: "error",
-            message: "The primary Muse could not be identified.",
+            message:
+              "The primary Muse could not be identified.",
           },
           { status: 400 },
         );
@@ -864,13 +1266,17 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             status: "error",
-            message: "Choose a different Muse for collaboration.",
+            message:
+              "Choose a different Muse for collaboration.",
           },
           { status: 400 },
         );
       }
 
-      if (!originalQuestion || !primaryResponse) {
+      if (
+        !originalQuestion ||
+        !primaryResponse
+      ) {
         return NextResponse.json(
           {
             status: "error",
@@ -882,16 +1288,24 @@ export async function POST(request: Request) {
       }
     } else if (!message) {
       return NextResponse.json(
-        { status: "error", message: `Please enter a message for ${muse.name}.` },
+        {
+          status: "error",
+          message: `Please enter a message for ${muse.name}.`,
+        },
         { status: 400 },
       );
     }
 
-    const supabase = await createServerSupabaseClient();
+    const supabase =
+      await createServerSupabaseClient();
 
     if (!supabase) {
       return NextResponse.json(
-        { status: "error", message: "Supabase is not available." },
+        {
+          status: "error",
+          message:
+            "Supabase is not available.",
+        },
         { status: 500 },
       );
     }
@@ -902,30 +1316,43 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
 
     if (authError) {
-      console.error("Muse chat authentication error:", authError);
+      console.error(
+        "Muse chat authentication error:",
+        authError,
+      );
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
     const model =
       process.env.OPENAI_MUSE_MODEL ||
       process.env.OPENAI_MODEL ||
       "gpt-5-mini";
-    const question = mode === "collaborate" ? originalQuestion : message;
 
-    /* General Muse chat remains stateless. */
+    const question =
+      mode === "collaborate"
+        ? originalQuestion
+        : message;
+
     if (!songId) {
       const context = {
         selectedMuse: {
           slug: muse.slug,
           name: muse.name,
           domain: muse.domain,
-          role: mode === "collaborate" ? "collaborator" : "primary",
+          role:
+            mode === "collaborate"
+              ? "collaborator"
+              : "primary",
         },
         song: null,
         acceptedMemories: [],
         recordedDecisions: [],
         unresolvedQuestions: [],
         changesSinceLastSession: [],
+        previousDiagnostics: [],
         knowledge: [],
       };
 
@@ -935,22 +1362,26 @@ export async function POST(request: Request) {
         museName: muse.name,
         museDomain: muse.domain,
         mode,
-        primaryMuseName: primaryMuse?.name,
-        primaryMuseDomain: primaryMuse?.domain,
+        primaryMuseName:
+          primaryMuse?.name,
+        primaryMuseDomain:
+          primaryMuse?.domain,
         primaryResponse,
       });
 
-      const result = await createMuseResponse({
-        openai,
-        model,
-        muse,
-        prompt,
-      });
+      const result =
+        await createMuseResponse({
+          openai,
+          model,
+          muse,
+          prompt,
+        });
 
       return NextResponse.json({
         status: "success",
         mode,
         conversationId: null,
+        messageId: null,
         muse: {
           slug: muse.slug,
           name: muse.name,
@@ -968,6 +1399,7 @@ export async function POST(request: Request) {
         reply: result.reply,
         intelligence: result,
         memories: [],
+        taskAction: null,
       });
     }
 
@@ -975,36 +1407,49 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           status: "error",
-          message: "Please sign in before discussing a saved song.",
+          message:
+            "Please sign in before discussing a saved song.",
         },
         { status: 401 },
       );
     }
 
-    const song = await getOwnedSong(supabase, songId, user.id);
+    const song = await getOwnedSong(
+      supabase,
+      songId,
+      user.id,
+    );
 
     if (!song) {
       return NextResponse.json(
         {
           status: "error",
-          message: "The song was not found or does not belong to you.",
+          message:
+            "The song was not found or does not belong to you.",
         },
         { status: 404 },
       );
     }
 
     const conversationMuseSlug =
-      mode === "collaborate" && primaryMuse ? primaryMuse.slug : muse.slug;
+      mode === "collaborate" && primaryMuse
+        ? primaryMuse.slug
+        : muse.slug;
 
-    const conversation = await ensureConversation({
-      supabase,
-      userId: user.id,
-      song,
-      museSlug: conversationMuseSlug,
-      conversationId: conversationId || undefined,
-    });
+    const conversation =
+      await ensureConversation({
+        supabase,
+        userId: user.id,
+        song,
+        museSlug: conversationMuseSlug,
+        conversationId:
+          conversationId || undefined,
+      });
 
-    const isPrimaryMuse = conversation.primary_muse_slug === muse.slug;
+    const isPrimaryMuse =
+      conversation.primary_muse_slug ===
+      muse.slug;
+
     const role =
       mode === "collaborate"
         ? "collaborator"
@@ -1023,7 +1468,11 @@ export async function POST(request: Request) {
 
     if (!context) {
       return NextResponse.json(
-        { status: "error", message: "The song context could not be loaded." },
+        {
+          status: "error",
+          message:
+            "The song context could not be loaded.",
+        },
         { status: 404 },
       );
     }
@@ -1048,72 +1497,105 @@ export async function POST(request: Request) {
       museName: muse.name,
       museDomain: muse.domain,
       mode,
-      primaryMuseName: primaryMuse?.name,
-      primaryMuseDomain: primaryMuse?.domain,
+      primaryMuseName:
+        primaryMuse?.name,
+      primaryMuseDomain:
+        primaryMuse?.domain,
       primaryResponse,
     });
 
-    const result = await createMuseResponse({
-      openai,
-      model,
-      muse,
-      prompt,
-    });
+    const result =
+      await createMuseResponse({
+        openai,
+        model,
+        muse,
+        prompt,
+      });
 
-    const assistantMessage = await insertMessage({
-      supabase,
-      conversationId: conversation.id,
-      ownerUserId: user.id,
-      songId,
-      museSlug: muse.slug,
-      role: "assistant",
-      kind: mode === "collaborate" ? "collaborator" : "primary",
-      content: result.reply,
-      questionText: question,
-      comparisonWith: mode === "collaborate" ? primaryMuse?.name ?? null : null,
-      structuredResult: result as unknown as Record<string, unknown>,
-      modelName: model,
-    });
+    const assistantMessage =
+      await insertMessage({
+        supabase,
+        conversationId: conversation.id,
+        ownerUserId: user.id,
+        songId,
+        museSlug: muse.slug,
+        role: "assistant",
+        kind:
+          mode === "collaborate"
+            ? "collaborator"
+            : "primary",
+        content: result.reply,
+        questionText: question,
+        comparisonWith:
+          mode === "collaborate"
+            ? primaryMuse?.name ?? null
+            : null,
+        structuredResult:
+          result as unknown as Record<
+            string,
+            unknown
+          >,
+        modelName: model,
+      });
 
-    const memories = await saveMemoryCandidates({
-      supabase,
-      result,
-      conversationId: conversation.id,
-      userId: user.id,
-      songId,
-      museSlug: muse.slug,
-      sourceMessageId: assistantMessage.id,
-    });
+    const memories =
+      await saveMemoryCandidates({
+        supabase,
+        result,
+        conversationId: conversation.id,
+        userId: user.id,
+        songId,
+        museSlug: muse.slug,
+        sourceMessageId:
+          assistantMessage.id,
+      });
 
-    await saveUnresolvedQuestions({
-      supabase,
-      result,
-      conversationId: conversation.id,
-      userId: user.id,
-      songId,
-      songVersionId: context.currentVersion?.id ?? null,
-      museSlug: muse.slug,
-      sourceMessageId: assistantMessage.id,
-    });
+    await Promise.all([
+      saveUnresolvedQuestions({
+        supabase,
+        result,
+        conversationId: conversation.id,
+        userId: user.id,
+        songId,
+        songVersionId:
+          context.currentVersion?.id ?? null,
+        museSlug: muse.slug,
+        sourceMessageId:
+          assistantMessage.id,
+      }),
 
-    await updateConversationState({
-      supabase,
-      conversationId: conversation.id,
-      context,
-    });
+      saveDiagnosticFindings({
+        supabase,
+        result,
+        conversationId: conversation.id,
+        messageId: assistantMessage.id,
+        userId: user.id,
+        songId,
+        songVersionId:
+          context.currentVersion?.id ?? null,
+        museSlug: muse.slug,
+      }),
 
-    await saveMuseContextSnapshot({
-      supabase,
-      userId: user.id,
-      conversationId: conversation.id,
-      museSlug: muse.slug,
-      context,
-    });
+      updateConversationState({
+        supabase,
+        conversationId: conversation.id,
+        context,
+      }),
+
+      saveMuseContextSnapshot({
+        supabase,
+        userId: user.id,
+        conversationId: conversation.id,
+        museSlug: muse.slug,
+        context,
+      }),
+    ]);
 
     return NextResponse.json({
       status: "success",
       mode,
       conversationId: conversation.id,
+      messageId: assistantMessage.id,
       muse: {
         slug: muse.slug,
         name: muse.name,
@@ -1130,20 +1612,29 @@ export async function POST(request: Request) {
       song: {
         id: song.id,
         slug: song.slug,
-        title: song.title_final || song.title_working || "Untitled song",
+        title:
+          song.title_final ||
+          song.title_working ||
+          "Untitled song",
       },
       reply: result.reply,
       intelligence: result,
       memories,
+      taskAction: null,
     });
   } catch (error) {
-    console.error("Muse chat route error:", error);
+    console.error(
+      "Muse chat route error:",
+      error,
+    );
 
     return NextResponse.json(
       {
         status: "error",
         message:
-          error instanceof Error ? error.message : "The Muse could not respond.",
+          error instanceof Error
+            ? error.message
+            : "The Muse could not respond.",
       },
       { status: 500 },
     );
