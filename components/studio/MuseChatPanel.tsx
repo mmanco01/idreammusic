@@ -134,6 +134,7 @@ export function MuseChatPanel({
     "idle" | "loading" | "error"
   >("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [memoryActionIds, setMemoryActionIds] = useState<string[]>([]);
   const [collaborationSourceId, setCollaborationSourceId] = useState<
     string | null
   >(null);
@@ -485,19 +486,52 @@ export function MuseChatPanel({
     memoryId: string,
     nextStatus: "accepted" | "rejected",
   ) {
+    if (memoryActionIds.includes(memoryId)) {
+      return;
+    }
+
+    setMemoryActionIds((current) => [
+      ...current,
+      memoryId,
+    ]);
+    setErrorMessage("");
+
     try {
-      const response = await fetch("/api/muses/memory", {
+      const response = await fetch("/api/muses/chat", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ memoryId, status: nextStatus }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          memoryId,
+          status: nextStatus,
+        }),
       });
-      const result = (await response.json().catch(() => null)) as
-        | { status?: string; message?: string }
-        | null;
+
+      const responseText = await response.text();
+
+      let result:
+        | {
+            status?: string;
+            message?: string;
+          }
+        | null = null;
+
+      if (responseText) {
+        try {
+          result = JSON.parse(responseText) as {
+            status?: string;
+            message?: string;
+          };
+        } catch {
+          result = null;
+        }
+      }
 
       if (!response.ok || result?.status !== "success") {
         throw new Error(
-          result?.message || "The Muse memory could not be updated.",
+          result?.message ||
+            `The Muse memory update failed with status ${response.status}.`,
         );
       }
 
@@ -507,7 +541,10 @@ export function MuseChatPanel({
           memories:
             message.memories?.map((memory) =>
               memory.id === memoryId
-                ? { ...memory, status: nextStatus }
+                ? {
+                    ...memory,
+                    status: nextStatus,
+                  }
                 : memory,
             ) ?? [],
         })),
@@ -518,6 +555,10 @@ export function MuseChatPanel({
         error instanceof Error
           ? error.message
           : "The Muse memory could not be updated.",
+      );
+    } finally {
+      setMemoryActionIds((current) =>
+        current.filter((id) => id !== memoryId),
       );
     }
   }
@@ -720,78 +761,256 @@ export function MuseChatPanel({
                 {message.memories?.length ? (
                   <div
                     style={{
-                      display: "grid",
-                      gap: "0.5rem",
-                      marginTop: "0.55rem",
+                      marginTop: "0.65rem",
+                      padding: "0.9rem",
+                      border: "1px solid rgba(220, 182, 92, 0.34)",
+                      borderRadius: 15,
+                      background: "rgba(0,0,0,0.12)",
                     }}
                   >
-                    {message.memories.map((memory) => (
-                      <div
-                        key={memory.id}
-                        style={{
-                          padding: "0.75rem 0.85rem",
-                          border: "1px solid rgba(220, 182, 92, 0.32)",
-                          borderRadius: 13,
-                          background: "rgba(0,0,0,0.12)",
-                        }}
-                      >
-                        <div className="eyebrow">
-                          {memoryLabel(memory.memory_type)}
-                        </div>
-                        <p className="copy" style={{ margin: "0.3rem 0 0" }}>
-                          {memory.content}
-                        </p>
-                        {memory.reason ? (
-                          <p
-                            className="copy"
-                            style={{
-                              margin: "0.25rem 0 0",
-                              fontSize: "0.82rem",
-                              opacity: 0.76,
-                            }}
-                          >
-                            Why remember this: {memory.reason}
-                          </p>
-                        ) : null}
+                    <div className="eyebrow">
+                      What {message.museName || "the Muse"} proposes remembering
+                    </div>
 
-                        {memory.status === "proposed" ? (
-                          <div
-                            className="button-row"
-                            style={{ marginTop: "0.55rem" }}
-                          >
-                            <button
-                              type="button"
-                              className="button primary"
-                              onClick={() =>
-                                void updateMemory(memory.id, "accepted")
-                              }
+                    <p
+                      className="copy"
+                      style={{
+                        margin: "0.35rem 0 0",
+                        fontSize: "0.86rem",
+                        opacity: 0.82,
+                      }}
+                    >
+                      The full conversation and response are already saved.
+                      These are only distilled takeaways that may guide future
+                      sessions. Keep only the ones that feel true and useful.
+                    </p>
+
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: "0.65rem",
+                        marginTop: "0.75rem",
+                      }}
+                    >
+                      {[...message.memories]
+                        .sort(
+                          (a, b) =>
+                            Number(b.importance ?? 0) -
+                            Number(a.importance ?? 0),
+                        )
+                        .slice(0, 2)
+                        .map((memory, index) => {
+                          const isUpdating =
+                            memoryActionIds.includes(memory.id);
+
+                          return (
+                            <div
+                              key={memory.id}
+                              style={{
+                                padding: "0.8rem 0.85rem",
+                                border:
+                                  "1px solid rgba(220, 182, 92, 0.28)",
+                                borderRadius: 13,
+                                background: "rgba(255,255,255,0.025)",
+                              }}
                             >
-                              Remember this
-                            </button>
-                            <button
-                              type="button"
-                              className="button"
-                              onClick={() =>
-                                void updateMemory(memory.id, "rejected")
-                              }
-                            >
-                              Don&apos;t save
-                            </button>
-                          </div>
-                        ) : (
-                          <span
-                            className="pill"
-                            style={{ display: "inline-flex", marginTop: "0.55rem" }}
-                          >
-                            {memory.status === "accepted"
-                              ? "Remembered"
-                              : "Not saved"}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexWrap: "wrap",
+                                  gap: "0.45rem",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span className="pill">
+                                  Proposed memory {index + 1}
+                                </span>
+                                <span className="eyebrow">
+                                  {memoryLabel(memory.memory_type)}
+                                </span>
+                              </div>
+
+                              <p
+                                className="copy"
+                                style={{
+                                  margin: "0.45rem 0 0",
+                                  fontSize: "1rem",
+                                }}
+                              >
+                                {memory.content}
+                              </p>
+
+                              {memory.reason ? (
+                                <p
+                                  className="copy"
+                                  style={{
+                                    margin: "0.3rem 0 0",
+                                    fontSize: "0.82rem",
+                                    opacity: 0.76,
+                                  }}
+                                >
+                                  Why it may help later: {memory.reason}
+                                </p>
+                              ) : null}
+
+                              {memory.status === "proposed" ? (
+                                <div
+                                  className="button-row"
+                                  style={{ marginTop: "0.65rem" }}
+                                >
+                                  <button
+                                    type="button"
+                                    className="button primary"
+                                    disabled={isUpdating}
+                                    onClick={() =>
+                                      void updateMemory(
+                                        memory.id,
+                                        "accepted",
+                                      )
+                                    }
+                                  >
+                                    {isUpdating
+                                      ? "Saving…"
+                                      : "Keep for future sessions"}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="button"
+                                    disabled={isUpdating}
+                                    onClick={() =>
+                                      void updateMemory(
+                                        memory.id,
+                                        "rejected",
+                                      )
+                                    }
+                                  >
+                                    Skip
+                                  </button>
+                                </div>
+                              ) : (
+                                <span
+                                  className="pill"
+                                  style={{
+                                    display: "inline-flex",
+                                    marginTop: "0.65rem",
+                                  }}
+                                >
+                                  {memory.status === "accepted"
+                                    ? "Kept for future sessions"
+                                    : "Skipped"}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {message.memories.length > 2 ? (
+                      <details style={{ marginTop: "0.65rem" }}>
+                        <summary
+                          className="copy"
+                          style={{ cursor: "pointer" }}
+                        >
+                          Show {message.memories.length - 2} additional possible
+                          {message.memories.length - 2 === 1
+                            ? " memory"
+                            : " memories"}
+                        </summary>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gap: "0.55rem",
+                            marginTop: "0.6rem",
+                          }}
+                        >
+                          {[...message.memories]
+                            .sort(
+                              (a, b) =>
+                                Number(b.importance ?? 0) -
+                                Number(a.importance ?? 0),
+                            )
+                            .slice(2)
+                            .map((memory) => {
+                              const isUpdating =
+                                memoryActionIds.includes(memory.id);
+
+                              return (
+                                <div
+                                  key={memory.id}
+                                  style={{
+                                    padding: "0.7rem 0.75rem",
+                                    border: "1px solid var(--line)",
+                                    borderRadius: 12,
+                                  }}
+                                >
+                                  <div className="eyebrow">
+                                    {memoryLabel(memory.memory_type)}
+                                  </div>
+
+                                  <p
+                                    className="copy"
+                                    style={{ margin: "0.3rem 0 0" }}
+                                  >
+                                    {memory.content}
+                                  </p>
+
+                                  {memory.status === "proposed" ? (
+                                    <div
+                                      className="button-row"
+                                      style={{ marginTop: "0.55rem" }}
+                                    >
+                                      <button
+                                        type="button"
+                                        className="button primary"
+                                        disabled={isUpdating}
+                                        onClick={() =>
+                                          void updateMemory(
+                                            memory.id,
+                                            "accepted",
+                                          )
+                                        }
+                                      >
+                                        {isUpdating ? "Saving…" : "Keep"}
+                                      </button>
+
+                                      <button
+                                        type="button"
+                                        className="button"
+                                        disabled={isUpdating}
+                                        onClick={() =>
+                                          void updateMemory(
+                                            memory.id,
+                                            "rejected",
+                                          )
+                                        }
+                                      >
+                                        Skip
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <span
+                                      className="pill"
+                                      style={{
+                                        display: "inline-flex",
+                                        marginTop: "0.55rem",
+                                      }}
+                                    >
+                                      {memory.status === "accepted"
+                                        ? "Kept"
+                                        : "Skipped"}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </details>
+                    ) : null}
                   </div>
                 ) : null}
+
 
                 {message.role === "assistant" && message.kind === "primary" ? (
                   <div style={{ marginTop: "0.55rem" }}>
@@ -953,9 +1172,9 @@ export function MuseChatPanel({
           className="copy"
           style={{ marginTop: "0.5rem", fontSize: "0.84rem", opacity: 0.8 }}
         >
-          Press Ctrl+Enter or Command+Enter to send. Saved-song conversations
-          return after a page refresh. You choose which proposed memories become
-          part of future Muse context.
+          Press Ctrl+Enter or Command+Enter to send. The conversation is
+          saved automatically. Proposed memories are optional distilled takeaways;
+          only the ones you keep become long-term guidance for future sessions.
         </p>
       </form>
 
