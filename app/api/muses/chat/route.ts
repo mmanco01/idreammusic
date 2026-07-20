@@ -28,6 +28,11 @@ type MuseChatRequest = {
   primaryResponse?: unknown;
 };
 
+type MuseMemoryActionRequest = {
+  memoryId?: unknown;
+  status?: unknown;
+};
+
 function cleanString(value: unknown, maxLength: number): string {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
@@ -380,9 +385,10 @@ Guidance for the structured fields:
 - primaryObservation: the single most important grounded observation.
 - recommendations: no more than three focused recommendations.
 - unresolvedQuestions: questions worth carrying into a future session.
-- memoryCandidates: only facts, preferences, decisions, rejected ideas,
-  unresolved issues, or next steps that would genuinely help future work.
-  Do not save casual wording or speculative claims.
+- memoryCandidates: return no more than two. Include only a durable
+  decision, preference, lyric/form choice, unresolved issue, or next step
+  that would genuinely improve a future session. Do not save casual wording,
+  repeated observations, or speculative claims.
 - proposedTask: include only when one concrete task would clearly help.
 - suggestedCollaborator: include only when another Muse has a specific,
   distinct contribution.
@@ -632,6 +638,170 @@ export async function DELETE(request: Request) {
           error instanceof Error
             ? error.message
             : "The Muse conversation could not be archived.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const body =
+      (await request.json()) as MuseMemoryActionRequest;
+
+    const memoryId = cleanString(
+      body.memoryId,
+      100,
+    );
+
+    const nextStatus = cleanString(
+      body.status,
+      30,
+    );
+
+    if (!memoryId) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "A Muse memory ID is required.",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (
+      nextStatus !== "accepted" &&
+      nextStatus !== "rejected"
+    ) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "Memory status must be accepted or rejected.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const supabase =
+      await createServerSupabaseClient();
+
+    if (!supabase) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "Supabase is not available.",
+        },
+        { status: 500 },
+      );
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) {
+      console.error(
+        "Muse memory authentication error:",
+        authError,
+      );
+    }
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "Please sign in to manage Muse memory.",
+        },
+        { status: 401 },
+      );
+    }
+
+    const {
+      data: existingMemory,
+      error: lookupError,
+    } = await (supabase as any)
+      .from("muse_memories")
+      .select(
+        "id, owner_user_id, memory_type, content, reason, importance, confidence, status",
+      )
+      .eq("id", memoryId)
+      .eq("owner_user_id", user.id)
+      .maybeSingle();
+
+    if (lookupError) {
+      throw new Error(
+        `Could not load the proposed memory: ${lookupError.message}`,
+      );
+    }
+
+    if (!existingMemory) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "This proposed memory could not be found. Refresh the page and try again.",
+        },
+        { status: 404 },
+      );
+    }
+
+    const { data, error } = await (
+      supabase as any
+    )
+      .from("muse_memories")
+      .update({
+        status: nextStatus,
+        last_referenced_at:
+          nextStatus === "accepted"
+            ? new Date().toISOString()
+            : null,
+      })
+      .eq("id", memoryId)
+      .eq("owner_user_id", user.id)
+      .select(
+        "id, memory_type, content, reason, importance, confidence, status",
+      )
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(
+        `Could not update the proposed memory: ${error.message}`,
+      );
+    }
+
+    if (!data) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "The proposed memory was not updated. Refresh the page and try again.",
+        },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json({
+      status: "success",
+      memory: data,
+    });
+  } catch (error) {
+    console.error(
+      "Muse memory update error:",
+      error,
+    );
+
+    return NextResponse.json(
+      {
+        status: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The Muse memory could not be updated.",
       },
       { status: 500 },
     );
