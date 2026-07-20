@@ -187,6 +187,7 @@ export async function buildMuseContext({
     questionResult,
     messageResult,
     previousSnapshotResult,
+    diagnosticResult,
   ] = await Promise.all([
     supabase
       .from("song_transcripts")
@@ -267,6 +268,17 @@ export async function buildMuseContext({
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+
+    supabase
+      .from("muse_diagnostic_findings")
+      .select(
+        "diagnostic_key, diagnostic_label, score, finding, evidence, confidence, change_direction, created_at",
+      )
+      .eq("owner_user_id", userId)
+      .eq("song_id", songId)
+      .eq("muse_slug", muse.slug)
+      .order("created_at", { ascending: false })
+      .limit(25),
   ]);
 
   const transcripts = transcriptResult.data ?? [];
@@ -356,6 +368,23 @@ export async function buildMuseContext({
     openTasks,
   });
 
+  const previousDiagnosticsByKey = new Map<string, any>();
+
+  for (const finding of diagnosticResult.data ?? []) {
+    if (!previousDiagnosticsByKey.has(finding.diagnostic_key)) {
+      previousDiagnosticsByKey.set(finding.diagnostic_key, {
+        key: finding.diagnostic_key,
+        label: finding.diagnostic_label,
+        score: finding.score,
+        finding: finding.finding,
+        evidence: finding.evidence,
+        confidence: finding.confidence,
+        changeDirection: finding.change_direction,
+        createdAt: finding.created_at,
+      });
+    }
+  }
+
   return {
     selectedMuse: {
       slug: muse.slug,
@@ -400,6 +429,9 @@ export async function buildMuseContext({
     unresolvedQuestions: questionResult.data ?? [],
     recentConversation: [...(messageResult.data ?? [])].reverse(),
     changesSinceLastSession,
+    previousDiagnostics: Array.from(
+      previousDiagnosticsByKey.values(),
+    ),
     knowledge: [],
   };
 }
