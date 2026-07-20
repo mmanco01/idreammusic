@@ -621,6 +621,18 @@ Guidance for the structured fields:
 - Distinguish transcript, existing lyrics, writer notes, analysis, accepted
   decisions, and new Muse suggestions.
 - Scores are directional creative judgments, not objective grades.
+- Keep the entire structured result concise enough to complete reliably:
+  - reply: no more than 450 words;
+  - each diagnostic finding: no more than 55 words;
+  - each evidence item: no more than 20 words;
+  - each lens summary: no more than 70 words;
+  - each lens strength or risk: no more than 18 words;
+  - each nextMove: no more than 35 words;
+  - each recommendation reasoning: no more than 55 words;
+  - version comparison summary: no more than 80 words;
+  - lyric and form reasoning: no more than 90 words.
+- Return only the structured response. Do not add markdown fences,
+  commentary before the JSON, or commentary after it.
   `.trim();
 }
 
@@ -677,6 +689,54 @@ function mapHistoryMessages(
   }));
 }
 
+type OpenAIResponseMetadata = {
+  status?: string | null;
+  incomplete_details?: {
+    reason?: string | null;
+  } | null;
+};
+
+function responseFailureDetail(
+  response: OpenAIResponseMetadata,
+) {
+  const status =
+    response.status ?? "unknown";
+
+  const reason =
+    response.incomplete_details?.reason ??
+    "not provided";
+
+  return `status=${status}; incomplete_reason=${reason}`;
+}
+
+function shouldRetryMuseResponse(
+  error: unknown,
+) {
+  const status =
+    typeof error === "object" &&
+    error !== null &&
+    "status" in error
+      ? Number(
+          (error as { status?: unknown })
+            .status,
+        )
+      : null;
+
+  if (
+    status !== null &&
+    Number.isFinite(status) &&
+    status >= 400 &&
+    status < 500 &&
+    status !== 408 &&
+    status !== 409 &&
+    status !== 429
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 async function createMuseResponse({
   openai,
   model,
@@ -690,29 +750,108 @@ async function createMuseResponse({
   >;
   prompt: string;
 }) {
-  const response = await openai.responses.create({
-    model,
-    instructions: muse.systemPrompt,
-    input: prompt,
-    text: {
-      format:
-        MUSE_INTELLIGENCE_TEXT_FORMAT as any,
+  const attempts = [
+    {
+      maxOutputTokens: 5600,
+      extraInstruction: "",
     },
-    max_output_tokens: 3600,
-    store: false,
-  });
+    {
+      maxOutputTokens: 8000,
+      extraInstruction: `
+IMPORTANT RETRY:
+The previous attempt was incomplete or malformed.
+Return a fresh, complete structured result from the beginning.
+Be concise. Do not repeat yourself. Do not use markdown fences.
+Every required property must be present, and the JSON must close cleanly.
+      `.trim(),
+    },
+  ];
 
-  const outputText =
-    response.output_text?.trim();
+  let lastError: unknown = null;
 
-  if (!outputText) {
-    throw new Error(
-      `${muse.name} did not return a response.`,
-    );
+  for (
+    let attemptIndex = 0;
+    attemptIndex < attempts.length;
+    attemptIndex += 1
+  ) {
+    const attempt =
+      attempts[attemptIndex];
+
+    try {
+      const response =
+        await openai.responses.create({
+          model,
+          instructions:
+            muse.systemPrompt,
+          input: attempt.extraInstruction
+            ? `${prompt}\n\n${attempt.extraInstruction}`
+            : prompt,
+          text: {
+            format:
+              MUSE_INTELLIGENCE_TEXT_FORMAT as any,
+          },
+          max_output_tokens:
+            attempt.maxOutputTokens,
+          store: false,
+        });
+
+      const metadata =
+        response as OpenAIResponseMetadata;
+
+      if (
+        metadata.status === "incomplete"
+      ) {
+        throw new Error(
+          `${muse.name}'s structured response was incomplete (${responseFailureDetail(
+            metadata,
+          )}).`,
+        );
+      }
+
+      const outputText =
+        response.output_text?.trim();
+
+      if (!outputText) {
+        throw new Error(
+          `${muse.name} did not return structured response text (${responseFailureDetail(
+            metadata,
+          )}).`,
+        );
+      }
+
+      return parseMuseIntelligenceOutput(
+        outputText,
+      );
+    } catch (error) {
+      lastError = error;
+
+      const isLastAttempt =
+        attemptIndex ===
+        attempts.length - 1;
+
+      if (
+        isLastAttempt ||
+        !shouldRetryMuseResponse(error)
+      ) {
+        break;
+      }
+
+      console.warn(
+        `Retrying ${muse.name} structured response after attempt ${
+          attemptIndex + 1
+        }:`,
+        error,
+      );
+    }
   }
 
-  return parseMuseIntelligenceOutput(
-    outputText,
+  const detail =
+    lastError instanceof Error
+      ? lastError.message
+      : "Unknown structured response error.";
+
+  throw new Error(
+    `${muse.name}'s full creative-lens analysis could not be completed because the structured result was cut off or malformed after two attempts. ${detail}`,
   );
 }
 
