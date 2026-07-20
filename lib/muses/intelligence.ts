@@ -127,7 +127,7 @@ export const MUSE_INTELLIGENCE_TEXT_FORMAT = {
       },
       memoryCandidates: {
         type: "array",
-        maxItems: 5,
+        maxItems: 2,
         items: {
           type: "object",
           additionalProperties: false,
