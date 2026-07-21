@@ -9,6 +9,8 @@ export type MuseMemoryType =
   | "accepted_suggestion"
   | "rejected_suggestion"
   | "songwriter_preference"
+  | "muse_recommendation"
+  | "question_to_confirm"
   | "unresolved_question"
   | "next_step"
   | "lyric_choice"
@@ -357,6 +359,8 @@ export const MUSE_INTELLIGENCE_TEXT_FORMAT = {
                 "accepted_suggestion",
                 "rejected_suggestion",
                 "songwriter_preference",
+                "muse_recommendation",
+                "question_to_confirm",
                 "unresolved_question",
                 "next_step",
                 "lyric_choice",
