@@ -1,17 +1,14 @@
-import PolyhymniaKnowledgeLibrary from "@/components/studio/PolyhymniaKnowledgeLibrary";
+import { MuseKnowledgeLibraryPage } from "@/components/studio/MuseKnowledgeLibraryPage";
 
 export const metadata = {
   title: "Calliope Knowledge Library | iDreamMusic",
-  description:
-    "Search, curate, and embed Calliope's narrative and storytelling knowledge.",
+  description: "Search, curate, and embed Calliope's narrative knowledge.",
 };
 
-export default function CalliopeKnowledgeLibraryPage() {
+export default function Page() {
   return (
-    <PolyhymniaKnowledgeLibrary
+    <MuseKnowledgeLibraryPage
       museSlug="calliope"
-      museName="Calliope"
-      defaultQuery="How can a song create a compelling character, clear stakes, and an earned narrative turn?"
     />
   );
 }
