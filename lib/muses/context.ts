@@ -26,6 +26,7 @@ function compareSnapshots(
     currentVersion: any;
     latestTranscript: any;
     latestAnalysis: any;
+    currentAudioProfile: any;
     openTasks: any[];
   },
 ): string[] {
@@ -37,6 +38,8 @@ function compareSnapshots(
   const previousVersion = previousContext.currentVersion ?? null;
   const previousTranscript = previousContext.latestTranscript ?? null;
   const previousAnalysis = previousContext.latestAnalysis ?? null;
+  const previousAudioProfile =
+    previousContext.currentAudioProfile ?? null;
   const previousOpenTasks = Array.isArray(previousContext.openTasks)
     ? previousContext.openTasks
     : [];
@@ -72,6 +75,24 @@ function compareSnapshots(
       current.latestAnalysis
         ? "A newer Song Intelligence analysis is available."
         : "The previous Song Intelligence analysis is no longer available.",
+    );
+  }
+
+  if (
+    previousAudioProfile?.id !==
+    current.currentAudioProfile?.id
+  ) {
+    changes.push(
+      current.currentAudioProfile
+        ? "A new audio-derived Muse profile is available for the current recording."
+        : "The previous audio-derived Muse profile is no longer available.",
+    );
+  } else if (
+    previousAudioProfile?.updatedAt !==
+    current.currentAudioProfile?.updatedAt
+  ) {
+    changes.push(
+      "The current recording's audio-derived Muse profile was refreshed.",
     );
   }
 
@@ -190,6 +211,7 @@ export async function buildMuseContext({
     questionResult,
     messageResult,
     previousSnapshotResult,
+    audioProfileResult,
     diagnosticResult,
   ] = await Promise.all([
     supabase
@@ -272,6 +294,29 @@ export async function buildMuseContext({
       .limit(1)
       .maybeSingle(),
 
+    currentVersion
+      ? supabase
+          .from("muse_audio_profiles")
+          .select(
+            "id, song_version_id, attachment_id, status, analysis_version, model_name, source_filename, source_mime_type, source_format, source_bytes, profile_json, completed_at, updated_at",
+          )
+          .eq("owner_user_id", userId)
+          .eq("song_id", songId)
+          .eq(
+            "song_version_id",
+            currentVersion.id,
+          )
+          .eq("status", "ready")
+          .order("updated_at", {
+            ascending: false,
+          })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({
+          data: null,
+          error: null,
+        }),
+
     supabase
       .from("muse_diagnostic_findings")
       .select(
@@ -352,6 +397,47 @@ export async function buildMuseContext({
       }
     : null;
 
+  const currentAudioProfile =
+    audioProfileResult.data
+      ? {
+          id: audioProfileResult.data.id,
+          songVersionId:
+            audioProfileResult.data.song_version_id,
+          attachmentId:
+            audioProfileResult.data.attachment_id,
+          availability: "analyzed",
+          evidenceType:
+            "audio-derived profile from the complete mix",
+          rawAudioAvailableToMuseChat: false,
+          analysisVersion:
+            audioProfileResult.data.analysis_version,
+          modelName:
+            audioProfileResult.data.model_name,
+          sourceFilename:
+            audioProfileResult.data.source_filename,
+          sourceMimeType:
+            audioProfileResult.data.source_mime_type,
+          sourceFormat:
+            audioProfileResult.data.source_format,
+          sourceBytes:
+            audioProfileResult.data.source_bytes,
+          profile:
+            audioProfileResult.data.profile_json,
+          completedAt:
+            audioProfileResult.data.completed_at,
+          updatedAt:
+            audioProfileResult.data.updated_at,
+          requiredLanguage:
+            "Treat these as audio-derived observations and estimates. Do not say you are hearing the raw recording during this chat. Distinguish full-mix evidence from claims requiring stems, a tempo map, or a live recording.",
+        }
+      : {
+          availability: "unavailable",
+          evidenceType: "none",
+          rawAudioAvailableToMuseChat: false,
+          reason:
+            "No ready audio-derived profile exists for the current song version. The Muse Audio Bridge must analyze the attached MP3 or WAV first.",
+        };
+
   const openTasks = (taskResult.data ?? []).map((task: any) => ({
     id: task.id,
     songVersionId: task.song_version_id,
@@ -368,6 +454,11 @@ export async function buildMuseContext({
     currentVersion: normalizedCurrentVersion,
     latestTranscript: normalizedTranscript,
     latestAnalysis: normalizedAnalysis,
+    currentAudioProfile:
+      currentAudioProfile.availability ===
+      "analyzed"
+        ? currentAudioProfile
+        : null,
     openTasks,
   });
 
@@ -426,6 +517,7 @@ export async function buildMuseContext({
       })),
     latestTranscript: normalizedTranscript,
     latestAnalysis: normalizedAnalysis,
+    currentAudioProfile,
     openTasks,
     acceptedMemories: memoryResult.data ?? [],
     recordedDecisions: decisionResult.data ?? [],
@@ -459,6 +551,10 @@ export async function saveMuseContextSnapshot({
     song_version_id: context.currentVersion?.id ?? null,
     transcript_id: context.latestTranscript?.id ?? null,
     analysis_run_id: context.latestAnalysis?.id ?? null,
+    audio_profile_id:
+      context.currentAudioProfile?.availability === "analyzed"
+        ? context.currentAudioProfile.id
+        : null,
     muse_slug: museSlug,
     context_json: context,
   });
