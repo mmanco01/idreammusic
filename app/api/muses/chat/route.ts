@@ -23,6 +23,7 @@ import {
 import type {
   MuseKnowledgeCitation,
   MuseKnowledgePromptItem,
+  MuseKnowledgeRetrievalMetrics,
 } from "@/lib/muses/knowledge-types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -54,6 +55,35 @@ function cleanString(
   return typeof value === "string"
     ? value.trim().slice(0, maxLength)
     : "";
+}
+
+function buildKnowledgeMetrics({
+  searchId,
+  retrieved,
+  cited,
+  requestedCount,
+}: {
+  searchId: string | null;
+  retrieved: MuseKnowledgePromptItem[];
+  cited: MuseKnowledgeCitation[];
+  requestedCount: number;
+}): MuseKnowledgeRetrievalMetrics {
+  const scores = retrieved
+    .map((item) => item.relevanceScore)
+    .filter((score) => Number.isFinite(score));
+
+  return {
+    requestedCount,
+    retrievedCount: retrieved.length,
+    citedCount: cited.length,
+    averageRelevance: scores.length
+      ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+      : null,
+    highestRelevance: scores.length
+      ? Math.max(...scores)
+      : null,
+    searchId,
+  };
 }
 
 async function getOwnedSong(
@@ -1643,6 +1673,14 @@ export async function POST(request: Request) {
             knowledgeSearch.results,
         });
 
+      const knowledgeMetrics =
+        buildKnowledgeMetrics({
+          searchId: knowledgeSearch.searchId,
+          retrieved: knowledgeSearch.results,
+          cited: knowledgeCitations,
+          requestedCount: 7,
+        });
+
       return NextResponse.json({
         status: "success",
         mode,
@@ -1667,6 +1705,7 @@ export async function POST(request: Request) {
         memories: [],
         taskAction: null,
         knowledgeCitations,
+        knowledgeMetrics,
       });
     }
 
@@ -1848,6 +1887,14 @@ export async function POST(request: Request) {
           knowledgeSearch.results,
       });
 
+    const knowledgeMetrics =
+      buildKnowledgeMetrics({
+        searchId: knowledgeSearch.searchId,
+        retrieved: knowledgeSearch.results,
+        cited: knowledgeCitations,
+        requestedCount: 8,
+      });
+
     await saveMuseKnowledgeCitations({
       supabase,
       citations:
@@ -1946,6 +1993,7 @@ export async function POST(request: Request) {
       memories,
       taskAction: null,
       knowledgeCitations,
+      knowledgeMetrics,
     });
   } catch (error) {
     console.error(
