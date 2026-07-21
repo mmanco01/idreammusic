@@ -9,8 +9,23 @@ export function MuseKnowledgeLibraryPage({
   museSlug: MuseSlug;
 }) {
   const muse = getMuseBySlug(museSlug);
+
+  if (!muse) {
+    return (
+      <main
+        className="shell"
+        style={{
+          paddingTop: "1.5rem",
+          paddingBottom: "3rem",
+        }}
+      >
+        <p>Muse not found.</p>
+      </main>
+    );
+  }
+
   const platform =
-    getMusePlatformConfig(museSlug);
+    getMusePlatformConfig(muse.slug);
 
   return (
     <main
