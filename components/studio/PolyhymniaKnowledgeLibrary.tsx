@@ -61,7 +61,15 @@ function percent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-export function PolyhymniaKnowledgeLibrary({ museSlug = "polyhymnia", museName = "Polyhymnia" }: { museSlug?: string; museName?: string }) {
+export function PolyhymniaKnowledgeLibrary({
+  museSlug = "polyhymnia",
+  museName = "Polyhymnia",
+  defaultQuery = "How can a faith song preserve doubt without weakening hope?",
+}: {
+  museSlug?: string;
+  museName?: string;
+  defaultQuery?: string;
+}) {
   const [library, setLibrary] =
     useState<LibraryPayload | null>(null);
   const [status, setStatus] =
@@ -72,9 +80,7 @@ export function PolyhymniaKnowledgeLibrary({ museSlug = "polyhymnia", museName =
     useState("");
 
   const [query, setQuery] =
-    useState(
-      "How can a faith song preserve doubt without weakening hope?",
-    );
+    useState(defaultQuery);
   const [searchStatus, setSearchStatus] =
     useState<
       "idle" | "searching" | "error"
