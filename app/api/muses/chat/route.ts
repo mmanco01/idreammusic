@@ -1624,7 +1624,7 @@ export async function POST(request: Request) {
         results: [],
       };
 
-      if (muse.slug === "polyhymnia") {
+      if (muse.slug === "polyhymnia" || muse.slug === "calliope") {
         knowledgeSearch =
           await retrieveMuseKnowledge({
             supabase,
@@ -1791,7 +1791,7 @@ export async function POST(request: Request) {
       results: [],
     };
 
-    if (muse.slug === "polyhymnia") {
+    if (muse.slug === "polyhymnia" || muse.slug === "calliope") {
       knowledgeSearch =
         await retrieveMuseKnowledge({
           supabase,
