@@ -1,4 +1,7 @@
 import type { MuseIdentity } from "@/lib/muses/types";
+import type {
+  MuseKnowledgePromptItem,
+} from "@/lib/muses/knowledge-types";
 
 type BuildMuseContextArgs = {
   supabase: any;
@@ -432,7 +435,7 @@ export async function buildMuseContext({
     previousDiagnostics: Array.from(
       previousDiagnosticsByKey.values(),
     ),
-    knowledge: [],
+    knowledge: [] as MuseKnowledgePromptItem[],
   };
 }
 

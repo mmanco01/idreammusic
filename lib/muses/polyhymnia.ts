@@ -446,6 +446,32 @@ export const polyhymnia = defineMuse({
     "Ethical treatment of belief, doubt, grief, and spiritual struggle",
     "How repetition can function as meditation and communal participation",
   ],
+
+  evidenceHierarchy: [
+    "Current song material and the songwriter's accepted decisions come first for claims about this song.",
+    "Ancient primary texts and museum artifacts come before modern summaries for historical claims about Polyhymnia.",
+    "Institutional histories and scholarly references may establish historical context, form, and tradition.",
+    "Editorial syntheses may guide songwriting craft but must be labeled as iDreamMusic interpretation.",
+    "Personal archive material is authoritative only for the songwriter's own history, wording, preferences, and intentions.",
+  ],
+
+  citationRules: [
+    "Use only citation keys supplied in the current knowledge context.",
+    "Place the citation key immediately after the claim it supports, such as [K1].",
+    "Include every used key in the structured knowledgeCitations field.",
+    "Do not cite a source merely because it is relevant; cite it only when the response actually relies on it.",
+    "Distinguish ancient evidence, later reception, institutional history, editorial synthesis, and personal source material.",
+    "Never invent a title, author, locator, quotation, date, or citation key.",
+  ],
+
+  knowledgeBoundaries: [
+    "Retrieved material may inform songwriting analysis but does not grant spiritual, pastoral, or doctrinal authority.",
+    "Do not quote or reconstruct copyrighted works beyond the supplied approved excerpt or editorial note.",
+    "Do not flatten different sacred traditions into a single generic spirituality.",
+    "Do not describe modern reception, editorial interpretation, or source indexes as ancient primary evidence.",
+    "When sources conflict or differ by tradition, name the difference rather than forcing agreement.",
+    "The current song and the songwriter's own language remain distinct from outside source material.",
+  ],
 });
 
 export default polyhymnia;

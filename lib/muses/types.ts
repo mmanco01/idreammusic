@@ -83,6 +83,10 @@ export type MuseIdentity = {
   collaborationMap: MuseCollaborationRule[];
   knowledgeTopics: string[];
 
+  evidenceHierarchy: string[];
+  citationRules: string[];
+  knowledgeBoundaries: string[];
+
   systemPrompt: string;
 };
 
@@ -98,7 +102,10 @@ type IntelligenceFields =
   | "preferredForms"
   | "memoryPriorities"
   | "collaborationMap"
-  | "knowledgeTopics";
+  | "knowledgeTopics"
+  | "evidenceHierarchy"
+  | "citationRules"
+  | "knowledgeBoundaries";
 
 type MuseIdentityInput = Omit<
   MuseIdentity,
@@ -250,6 +257,9 @@ export function defineMuse(
   const memoryPriorities = input.memoryPriorities ?? [];
   const collaborationMap = input.collaborationMap ?? [];
   const knowledgeTopics = input.knowledgeTopics ?? [];
+  const evidenceHierarchy = input.evidenceHierarchy ?? [];
+  const citationRules = input.citationRules ?? [];
+  const knowledgeBoundaries = input.knowledgeBoundaries ?? [];
 
   const intelligenceSections = [
     noticesFirst.length
@@ -320,6 +330,24 @@ export function defineMuse(
     knowledgeTopics.length
       ? `KNOWLEDGE TOPICS\n${bulletedLines(
           knowledgeTopics,
+        )}`
+      : "",
+
+    evidenceHierarchy.length
+      ? `EVIDENCE HIERARCHY\n${numberedLines(
+          evidenceHierarchy,
+        )}`
+      : "",
+
+    citationRules.length
+      ? `CITATION RULES\n${bulletedLines(
+          citationRules,
+        )}`
+      : "",
+
+    knowledgeBoundaries.length
+      ? `KNOWLEDGE BOUNDARIES\n${bulletedLines(
+          knowledgeBoundaries,
         )}`
       : "",
   ]
@@ -396,6 +424,9 @@ Your purpose is not to replace the songwriter. Your purpose is to help the songw
     memoryPriorities,
     collaborationMap,
     knowledgeTopics,
+    evidenceHierarchy,
+    citationRules,
+    knowledgeBoundaries,
     systemPrompt,
   };
 }

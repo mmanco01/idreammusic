@@ -1,4 +1,7 @@
 import type { MuseSlug } from "@/lib/muses/types";
+import type {
+  MuseKnowledgeCitationRequest,
+} from "@/lib/muses/knowledge-types";
 
 export type MuseMemoryType =
   | "observation"
@@ -114,6 +117,8 @@ export type MuseIntelligenceResult = {
     alternatives: string[];
     reasoning: string;
   } | null;
+
+  knowledgeCitations: MuseKnowledgeCitationRequest[];
 };
 
 const LENS_ASSESSMENT_SCHEMA = {
@@ -154,7 +159,7 @@ const LENS_ASSESSMENT_SCHEMA = {
 
 export const MUSE_INTELLIGENCE_TEXT_FORMAT = {
   type: "json_schema",
-  name: "muse_intelligence_response_v1_1",
+  name: "muse_intelligence_response_v1_2",
   strict: true,
   schema: {
     type: "object",
@@ -172,6 +177,7 @@ export const MUSE_INTELLIGENCE_TEXT_FORMAT = {
       "suggestedCollaborator",
       "lyricWork",
       "formWork",
+      "knowledgeCitations",
     ],
     properties: {
       reply: { type: "string" },
@@ -486,6 +492,28 @@ export const MUSE_INTELLIGENCE_TEXT_FORMAT = {
           { type: "null" },
         ],
       },
+
+      knowledgeCitations: {
+        type: "array",
+        maxItems: 5,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "citationKey",
+            "supportedClaim",
+          ],
+          properties: {
+            citationKey: {
+              type: "string",
+              pattern: "^K[1-9][0-9]?$",
+            },
+            supportedClaim: {
+              type: "string",
+            },
+          },
+        },
+      },
     },
   },
 } as const;
@@ -514,7 +542,8 @@ export function isMuseIntelligenceResult(
     isRecord(value.lensAssessments) &&
     Array.isArray(value.recommendations) &&
     Array.isArray(value.unresolvedQuestions) &&
-    Array.isArray(value.memoryCandidates)
+    Array.isArray(value.memoryCandidates) &&
+    Array.isArray(value.knowledgeCitations)
   );
 }
 
