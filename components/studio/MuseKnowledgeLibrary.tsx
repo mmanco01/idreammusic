@@ -1030,8 +1030,8 @@ export function MuseKnowledgeLibrary({
   );
 }
 
-export default PolyhymniaKnowledgeLibrary;
+// Backwards-compatible named export while existing pages are migrated.
+export const PolyhymniaKnowledgeLibrary =
+  MuseKnowledgeLibrary;
 
-
-// Backwards-compatible export while existing pages are migrated.
-export const PolyhymniaKnowledgeLibrary = MuseKnowledgeLibrary;
+export default MuseKnowledgeLibrary;
