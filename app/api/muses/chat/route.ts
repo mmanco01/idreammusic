@@ -25,6 +25,7 @@ import type {
   MuseKnowledgePromptItem,
   MuseKnowledgeRetrievalMetrics,
 } from "@/lib/muses/knowledge-types";
+import { getMusePlatformConfig } from "@/lib/muses/platform";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -1487,6 +1488,8 @@ export async function POST(request: Request) {
     const muse = getMuseBySlug(
       requestedMuseSlug,
     );
+    const musePlatform =
+      getMusePlatformConfig(muse.slug);
 
     if (!muse) {
       return NextResponse.json(
@@ -1624,7 +1627,7 @@ export async function POST(request: Request) {
         results: [],
       };
 
-      if (muse.slug === "polyhymnia" || muse.slug === "calliope") {
+      if (musePlatform.knowledgeEnabled) {
         knowledgeSearch =
           await retrieveMuseKnowledge({
             supabase,
@@ -1635,7 +1638,7 @@ export async function POST(request: Request) {
               user?.id ?? null,
             queryContext:
               "General Muse conversation",
-            matchCount: 7,
+            matchCount: musePlatform.generalRetrievalCount,
             logSearch:
               Boolean(user?.id),
           });
@@ -1678,7 +1681,7 @@ export async function POST(request: Request) {
           searchId: knowledgeSearch.searchId,
           retrieved: knowledgeSearch.results,
           cited: knowledgeCitations,
-          requestedCount: 7,
+          requestedCount: musePlatform.generalRetrievalCount,
         });
 
       return NextResponse.json({
@@ -1791,7 +1794,7 @@ export async function POST(request: Request) {
       results: [],
     };
 
-    if (muse.slug === "polyhymnia" || muse.slug === "calliope") {
+    if (musePlatform.knowledgeEnabled) {
       knowledgeSearch =
         await retrieveMuseKnowledge({
           supabase,
@@ -1811,7 +1814,7 @@ export async function POST(request: Request) {
               context.song?.title ??
               "saved song"
             }`,
-          matchCount: 8,
+          matchCount: musePlatform.songRetrievalCount,
         });
 
       context.knowledge =
@@ -1892,7 +1895,7 @@ export async function POST(request: Request) {
         searchId: knowledgeSearch.searchId,
         retrieved: knowledgeSearch.results,
         cited: knowledgeCitations,
-        requestedCount: 8,
+        requestedCount: musePlatform.songRetrievalCount,
       });
 
     await saveMuseKnowledgeCitations({
