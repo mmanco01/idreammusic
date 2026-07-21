@@ -13,6 +13,17 @@ import {
   buildMuseContext,
   saveMuseContextSnapshot,
 } from "@/lib/muses/context";
+import {
+  buildSongKnowledgeQuery,
+  hydrateStoredCitation,
+  resolveKnowledgeCitations,
+  retrieveMuseKnowledge,
+  saveMuseKnowledgeCitations,
+} from "@/lib/muses/knowledge";
+import type {
+  MuseKnowledgeCitation,
+  MuseKnowledgePromptItem,
+} from "@/lib/muses/knowledge-types";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -617,6 +628,15 @@ Guidance for the structured fields:
   lyric alternatives are central. Mark newly proposed language as
   muse_suggestion.
 - formWork: include only when structure is central to the question or finding.
+- knowledgeCitations: include every supplied knowledge citation key actually
+  used in the reply or structured findings, with a brief supportedClaim.
+  Use no more than five keys and leave the array empty when no library source
+  was used.
+- When relying on a library item, place its key immediately after the supported
+  statement in the reply, such as [K1]. Never invent or alter a citation key.
+- Treat primary texts, material artifacts, institutional histories, scholarly
+  references, editorial syntheses, and personal sources as distinct evidence.
+  Do not present editorial synthesis or later reception as ancient fact.
 - Ground evidence in the supplied context. Never invent audio evidence.
 - Distinguish transcript, existing lyrics, writer notes, analysis, accepted
   decisions, and new Muse suggestions.
@@ -640,9 +660,12 @@ function mapHistoryMessages(
   messages: any[],
   memories: any[],
   taskActions: any[],
+  citations: any[],
 ) {
   const memoriesByMessage = new Map<string, any[]>();
   const taskActionByMessage = new Map<string, any>();
+  const citationsByMessage =
+    new Map<string, MuseKnowledgeCitation[]>();
 
   for (const memory of memories) {
     if (!memory.source_message_id) {
@@ -672,6 +695,22 @@ function mapHistoryMessages(
     );
   }
 
+  for (const citation of citations) {
+    const current =
+      citationsByMessage.get(
+        citation.message_id,
+      ) ?? [];
+
+    current.push(
+      hydrateStoredCitation(citation),
+    );
+
+    citationsByMessage.set(
+      citation.message_id,
+      current,
+    );
+  }
+
   return messages.map((message) => ({
     id: message.id,
     role: message.role,
@@ -686,6 +725,8 @@ function mapHistoryMessages(
       memoriesByMessage.get(message.id) ?? [],
     taskAction:
       taskActionByMessage.get(message.id) ?? null,
+    knowledgeCitations:
+      citationsByMessage.get(message.id) ?? [],
   }));
 }
 
@@ -953,6 +994,7 @@ export async function GET(request: Request) {
       messageResult,
       memoryResult,
       taskActionResult,
+      citationResult,
     ] = await Promise.all([
       (supabase as any)
         .from("muse_messages")
@@ -989,6 +1031,48 @@ export async function GET(request: Request) {
           "conversation_id",
           conversation.id,
         ),
+
+      (supabase as any)
+        .from(
+          "muse_message_knowledge_citations",
+        )
+        .select(`
+          message_id,
+          source_id,
+          chunk_id,
+          citation_key,
+          claim_summary,
+          relevance_score,
+          muse_knowledge_sources (
+            source_key,
+            source_type,
+            title,
+            author_creator,
+            editor_translator,
+            tradition,
+            historical_period,
+            publication_year,
+            canonical_url,
+            bibliographic_citation,
+            source_locator,
+            evidence_classification,
+            rights_status,
+            verification_status,
+            source_quality
+          ),
+          muse_knowledge_chunks (
+            heading,
+            source_locator,
+            citation_text
+          )
+        `)
+        .eq(
+          "conversation_id",
+          conversation.id,
+        )
+        .order("citation_key", {
+          ascending: true,
+        }),
     ]);
 
     if (messageResult.error) {
@@ -1009,6 +1093,12 @@ export async function GET(request: Request) {
       );
     }
 
+    if (citationResult.error) {
+      throw new Error(
+        citationResult.error.message,
+      );
+    }
+
     return NextResponse.json({
       status: "success",
       conversation: {
@@ -1023,6 +1113,7 @@ export async function GET(request: Request) {
         messageResult.data ?? [],
         memoryResult.data ?? [],
         taskActionResult.data ?? [],
+        citationResult.data ?? [],
       ),
     });
   } catch (error) {
@@ -1492,8 +1583,36 @@ export async function POST(request: Request) {
         unresolvedQuestions: [],
         changesSinceLastSession: [],
         previousDiagnostics: [],
-        knowledge: [],
+        knowledge: [] as MuseKnowledgePromptItem[],
       };
+
+      let knowledgeSearch: {
+        searchId: string | null;
+        results: MuseKnowledgePromptItem[];
+      } = {
+        searchId: null,
+        results: [],
+      };
+
+      if (muse.slug === "polyhymnia") {
+        knowledgeSearch =
+          await retrieveMuseKnowledge({
+            supabase,
+            openai,
+            query: question,
+            museSlug: muse.slug,
+            ownerUserId:
+              user?.id ?? null,
+            queryContext:
+              "General Muse conversation",
+            matchCount: 7,
+            logSearch:
+              Boolean(user?.id),
+          });
+
+        context.knowledge =
+          knowledgeSearch.results;
+      }
 
       const prompt = makeStructuredPrompt({
         context,
@@ -1514,6 +1633,14 @@ export async function POST(request: Request) {
           model,
           muse,
           prompt,
+        });
+
+      const knowledgeCitations =
+        resolveKnowledgeCitations({
+          requests:
+            result.knowledgeCitations,
+          retrieved:
+            knowledgeSearch.results,
         });
 
       return NextResponse.json({
@@ -1539,6 +1666,7 @@ export async function POST(request: Request) {
         intelligence: result,
         memories: [],
         taskAction: null,
+        knowledgeCitations,
       });
     }
 
@@ -1616,6 +1744,41 @@ export async function POST(request: Request) {
       );
     }
 
+    let knowledgeSearch: {
+      searchId: string | null;
+      results: MuseKnowledgePromptItem[];
+    } = {
+      searchId: null,
+      results: [],
+    };
+
+    if (muse.slug === "polyhymnia") {
+      knowledgeSearch =
+        await retrieveMuseKnowledge({
+          supabase,
+          openai,
+          query:
+            buildSongKnowledgeQuery({
+              question,
+              context,
+            }),
+          museSlug: muse.slug,
+          ownerUserId: user.id,
+          songId,
+          conversationId:
+            conversation.id,
+          queryContext:
+            `Song-aware retrieval for ${
+              context.song?.title ??
+              "saved song"
+            }`,
+          matchCount: 8,
+        });
+
+      context.knowledge =
+        knowledgeSearch.results;
+    }
+
     if (mode === "chat") {
       await insertMessage({
         supabase,
@@ -1676,6 +1839,28 @@ export async function POST(request: Request) {
           >,
         modelName: model,
       });
+
+    const knowledgeCitations =
+      resolveKnowledgeCitations({
+        requests:
+          result.knowledgeCitations,
+        retrieved:
+          knowledgeSearch.results,
+      });
+
+    await saveMuseKnowledgeCitations({
+      supabase,
+      citations:
+        knowledgeCitations,
+      ownerUserId: user.id,
+      songId,
+      conversationId:
+        conversation.id,
+      messageId:
+        assistantMessage.id,
+      searchId:
+        knowledgeSearch.searchId,
+    });
 
     const memories =
       await saveMemoryCandidates({
@@ -1760,6 +1945,7 @@ export async function POST(request: Request) {
       intelligence: result,
       memories,
       taskAction: null,
+      knowledgeCitations,
     });
   } catch (error) {
     console.error(
