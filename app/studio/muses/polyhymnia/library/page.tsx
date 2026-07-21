@@ -1,20 +1,14 @@
-import { PolyhymniaKnowledgeLibrary } from "@/components/studio/PolyhymniaKnowledgeLibrary";
+import { MuseKnowledgeLibraryPage } from "@/components/studio/MuseKnowledgeLibraryPage";
 
 export const metadata = {
-  title:
-    "Polyhymnia Knowledge Library | iDreamMusic",
+  title: "Polyhymnia Knowledge Library | iDreamMusic",
+  description: "Search, curate, and embed Polyhymnia's faith knowledge.",
 };
 
-export default function PolyhymniaKnowledgeLibraryPage() {
+export default function Page() {
   return (
-    <main
-      className="shell"
-      style={{
-        paddingTop: "1.5rem",
-        paddingBottom: "3rem",
-      }}
-    >
-      <PolyhymniaKnowledgeLibrary />
-    </main>
+    <MuseKnowledgeLibraryPage
+      museSlug="polyhymnia"
+    />
   );
 }
