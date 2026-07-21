@@ -8,6 +8,7 @@ import {
   MUSE_INTELLIGENCE_TEXT_FORMAT,
   parseMuseIntelligenceOutput,
   type MuseIntelligenceResult,
+  type MuseMemoryCandidate,
 } from "@/lib/muses/intelligence";
 import {
   buildMuseContext,
@@ -56,6 +57,246 @@ function cleanString(
   return typeof value === "string"
     ? value.trim().slice(0, maxLength)
     : "";
+}
+
+const MEMORY_COMMITMENT_TYPES = new Set([
+  "decision",
+  "accepted_suggestion",
+  "rejected_suggestion",
+  "songwriter_preference",
+  "lyric_choice",
+  "form_choice",
+]);
+
+const MEMORY_STATUS_TEST_LANGUAGE =
+  /\b(do not (?:label|treat|call)|unless i explicitly|not (?:my|a) preference|question to confirm|current (?:muse )?recommendation|memory-status test|regression test)\b/i;
+
+const EXPLICIT_USER_COMMITMENT =
+  /\b(?:i|we)\s+(?:prefer|want|choose|accept|approve|decide|decided|am keeping|are keeping|will keep|want to keep|would like to keep|do not want|don't want|never want|always want)\b|\blet'?s\s+(?:keep|use|choose|go with|preserve|avoid)\b|\bthat is my preference\b|\bgo with that\b/i;
+
+const MEMORY_STOP_WORDS = new Set([
+  "about",
+  "after",
+  "again",
+  "also",
+  "because",
+  "before",
+  "being",
+  "could",
+  "from",
+  "have",
+  "into",
+  "just",
+  "later",
+  "might",
+  "more",
+  "should",
+  "that",
+  "their",
+  "there",
+  "these",
+  "they",
+  "this",
+  "through",
+  "toward",
+  "when",
+  "where",
+  "which",
+  "with",
+  "would",
+]);
+
+function memoryTokens(
+  value: unknown,
+): Set<string> {
+  if (typeof value !== "string") {
+    return new Set();
+  }
+
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9'\s-]/g, " ")
+      .split(/\s+/)
+      .map((token) =>
+        token.replace(/^'+|'+$/g, ""),
+      )
+      .filter(
+        (token) =>
+          token.length >= 4 &&
+          !MEMORY_STOP_WORDS.has(token),
+      ),
+  );
+}
+
+function memoryOverlap(
+  left: unknown,
+  right: unknown,
+): number {
+  const leftTokens = memoryTokens(left);
+  const rightTokens = memoryTokens(right);
+
+  if (!leftTokens.size || !rightTokens.size) {
+    return 0;
+  }
+
+  let shared = 0;
+
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      shared += 1;
+    }
+  }
+
+  return shared / Math.min(
+    leftTokens.size,
+    rightTokens.size,
+  );
+}
+
+function hasAcceptedMemoryEvidence({
+  memory,
+  context,
+}: {
+  memory: MuseMemoryCandidate;
+  context: any;
+}): boolean {
+  const acceptedMemories =
+    Array.isArray(context?.acceptedMemories)
+      ? context.acceptedMemories
+      : [];
+
+  const recordedDecisions =
+    Array.isArray(context?.recordedDecisions)
+      ? context.recordedDecisions
+      : [];
+
+  return (
+    acceptedMemories.some(
+      (accepted: any) =>
+        memoryOverlap(
+          memory.content,
+          accepted?.content,
+        ) >= 0.72,
+    ) ||
+    recordedDecisions.some(
+      (decision: any) =>
+        memoryOverlap(
+          memory.content,
+          decision?.decision_text,
+        ) >= 0.72,
+    )
+  );
+}
+
+function hasExplicitCurrentUserCommitment({
+  memory,
+  currentUserMessage,
+}: {
+  memory: MuseMemoryCandidate;
+  currentUserMessage: string;
+}): boolean {
+  if (
+    !currentUserMessage ||
+    MEMORY_STATUS_TEST_LANGUAGE.test(
+      currentUserMessage,
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    !EXPLICIT_USER_COMMITMENT.test(
+      currentUserMessage,
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    memoryOverlap(
+      memory.content,
+      currentUserMessage,
+    ) >= 0.42
+  );
+}
+
+function commitmentIsGrounded({
+  memory,
+  currentUserMessage,
+  context,
+}: {
+  memory: MuseMemoryCandidate;
+  currentUserMessage: string;
+  context: any;
+}): boolean {
+  return (
+    hasAcceptedMemoryEvidence({
+      memory,
+      context,
+    }) ||
+    hasExplicitCurrentUserCommitment({
+      memory,
+      currentUserMessage,
+    })
+  );
+}
+
+function unconfirmedMemoryType(
+  memory: MuseMemoryCandidate,
+): MuseMemoryCandidate["type"] {
+  if (
+    memory.type === "songwriter_preference" ||
+    memory.type === "accepted_suggestion"
+  ) {
+    return "muse_recommendation";
+  }
+
+  return "question_to_confirm";
+}
+
+function normalizeMemoryCandidates({
+  result,
+  currentUserMessage,
+  context,
+}: {
+  result: MuseIntelligenceResult;
+  currentUserMessage: string;
+  context: any;
+}): MuseMemoryCandidate[] {
+  return result.memoryCandidates
+    .slice(0, 2)
+    .map((memory) => {
+      if (
+        memory.type === "muse_recommendation" ||
+        memory.type === "question_to_confirm"
+      ) {
+        return memory;
+      }
+
+      if (
+        !MEMORY_COMMITMENT_TYPES.has(
+          memory.type,
+        )
+      ) {
+        return memory;
+      }
+
+      if (
+        commitmentIsGrounded({
+          memory,
+          currentUserMessage,
+          context,
+        })
+      ) {
+        return memory;
+      }
+
+      return {
+        ...memory,
+        type: unconfirmedMemoryType(memory),
+      };
+    });
 }
 
 function buildKnowledgeMetrics({
@@ -503,6 +744,7 @@ async function promoteAcceptedMemoryToDecision({
     "accepted_suggestion",
     "rejected_suggestion",
     "songwriter_preference",
+    "muse_recommendation",
     "lyric_choice",
     "form_choice",
   ]);
@@ -541,6 +783,7 @@ async function promoteAcceptedMemoryToDecision({
     accepted_suggestion: "accepted_idea",
     rejected_suggestion: "rejected_idea",
     songwriter_preference: "preference",
+    muse_recommendation: "accepted_idea",
     lyric_choice: "lyric",
     form_choice: "form",
   };
@@ -649,9 +892,20 @@ Guidance for the structured fields:
   available. Identify meaningful changes and elements worth protecting.
 - recommendations: no more than three focused recommendations.
 - unresolvedQuestions: questions worth carrying into a future session.
-- memoryCandidates: return no more than two. Include only a durable
-  decision, preference, lyric/form choice, rejected idea, unresolved issue,
-  or next step that would genuinely improve a future session.
+- memoryCandidates: return no more than two. Preserve the source and
+  confirmation status honestly:
+  - muse_recommendation: a current Muse recommendation the songwriter has
+    not explicitly accepted;
+  - question_to_confirm: a possible preference, choice, decision, rejection,
+    or boundary that still requires the songwriter's confirmation;
+  - songwriter_preference: use only when the songwriter explicitly stated
+    or accepted the preference in the current message, an accepted memory,
+    or a recorded decision;
+  - decision, accepted_suggestion, rejected_suggestion, lyric_choice, and
+    form_choice: use only when explicit songwriter commitment is present;
+  - unresolved_question and next_step: may be used without commitment.
+  Never convert a Muse recommendation into a songwriter preference.
+  The server will conservatively downgrade unsupported commitment labels.
 - proposedTask: include only when one concrete task would clearly help.
 - suggestedCollaborator: include only when another Muse has a specific,
   distinct contribution tied to a detected need.
@@ -1669,6 +1923,13 @@ export async function POST(request: Request) {
           prompt,
         });
 
+      result.memoryCandidates =
+        normalizeMemoryCandidates({
+          result,
+          currentUserMessage: question,
+          context,
+        });
+
       const knowledgeCitations =
         resolveKnowledgeCitations({
           requests:
@@ -1855,6 +2116,13 @@ export async function POST(request: Request) {
         model,
         muse,
         prompt,
+      });
+
+    result.memoryCandidates =
+      normalizeMemoryCandidates({
+        result,
+        currentUserMessage: question,
+        context,
       });
 
     const assistantMessage =
