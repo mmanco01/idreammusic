@@ -4,6 +4,9 @@ import type {
   MuseIntelligenceResult,
   MuseLensAssessment,
 } from "@/lib/muses/intelligence";
+import type {
+  MuseKnowledgeCitation,
+} from "@/lib/muses/knowledge-types";
 
 export type MuseTaskActionState = {
   status: "created" | "dismissed";
@@ -22,6 +25,7 @@ type Props = {
   museName: string;
   museOptions: readonly MuseOption[];
   taskAction: MuseTaskActionState;
+  knowledgeCitations: MuseKnowledgeCitation[];
   taskBusy: boolean;
   collaborationBusy: boolean;
   onTaskAction: (
@@ -116,6 +120,7 @@ export function MuseIntelligenceDetails({
   museName,
   museOptions,
   taskAction,
+  knowledgeCitations,
   taskBusy,
   collaborationBusy,
   onTaskAction,
@@ -177,6 +182,172 @@ export function MuseIntelligenceDetails({
           {confidenceLabel(intelligence.primaryObservation.confidence)}
         </p>
       </div>
+
+      {knowledgeCitations.length ? (
+        <details
+          open
+          style={{ marginTop: "0.85rem" }}
+        >
+          <summary
+            className="copy"
+            style={{
+              cursor: "pointer",
+              fontWeight: 700,
+            }}
+          >
+            Sources used ·{" "}
+            {knowledgeCitations.length}
+          </summary>
+
+          <p
+            className="copy"
+            style={{
+              margin: "0.45rem 0 0",
+              fontSize: "0.84rem",
+              opacity: 0.78,
+            }}
+          >
+            Citation keys in the Muse response
+            map to these exact retrieved source
+            records. Evidence class, rights
+            status, locator, and provenance remain
+            visible.
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gap: "0.6rem",
+              marginTop: "0.65rem",
+            }}
+          >
+            {knowledgeCitations.map(
+              (citation) => (
+                <article
+                  key={`${citation.citationKey}-${citation.chunkId}`}
+                  style={{
+                    padding: "0.8rem",
+                    border:
+                      "1px solid var(--line)",
+                    borderRadius: 14,
+                    background:
+                      "rgba(255,255,255,0.025)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "0.4rem",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span className="pill">
+                      {
+                        citation.citationKey
+                      }
+                    </span>
+                    <span className="pill">
+                      {citation.evidenceClassification.replace(
+                        /_/g,
+                        " ",
+                      )}
+                    </span>
+                    <span className="pill">
+                      {citation.rightsStatus.replace(
+                        /_/g,
+                        " ",
+                      )}
+                    </span>
+                    <span className="pill">
+                      Quality{" "}
+                      {
+                        citation.sourceQuality
+                      }
+                      /5
+                    </span>
+                  </div>
+
+                  <h4
+                    className="h3"
+                    style={{
+                      margin:
+                        "0.5rem 0 0",
+                    }}
+                  >
+                    {citation.title}
+                  </h4>
+
+                  <p
+                    className="copy"
+                    style={{
+                      margin:
+                        "0.2rem 0 0",
+                      opacity: 0.78,
+                    }}
+                  >
+                    {[
+                      citation.authorCreator,
+                      citation.tradition,
+                      citation.historicalPeriod,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+
+                  <p
+                    className="copy"
+                    style={{
+                      margin:
+                        "0.45rem 0 0",
+                    }}
+                  >
+                    <strong>
+                      Supported claim:
+                    </strong>{" "}
+                    {
+                      citation.supportedClaim
+                    }
+                  </p>
+
+                  <p
+                    className="copy"
+                    style={{
+                      margin:
+                        "0.35rem 0 0",
+                      fontSize: "0.84rem",
+                      opacity: 0.78,
+                    }}
+                  >
+                    {
+                      citation.citationText
+                    }
+                  </p>
+
+                  {citation.canonicalUrl ? (
+                    <a
+                      className="button"
+                      href={
+                        citation.canonicalUrl
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display:
+                          "inline-flex",
+                        marginTop:
+                          "0.55rem",
+                      }}
+                    >
+                      Open source
+                    </a>
+                  ) : null}
+                </article>
+              ),
+            )}
+          </div>
+        </details>
+      ) : null}
 
       {intelligence.recommendations.length ? (
         <div style={{ marginTop: "0.85rem" }}>

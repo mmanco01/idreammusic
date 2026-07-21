@@ -11,6 +11,9 @@ import {
   isMuseIntelligenceResult,
   type MuseIntelligenceResult,
 } from "@/lib/muses/intelligence";
+import type {
+  MuseKnowledgeCitation,
+} from "@/lib/muses/knowledge-types";
 import {
   MuseIntelligenceDetails,
   type MuseTaskActionState,
@@ -60,6 +63,7 @@ type ChatMessage = {
   memories?: MemoryCandidate[];
   intelligence?: MuseIntelligenceResult;
   taskAction?: MuseTaskActionState;
+  knowledgeCitations?: MuseKnowledgeCitation[];
 };
 
 type MuseChatResponse = {
@@ -83,6 +87,7 @@ type MuseChatResponse = {
   intelligence?: unknown;
   memories?: MemoryCandidate[];
   taskAction?: MuseTaskActionState;
+  knowledgeCitations?: MuseKnowledgeCitation[];
 };
 
 type MuseHistoryResponse = {
@@ -105,6 +110,7 @@ type MuseHistoryResponse = {
     structuredResult?: unknown;
     memories?: MemoryCandidate[];
     taskAction?: MuseTaskActionState;
+    knowledgeCitations?: MuseKnowledgeCitation[];
   }>;
 };
 
@@ -303,6 +309,8 @@ export function MuseChatPanel({
                 intelligence,
                 taskAction:
                   message.taskAction ?? null,
+                knowledgeCitations:
+                  message.knowledgeCitations ?? [],
               };
             },
           ),
@@ -550,6 +558,8 @@ export function MuseChatPanel({
           intelligence,
           taskAction:
             result.taskAction ?? null,
+          knowledgeCitations:
+            result.knowledgeCitations ?? [],
         },
       ]);
 
@@ -685,6 +695,8 @@ export function MuseChatPanel({
           intelligence,
           taskAction:
             result.taskAction ?? null,
+          knowledgeCitations:
+            result.knowledgeCitations ?? [],
         },
       ]);
 
@@ -1146,6 +1158,9 @@ export function MuseChatPanel({
                     museOptions={museOptions}
                     taskAction={
                       message.taskAction ?? null
+                    }
+                    knowledgeCitations={
+                      message.knowledgeCitations ?? []
                     }
                     taskBusy={
                       taskActionMessageIds.includes(
