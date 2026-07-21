@@ -24,28 +24,48 @@ export async function GET(request: Request) {
       );
     }
 
+    const sourceResult = await (supabase as any)
+      .from("muse_knowledge_sources")
+      .select(
+        "id, source_key, muse_slug, scope, source_type, title, author_creator, editor_translator, tradition, historical_period, publication_year, publisher, canonical_url, bibliographic_citation, source_locator, evidence_classification, rights_status, rights_note, verification_status, source_quality, provenance_notes, curation_notes, is_active, updated_at",
+      )
+      .eq("muse_slug", museSlug)
+      .order("source_type", {
+        ascending: true,
+      })
+      .order("title", {
+        ascending: true,
+      });
+
+    if (sourceResult.error) {
+      throw new Error(
+        sourceResult.error.message,
+      );
+    }
+
+    const sourceIds = (
+      sourceResult.data ?? []
+    ).map((source: any) => source.id);
+
     const [
-      sourceResult,
       documentResult,
       chunkResult,
     ] = await Promise.all([
-      (supabase as any)
-        .from("muse_knowledge_sources")
-        .select(
-          "id, source_key, muse_slug, scope, source_type, title, author_creator, editor_translator, tradition, historical_period, publication_year, publisher, canonical_url, bibliographic_citation, source_locator, evidence_classification, rights_status, rights_note, verification_status, source_quality, provenance_notes, curation_notes, is_active, updated_at",
-        )
-        .eq("muse_slug", museSlug)
-        .order("source_type", {
-          ascending: true,
-        })
-        .order("title", {
-          ascending: true,
-        }),
-
-      (supabase as any)
-        .from("muse_knowledge_documents")
-        .select("id, source_id, curation_status")
-        .eq("curation_status", "approved"),
+      sourceIds.length > 0
+        ? (supabase as any)
+            .from("muse_knowledge_documents")
+            .select(
+              "id, source_id, curation_status",
+            )
+            .in("source_id", sourceIds)
+            .eq(
+              "curation_status",
+              "approved",
+            )
+        : Promise.resolve({
+            data: [],
+            error: null,
+          }),
 
       (supabase as any)
         .from("muse_knowledge_chunks")
@@ -54,12 +74,6 @@ export async function GET(request: Request) {
         )
         .eq("muse_slug", museSlug),
     ]);
-
-    if (sourceResult.error) {
-      throw new Error(
-        sourceResult.error.message,
-      );
-    }
 
     if (documentResult.error) {
       throw new Error(
