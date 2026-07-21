@@ -1,3 +1,12 @@
+export type MuseKnowledgeRetrievalMetrics = {
+  requestedCount: number;
+  retrievedCount: number;
+  citedCount: number;
+  averageRelevance: number | null;
+  highestRelevance: number | null;
+  searchId: string | null;
+};
+
 export type MuseKnowledgeCitationRequest = {
   citationKey: string;
   supportedClaim: string;
