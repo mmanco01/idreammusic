@@ -1488,8 +1488,6 @@ export async function POST(request: Request) {
     const muse = getMuseBySlug(
       requestedMuseSlug,
     );
-    const musePlatform =
-      getMusePlatformConfig(muse.slug);
 
     if (!muse) {
       return NextResponse.json(
@@ -1502,6 +1500,9 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    const musePlatform =
+      getMusePlatformConfig(muse.slug);
 
     let primaryMuse:
       | ReturnType<
