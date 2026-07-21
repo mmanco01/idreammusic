@@ -13,6 +13,7 @@ import {
 } from "@/lib/muses/intelligence";
 import type {
   MuseKnowledgeCitation,
+  MuseKnowledgeRetrievalMetrics,
 } from "@/lib/muses/knowledge-types";
 import {
   MuseIntelligenceDetails,
@@ -64,6 +65,7 @@ type ChatMessage = {
   intelligence?: MuseIntelligenceResult;
   taskAction?: MuseTaskActionState;
   knowledgeCitations?: MuseKnowledgeCitation[];
+  knowledgeMetrics?: MuseKnowledgeRetrievalMetrics;
 };
 
 type MuseChatResponse = {
@@ -88,6 +90,7 @@ type MuseChatResponse = {
   memories?: MemoryCandidate[];
   taskAction?: MuseTaskActionState;
   knowledgeCitations?: MuseKnowledgeCitation[];
+  knowledgeMetrics?: MuseKnowledgeRetrievalMetrics;
 };
 
 type MuseHistoryResponse = {
@@ -111,6 +114,7 @@ type MuseHistoryResponse = {
     memories?: MemoryCandidate[];
     taskAction?: MuseTaskActionState;
     knowledgeCitations?: MuseKnowledgeCitation[];
+    knowledgeMetrics?: MuseKnowledgeRetrievalMetrics;
   }>;
 };
 
@@ -311,6 +315,8 @@ export function MuseChatPanel({
                   message.taskAction ?? null,
                 knowledgeCitations:
                   message.knowledgeCitations ?? [],
+                knowledgeMetrics:
+                  message.knowledgeMetrics,
               };
             },
           ),
@@ -560,6 +566,8 @@ export function MuseChatPanel({
             result.taskAction ?? null,
           knowledgeCitations:
             result.knowledgeCitations ?? [],
+          knowledgeMetrics:
+            result.knowledgeMetrics,
         },
       ]);
 
@@ -697,6 +705,8 @@ export function MuseChatPanel({
             result.taskAction ?? null,
           knowledgeCitations:
             result.knowledgeCitations ?? [],
+          knowledgeMetrics:
+            result.knowledgeMetrics,
         },
       ]);
 
@@ -1161,6 +1171,9 @@ export function MuseChatPanel({
                     }
                     knowledgeCitations={
                       message.knowledgeCitations ?? []
+                    }
+                    knowledgeMetrics={
+                      message.knowledgeMetrics
                     }
                     taskBusy={
                       taskActionMessageIds.includes(

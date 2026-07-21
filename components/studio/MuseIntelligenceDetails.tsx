@@ -6,6 +6,7 @@ import type {
 } from "@/lib/muses/intelligence";
 import type {
   MuseKnowledgeCitation,
+  MuseKnowledgeRetrievalMetrics,
 } from "@/lib/muses/knowledge-types";
 
 export type MuseTaskActionState = {
@@ -26,6 +27,7 @@ type Props = {
   museOptions: readonly MuseOption[];
   taskAction: MuseTaskActionState;
   knowledgeCitations: MuseKnowledgeCitation[];
+  knowledgeMetrics?: MuseKnowledgeRetrievalMetrics;
   taskBusy: boolean;
   collaborationBusy: boolean;
   onTaskAction: (
@@ -37,6 +39,18 @@ type Props = {
 function confidenceLabel(value: number) {
   const percent = Math.round(value * 100);
   return `${percent}% confidence`;
+}
+
+function confidenceBand(value: number) {
+  if (value >= 0.8) return "High";
+  if (value >= 0.6) return "Moderate";
+  return "Exploratory";
+}
+
+function percentLabel(value: number | null | undefined) {
+  return typeof value === "number"
+    ? `${Math.round(value * 100)}%`
+    : "Not measured";
 }
 
 function priorityLabel(
@@ -121,6 +135,7 @@ export function MuseIntelligenceDetails({
   museOptions,
   taskAction,
   knowledgeCitations,
+  knowledgeMetrics,
   taskBusy,
   collaborationBusy,
   onTaskAction,
@@ -140,6 +155,31 @@ export function MuseIntelligenceDetails({
     ["Performance lens", intelligence.lensAssessments.performance],
     ["Audience lens", intelligence.lensAssessments.audience],
   ].filter((entry): entry is [string, MuseLensAssessment] => Boolean(entry[1]));
+
+  const lensConfidence = availableLenses.length
+    ? availableLenses.reduce(
+        (sum, [, assessment]) => sum + assessment.confidence,
+        0,
+      ) / availableLenses.length
+    : intelligence.primaryObservation.confidence;
+
+  const evidenceConfidence =
+    knowledgeMetrics?.averageRelevance ??
+    (knowledgeCitations.length
+      ? knowledgeCitations.reduce(
+          (sum, citation) => sum + citation.relevanceScore,
+          0,
+        ) / knowledgeCitations.length
+      : 0);
+
+  const evidencePerspectives = Array.from(
+    new Set(
+      knowledgeCitations.flatMap((citation) => [
+        citation.tradition,
+        citation.evidenceClassification.replace(/_/g, " "),
+      ]),
+    ),
+  ).filter((value): value is string => Boolean(value));
 
   return (
     <div
@@ -183,6 +223,123 @@ export function MuseIntelligenceDetails({
         </p>
       </div>
 
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "0.55rem",
+          marginTop: "0.85rem",
+        }}
+      >
+        {[
+          {
+            label: "Song evidence",
+            value: intelligence.primaryObservation.confidence,
+          },
+          {
+            label: "Creative interpretation",
+            value: lensConfidence,
+          },
+          {
+            label: "Knowledge support",
+            value: evidenceConfidence,
+          },
+        ].map((item) => (
+          <div
+            key={item.label}
+            style={{
+              padding: "0.7rem",
+              border: "1px solid var(--line)",
+              borderRadius: 13,
+              background: "rgba(255,255,255,0.025)",
+            }}
+          >
+            <div className="eyebrow">{item.label}</div>
+            <strong className="copy" style={{ display: "block", marginTop: "0.25rem" }}>
+              {confidenceBand(item.value)} · {percentLabel(item.value)}
+            </strong>
+          </div>
+        ))}
+      </div>
+
+      {knowledgeCitations.length ? (
+        <div
+          style={{
+            marginTop: "0.85rem",
+            padding: "0.75rem",
+            border: "1px solid var(--line)",
+            borderRadius: 14,
+            background: "rgba(255,255,255,0.02)",
+          }}
+        >
+          <div className="eyebrow">Knowledge utilization</div>
+          <div
+            className="copy"
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.45rem",
+              marginTop: "0.45rem",
+            }}
+          >
+            <span className="pill">
+              Requested {knowledgeMetrics?.requestedCount ?? "—"}
+            </span>
+            <span className="pill">
+              Retrieved {knowledgeMetrics?.retrievedCount ?? knowledgeCitations.length}
+            </span>
+            <span className="pill">
+              Used {knowledgeMetrics?.citedCount ?? knowledgeCitations.length}
+            </span>
+            <span className="pill">
+              Best match {percentLabel(knowledgeMetrics?.highestRelevance)}
+            </span>
+          </div>
+
+          {evidencePerspectives.length ? (
+            <>
+              <div className="eyebrow" style={{ marginTop: "0.75rem" }}>
+                Evidence perspectives
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "0.4rem",
+                  marginTop: "0.4rem",
+                }}
+              >
+                {evidencePerspectives.slice(0, 8).map((perspective) => (
+                  <span className="pill" key={perspective}>
+                    {perspective}
+                  </span>
+                ))}
+              </div>
+            </>
+          ) : null}
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "0.4rem",
+              marginTop: "0.65rem",
+            }}
+          >
+            {knowledgeCitations.map((citation) => (
+              <a
+                key={`jump-${citation.citationKey}-${citation.chunkId}`}
+                className="pill"
+                href={`#source-${messageId}-${citation.citationKey}`}
+                style={{ textDecoration: "none" }}
+              >
+                Jump to {citation.citationKey}
+              </a>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {knowledgeCitations.length ? (
         <details
           open
@@ -224,6 +381,7 @@ export function MuseIntelligenceDetails({
             {knowledgeCitations.map(
               (citation) => (
                 <article
+                  id={`source-${messageId}-${citation.citationKey}`}
                   key={`${citation.citationKey}-${citation.chunkId}`}
                   style={{
                     padding: "0.8rem",
