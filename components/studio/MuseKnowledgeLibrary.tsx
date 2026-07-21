@@ -419,19 +419,29 @@ export function MuseKnowledgeLibrary({
             marginBottom: "0.45rem",
           }}
         >
-          Sources, citations, and provenance
+          Knowledge Library
         </h1>
+
+        <p
+          className="eyebrow"
+          style={{
+            marginBottom: "0.65rem",
+          }}
+        >
+          Semantic Search • Citations • Provenance
+        </p>
 
         <p
           className="copy"
           style={{ maxWidth: 920 }}
         >
-          This library keeps historical evidence,
-          institutional history, editorial songwriting
-          frameworks, and private personal material
-          visibly separate. Polyhymnia receives only
-          the most relevant approved chunks and must
-          cite the source keys she actually uses.
+          This library preserves the provenance of every
+          knowledge source by keeping historical evidence,
+          editorial frameworks, and private materials
+          visibly separate. The active Muse retrieves only
+          the most relevant approved knowledge and must cite
+          the source keys for every knowledge chunk used
+          during analysis.
         </p>
 
         {status === "loading" ? (
