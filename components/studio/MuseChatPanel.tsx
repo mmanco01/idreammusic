@@ -128,6 +128,8 @@ function memoryLabel(type: string) {
     accepted_suggestion: "Accepted suggestion",
     rejected_suggestion: "Rejected idea",
     songwriter_preference: "Songwriter preference",
+    muse_recommendation: "Current Muse recommendation",
+    question_to_confirm: "Question to confirm",
     unresolved_question: "Unresolved question",
     next_step: "Next step",
     lyric_choice: "Lyric choice",
@@ -136,6 +138,33 @@ function memoryLabel(type: string) {
   };
 
   return labels[type] ?? "Muse memory";
+}
+
+function memoryAcceptLabel(
+  type: string,
+) {
+  const labels: Record<string, string> = {
+    decision: "Confirm decision",
+    accepted_suggestion:
+      "Confirm accepted idea",
+    rejected_suggestion:
+      "Confirm rejection",
+    songwriter_preference:
+      "Confirm preference",
+    muse_recommendation:
+      "Accept recommendation",
+    question_to_confirm:
+      "Keep as open question",
+    lyric_choice:
+      "Confirm lyric choice",
+    form_choice:
+      "Confirm form choice",
+  };
+
+  return (
+    labels[type] ??
+    "Keep for future sessions"
+  );
 }
 
 export function MuseChatPanel({
@@ -1331,7 +1360,9 @@ export function MuseChatPanel({
                                   >
                                     {isUpdating
                                       ? "Saving…"
-                                      : "Keep for future sessions"}
+                                      : memoryAcceptLabel(
+                                          memory.memory_type,
+                                        )}
                                   </button>
                                   <button
                                     type="button"
