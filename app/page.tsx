@@ -731,7 +731,7 @@ export default async function HomePage() {
             <div className="button-row">
               <Link
                 href="/profile/muse-representation"
-                className="button"
+                className="button primary"
               >
                 Choose Muse Representation
               </Link>
