@@ -493,6 +493,8 @@ export async function POST(
             score.failureCategories,
           evaluator_notes:
             score.evaluatorNotes,
+          benchmark_explanation:
+            score.benchmarkExplanation,
           evaluator_details:
             score.evaluatorDetails,
         };
