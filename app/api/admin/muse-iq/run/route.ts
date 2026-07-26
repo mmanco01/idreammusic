@@ -225,16 +225,8 @@ export async function POST(
     );
   }
 
-  if (!isAdmin(user)) {
-    return NextResponse.json(
-      {
-        status: "error",
-        message:
-          "Muse IQ is restricted to administrators.",
-      },
-      { status: 403 },
-    );
-  }
+// The user has already been authenticated above.
+// Temporary Muse IQ v1.1 access rule: any signed-in user may run benchmarks.
 
   try {
     const body =
