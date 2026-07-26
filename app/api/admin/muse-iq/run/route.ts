@@ -18,6 +18,7 @@ export const maxDuration = 300;
 type RunRequest = {
   museSlug?: unknown;
   limit?: unknown;
+  offset?: unknown;
   benchmarkKey?: unknown;
   deploymentLabel?: unknown;
 };
@@ -55,17 +56,21 @@ function cleanLimit(
   );
 }
 
-function isAdmin(
-  user: any,
-): boolean {
-  const appRole =
-    user?.app_metadata?.role;
-  const userRole =
-    user?.user_metadata?.role;
+function cleanOffset(
+  value: unknown,
+): number {
+  const parsed =
+    Number(value);
 
-  return (
-    appRole === "admin" ||
-    userRole === "admin"
+  if (
+    !Number.isFinite(parsed)
+  ) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.floor(parsed),
   );
 }
 
@@ -225,8 +230,8 @@ export async function POST(
     );
   }
 
-// The user has already been authenticated above.
-// Temporary Muse IQ v1.1 access rule: any signed-in user may run benchmarks.
+  // Temporary Muse IQ access rule:
+  // any signed-in user may run benchmarks.
 
   try {
     const body =
@@ -255,6 +260,11 @@ export async function POST(
         ? 1
         : cleanLimit(body.limit);
 
+    const offset =
+      benchmarkKey
+        ? 0
+        : cleanOffset(body.offset);
+
     let benchmarkQuery =
       supabase
         .from("muse_benchmarks")
@@ -269,14 +279,21 @@ export async function POST(
           {
             ascending: true,
           },
-        )
-        .limit(limit);
+        );
 
     if (benchmarkKey) {
       benchmarkQuery =
-        benchmarkQuery.eq(
-          "benchmark_key",
-          benchmarkKey,
+        benchmarkQuery
+          .eq(
+            "benchmark_key",
+            benchmarkKey,
+          )
+          .limit(1);
+    } else {
+      benchmarkQuery =
+        benchmarkQuery.range(
+          offset,
+          offset + limit - 1,
         );
     }
 
@@ -309,7 +326,7 @@ export async function POST(
     const runName =
       benchmarkKey
         ? `Muse IQ: ${benchmarkKey}`
-        : `Muse IQ: ${museSlug} (${benchmarks.length})`;
+        : `Muse IQ: ${museSlug} (${offset + 1}-${offset + benchmarks.length})`;
 
     const {
       data: run,
