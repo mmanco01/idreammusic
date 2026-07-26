@@ -26,6 +26,7 @@ export type MuseIqBenchmark = {
   expected_concepts: string[];
   expected_source_titles: string[];
   disallowed_concepts: string[];
+  minimum_expected_concepts: number;
   minimum_retrieved_count: number;
   minimum_cited_count: number;
   minimum_average_relevance: number | null;
@@ -57,9 +58,14 @@ export type MuseIqScoreResult = {
   passed: boolean;
   structureValid: boolean;
   citationKeysValid: boolean;
+  citationMode:
+    | "inline"
+    | "separate"
+    | "none";
   expectedConceptsFound: string[];
   expectedConceptsMissing: string[];
   failureCategories: string[];
   evaluatorNotes: string;
+  benchmarkExplanation: string;
   evaluatorDetails: Record<string, unknown>;
 };

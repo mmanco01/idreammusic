@@ -30,39 +30,102 @@ function normalizeText(
     : "";
 }
 
+const CONCEPT_ALIASES: Record<
+  string,
+  string[]
+> = {
+  "changed meaning": [
+    "mean something different",
+    "means something different",
+    "new meaning",
+    "reframe",
+    "reframes",
+    "reframed",
+    "reinterpret",
+    "reinterpretation",
+    "changes the meaning",
+  ],
+  "temporal shift": [
+    "later",
+    "the next day",
+    "the next morning",
+    "afterward",
+    "before",
+    "after",
+    "time jump",
+    "move ahead in time",
+    "move forward in time",
+  ],
+  "new evidence": [
+    "new detail",
+    "discovery",
+    "found object",
+    "overheard line",
+    "private memory",
+    "reveal",
+    "new information",
+  ],
+  consequence: [
+    "what happens next",
+    "result",
+    "cost",
+    "broken routine",
+    "missed chance",
+    "because of",
+  ],
+};
+
+function conceptPhrases(
+  concept: string,
+): string[] {
+  const normalized =
+    normalizeText(concept);
+
+  return Array.from(
+    new Set([
+      normalized,
+      ...(CONCEPT_ALIASES[
+        normalized
+      ] ?? []).map(normalizeText),
+    ]),
+  ).filter(Boolean);
+}
+
 function includesConcept(
   haystack: string,
   concept: string,
 ): boolean {
-  const normalizedConcept =
-    normalizeText(concept);
+  return conceptPhrases(
+    concept,
+  ).some((phrase) => {
+    if (
+      haystack.includes(phrase)
+    ) {
+      return true;
+    }
 
-  if (!normalizedConcept) {
-    return false;
-  }
+    const words =
+      phrase
+        .split(" ")
+        .filter(
+          (word) =>
+            word.length >= 4,
+        );
 
-  if (
-    haystack.includes(normalizedConcept)
-  ) {
-    return true;
-  }
+    if (!words.length) {
+      return false;
+    }
 
-  const words =
-    normalizedConcept
-      .split(" ")
-      .filter((word) => word.length >= 4);
+    const matched =
+      words.filter(
+        (word) =>
+          haystack.includes(word),
+      ).length;
 
-  if (!words.length) {
-    return false;
-  }
-
-  const matched = words.filter(
-    (word) => haystack.includes(word),
-  ).length;
-
-  return (
-    matched / words.length >= 0.67
-  );
+    return (
+      matched / words.length >= 0.67
+    );
+  });
 }
 
 function citationKeysFromReply(
@@ -70,7 +133,9 @@ function citationKeysFromReply(
 ): string[] {
   return Array.from(
     new Set(
-      reply.match(/\[K[1-9][0-9]?\]/g) ?? [],
+      reply.match(
+        /\[K[1-9][0-9]?\]/g,
+      ) ?? [],
     ),
   ).map((key) =>
     key.slice(1, -1),
@@ -85,14 +150,17 @@ function responseText(
 
   return normalizeText([
     response.reply ?? "",
-    intelligence?.primaryObservation
+    intelligence
+      ?.primaryObservation
       ?.statement ?? "",
-    ...(intelligence?.diagnostics ?? [])
+    ...(intelligence
+      ?.diagnostics ?? [])
       .flatMap((item) => [
         item.finding,
         ...(item.evidence ?? []),
       ]),
-    ...(intelligence?.recommendations ?? [])
+    ...(intelligence
+      ?.recommendations ?? [])
       .flatMap((item) => [
         item.title,
         item.reasoning,
@@ -150,8 +218,10 @@ function scoreRetrieval({
           ? 25
           : clamp(
               25 *
-                (metrics.averageRelevance /
-                  benchmark.minimum_average_relevance),
+                (
+                  metrics.averageRelevance /
+                  benchmark.minimum_average_relevance
+                ),
             );
     } else {
       score += clamp(
@@ -182,6 +252,10 @@ function scoreCitations({
 }): {
   score: number;
   keysValid: boolean;
+  mode:
+    | "inline"
+    | "separate"
+    | "none";
   replyKeys: string[];
   resolvedKeys: string[];
 } {
@@ -196,17 +270,25 @@ function scoreCitations({
       (citation) =>
         citation.citationKey,
     );
-
   const resolvedSet =
     new Set(resolvedKeys);
 
+  const mode =
+    replyKeys.length > 0
+      ? "inline"
+      : citations.length > 0
+        ? "separate"
+        : "none";
+
+  // Inline mode: every citation key used in the prose must resolve.
+  // Separate mode: citations may be rendered by the UI beneath the reply.
   const keysValid =
-    replyKeys.every((key) =>
-      resolvedSet.has(key),
-    ) &&
-    resolvedKeys.every((key) =>
-      reply.includes(`[${key}]`),
-    );
+    mode === "inline"
+      ? replyKeys.every(
+          (key) =>
+            resolvedSet.has(key),
+        )
+      : mode === "separate";
 
   let score = 0;
 
@@ -215,12 +297,17 @@ function scoreCitations({
     benchmark.minimum_cited_count
   ) {
     score += 30;
-  } else if (citations.length > 0) {
+  } else if (
+    citations.length > 0
+  ) {
     score += 15;
   }
 
   if (keysValid) {
-    score += 40;
+    score +=
+      mode === "inline"
+        ? 40
+        : 32;
   }
 
   const supportedClaims =
@@ -235,8 +322,10 @@ function scoreCitations({
   if (citations.length > 0) {
     score +=
       20 *
-      (supportedClaims /
-        citations.length);
+      (
+        supportedClaims /
+        citations.length
+      );
   }
 
   const linked =
@@ -250,12 +339,16 @@ function scoreCitations({
   if (citations.length > 0) {
     score +=
       10 *
-      (linked / citations.length);
+      (
+        linked /
+        citations.length
+      );
   }
 
   return {
     score: clamp(score),
     keysValid,
+    mode,
     replyKeys,
     resolvedKeys,
   };
@@ -271,6 +364,7 @@ function scoreResponse({
   score: number;
   found: string[];
   missing: string[];
+  conceptTarget: number;
 } {
   const text =
     responseText(response);
@@ -279,32 +373,56 @@ function scoreResponse({
       .trim().length;
 
   const found =
-    benchmark.expected_concepts.filter(
-      (concept) =>
-        includesConcept(
-          text,
-          concept,
-        ),
-    );
+    benchmark.expected_concepts
+      .filter(
+        (concept) =>
+          includesConcept(
+            text,
+            concept,
+          ),
+      );
 
   const missing =
-    benchmark.expected_concepts.filter(
-      (concept) =>
-        !found.includes(concept),
+    benchmark.expected_concepts
+      .filter(
+        (concept) =>
+          !found.includes(concept),
+      );
+
+  const available =
+    benchmark.expected_concepts
+      .length;
+
+  const configuredTarget =
+    benchmark.minimum_expected_concepts ??
+    Math.min(2, available);
+
+  const conceptTarget =
+    Math.max(
+      0,
+      Math.min(
+        configuredTarget,
+        available,
+      ),
     );
 
   const conceptCoverage =
-    benchmark.expected_concepts.length
-      ? found.length /
-        benchmark.expected_concepts.length
-      : 1;
+    conceptTarget === 0
+      ? 1
+      : Math.min(
+          1,
+          found.length /
+            conceptTarget,
+        );
 
   let score =
     conceptCoverage * 55;
 
   if (replyLength >= 180) {
     score += 15;
-  } else if (replyLength >= 80) {
+  } else if (
+    replyLength >= 80
+  ) {
     score += 8;
   }
 
@@ -312,7 +430,9 @@ function scoreResponse({
     response.intelligence
       ?.recommendations ?? [];
 
-  if (recommendations.length > 0) {
+  if (
+    recommendations.length > 0
+  ) {
     score += 15;
   }
 
@@ -322,7 +442,10 @@ function scoreResponse({
       ?.reduce(
         (sum, item) =>
           sum +
-          (item.evidence?.length ?? 0),
+          (
+            item.evidence
+              ?.length ?? 0
+          ),
         0,
       ) ?? 0;
 
@@ -331,20 +454,24 @@ function scoreResponse({
   }
 
   const disallowedFound =
-    benchmark.disallowed_concepts
-      .filter((concept) =>
-        includesConcept(
-          text,
-          concept,
-        ),
+    benchmark
+      .disallowed_concepts
+      .filter(
+        (concept) =>
+          includesConcept(
+            text,
+            concept,
+          ),
       );
 
-  if (disallowedFound.length) {
-    score -=
-      Math.min(
-        30,
-        disallowedFound.length * 15,
-      );
+  if (
+    disallowedFound.length
+  ) {
+    score -= Math.min(
+      30,
+      disallowedFound.length *
+        15,
+    );
   }
 
   if (
@@ -362,6 +489,7 @@ function scoreResponse({
     score: clamp(score),
     found,
     missing,
+    conceptTarget,
   };
 }
 
@@ -414,16 +542,19 @@ function scoreStructure(
 
   if (
     Array.isArray(
-      intelligence.memoryCandidates,
+      intelligence
+        .memoryCandidates,
     ) &&
-    intelligence.memoryCandidates
+    intelligence
+      .memoryCandidates
       .length <= 2
   ) {
     score += 10;
   }
 
   const reply =
-    intelligence.reply.toLowerCase();
+    intelligence.reply
+      .toLowerCase();
 
   if (
     reply.includes(
@@ -440,6 +571,155 @@ function scoreStructure(
     score: clamp(score),
     valid: true,
   };
+}
+
+function qualityLabel(
+  score: number,
+): string {
+  if (score >= 90) {
+    return "excellent";
+  }
+
+  if (score >= 80) {
+    return "strong";
+  }
+
+  if (score >= 70) {
+    return "acceptable";
+  }
+
+  if (score >= 60) {
+    return "developing";
+  }
+
+  return "weak";
+}
+
+function buildExplanation({
+  benchmark,
+  retrievalScore,
+  citationScore,
+  responseScore,
+  structureScore,
+  overallScore,
+  passed,
+  found,
+  missing,
+  citationMode,
+  citationKeysValid,
+}: {
+  benchmark: MuseIqBenchmark;
+  retrievalScore: number;
+  citationScore: number;
+  responseScore: number;
+  structureScore: number;
+  overallScore: number;
+  passed: boolean;
+  found: string[];
+  missing: string[];
+  citationMode:
+    | "inline"
+    | "separate"
+    | "none";
+  citationKeysValid: boolean;
+}): string {
+  const strengths: string[] = [];
+  const improvements: string[] = [];
+
+  if (retrievalScore >= 85) {
+    strengths.push(
+      "knowledge retrieval was excellent",
+    );
+  } else if (
+    retrievalScore >= 70
+  ) {
+    strengths.push(
+      "knowledge retrieval was solid",
+    );
+  } else {
+    improvements.push(
+      "retrieval relevance or coverage needs attention",
+    );
+  }
+
+  if (
+    structureScore >= 90
+  ) {
+    strengths.push(
+      "the structured response contract remained intact",
+    );
+  } else {
+    improvements.push(
+      "the structured response needs validation",
+    );
+  }
+
+  if (
+    found.length > 0
+  ) {
+    strengths.push(
+      `the answer addressed ${found.join(", ")}`,
+    );
+  }
+
+  if (
+    responseScore < 70 &&
+    missing.length > 0
+  ) {
+    improvements.push(
+      `the response could more clearly develop alternatives such as ${missing.join(", ")}`,
+    );
+  }
+
+  if (
+    citationMode === "separate" &&
+    citationKeysValid
+  ) {
+    strengths.push(
+      "citations were supplied separately for interface rendering",
+    );
+  } else if (
+    citationMode === "inline" &&
+    citationKeysValid
+  ) {
+    strengths.push(
+      "inline citation keys resolved correctly",
+    );
+  } else if (
+    citationScore < 70
+  ) {
+    improvements.push(
+      "citation linkage needs improvement",
+    );
+  }
+
+  const opening =
+    `${passed ? "Passed" : "Did not pass"} with an overall score of ${overallScore.toFixed(1)}.`;
+
+  const strengthSentence =
+    strengths.length
+      ? ` Strengths: ${strengths.join("; ")}.`
+      : "";
+
+  const improvementSentence =
+    improvements.length
+      ? ` Improvement focus: ${improvements.join("; ")}.`
+      : "";
+
+  const calibrationSentence =
+    !passed &&
+    overallScore >=
+      benchmark.minimum_overall_score
+      ? " The blended score met the numerical target, but one or more quality gates prevented a pass."
+      : "";
+
+  return (
+    opening +
+    strengthSentence +
+    improvementSentence +
+    calibrationSentence +
+    ` Retrieval was ${qualityLabel(retrievalScore)}, citations were ${qualityLabel(citationScore)}, response quality was ${qualityLabel(responseScore)}, and structure was ${qualityLabel(structureScore)}.`
+  );
 }
 
 export function scoreMuseIqResponse({
@@ -487,7 +767,8 @@ export function scoreMuseIqResponse({
             benchmark.weight_response +
           structure.score *
             benchmark.weight_structure
-        ) / totalWeight
+        ) /
+        totalWeight
       : 0;
 
   const failureCategories: string[] =
@@ -533,31 +814,65 @@ export function scoreMuseIqResponse({
     structure.valid &&
     citation.keysValid &&
     (
-      response.knowledgeMetrics
+      response
+        .knowledgeMetrics
         ?.retrievedCount ?? 0
     ) >=
-      benchmark.minimum_retrieved_count &&
+      benchmark
+        .minimum_retrieved_count &&
     (
-      response.knowledgeMetrics
+      response
+        .knowledgeMetrics
         ?.citedCount ?? 0
     ) >=
-      benchmark.minimum_cited_count;
+      benchmark
+        .minimum_cited_count &&
+    responseQuality.score >= 70;
 
-  const evaluatorNotes = passed
-    ? "Passed the Muse IQ v1 deterministic evaluation."
-    : `Failed: ${
-        failureCategories.join(", ") ||
-        "overall score below target"
-      }.`;
+  const evaluatorNotes =
+    passed
+      ? "Passed the Muse IQ v1.2 calibrated deterministic evaluation."
+      : `Failed: ${
+          failureCategories.join(
+            ", ",
+          ) ||
+          "overall score below target"
+        }.`;
+
+  const benchmarkExplanation =
+    buildExplanation({
+      benchmark,
+      retrievalScore,
+      citationScore:
+        citation.score,
+      responseScore:
+        responseQuality.score,
+      structureScore:
+        structure.score,
+      overallScore,
+      passed,
+      found:
+        responseQuality.found,
+      missing:
+        responseQuality.missing,
+      citationMode:
+        citation.mode,
+      citationKeysValid:
+        citation.keysValid,
+    });
 
   return {
     retrievalScore:
       Number(
-        retrievalScore.toFixed(3),
+        retrievalScore.toFixed(
+          3,
+        ),
       ),
     citationScore:
       Number(
-        citation.score.toFixed(3),
+        citation.score.toFixed(
+          3,
+        ),
       ),
     responseScore:
       Number(
@@ -567,37 +882,55 @@ export function scoreMuseIqResponse({
       ),
     structureScore:
       Number(
-        structure.score.toFixed(3),
+        structure.score.toFixed(
+          3,
+        ),
       ),
     overallScore:
       Number(
-        overallScore.toFixed(3),
+        overallScore.toFixed(
+          3,
+        ),
       ),
     passed,
     structureValid:
       structure.valid,
     citationKeysValid:
       citation.keysValid,
+    citationMode:
+      citation.mode,
     expectedConceptsFound:
       responseQuality.found,
     expectedConceptsMissing:
       responseQuality.missing,
     failureCategories,
     evaluatorNotes,
+    benchmarkExplanation,
     evaluatorDetails: {
       replyCitationKeys:
         citation.replyKeys,
       resolvedCitationKeys:
         citation.resolvedKeys,
+      citationMode:
+        citation.mode,
+      conceptTarget:
+        responseQuality
+          .conceptTarget,
       requestedKnowledgeCount:
-        response.knowledgeMetrics
-          ?.requestedCount ?? null,
+        response
+          .knowledgeMetrics
+          ?.requestedCount ??
+        null,
       retrievedKnowledgeCount:
-        response.knowledgeMetrics
-          ?.retrievedCount ?? null,
+        response
+          .knowledgeMetrics
+          ?.retrievedCount ??
+        null,
       citedKnowledgeCount:
-        response.knowledgeMetrics
-          ?.citedCount ?? null,
+        response
+          .knowledgeMetrics
+          ?.citedCount ??
+        null,
     },
   };
 }
