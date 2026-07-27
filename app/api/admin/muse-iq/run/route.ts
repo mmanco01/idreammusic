@@ -184,9 +184,16 @@ async function updateRunSummary({
             "response_score",
           ),
         average_latency_ms:
-          average(
-            "latency_ms",
-          ),
+          (() => {
+            const value =
+              average(
+                "latency_ms",
+              );
+
+            return value === null
+              ? null
+              : Math.round(value);
+          })(),
       })
       .eq("id", runId);
 
