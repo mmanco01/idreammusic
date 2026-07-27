@@ -23,6 +23,7 @@ import {
 } from "@/lib/muses/knowledge";
 import type {
   MuseKnowledgeCitation,
+  MuseKnowledgeCitationRequest,
   MuseKnowledgePromptItem,
   MuseKnowledgeRetrievalMetrics,
 } from "@/lib/muses/knowledge-types";
@@ -57,6 +58,190 @@ function cleanString(
   return typeof value === "string"
     ? value.trim().slice(0, maxLength)
     : "";
+}
+
+function citationKeysFromReply(
+  reply: string,
+): string[] {
+  const keys: string[] = [];
+
+  for (
+    const bracketMatch of reply.matchAll(
+      /\[([^\]]+)\]/g,
+    )
+  ) {
+    const bracketContent =
+      bracketMatch[1] ?? "";
+
+    const bracketKeys =
+      bracketContent.match(
+        /\bK[1-9][0-9]?\b/g,
+      ) ?? [];
+
+    keys.push(...bracketKeys);
+  }
+
+  return Array.from(
+    new Set(keys),
+  );
+}
+
+function fallbackSupportedClaim({
+  reply,
+  citationKey,
+  sourceTitle,
+}: {
+  reply: string;
+  citationKey: string;
+  sourceTitle: string;
+}): string {
+  const escapedKey =
+    citationKey.replace(
+      /[.*+?^${}()|[\]\\]/g,
+      "\\$&",
+    );
+
+  const citationPattern =
+    new RegExp(
+      `\\[[^\\]]*\\b${escapedKey}\\b[^\\]]*\\]`,
+      "i",
+    );
+
+  const citedLine =
+    reply
+      .split(/\n+/)
+      .map((line) =>
+        line.trim(),
+      )
+      .find((line) =>
+        citationPattern.test(line),
+      );
+
+  const cleanedLine =
+    citedLine
+      ?.replace(
+        /\[[^\]]+\]/g,
+        "",
+      )
+      .replace(/\s+/g, " ")
+      .trim();
+
+  if (cleanedLine) {
+    return cleanedLine.slice(
+      0,
+      500,
+    );
+  }
+
+  return (
+    `Supports the Muse response using the retrieved source "${sourceTitle}".`
+  );
+}
+
+function reconcileKnowledgeCitationRequests({
+  result,
+  retrieved,
+}: {
+  result: MuseIntelligenceResult;
+  retrieved: MuseKnowledgePromptItem[];
+}): MuseKnowledgeCitationRequest[] {
+  const retrievedByKey =
+    new Map(
+      retrieved.map((item) => [
+        item.citationKey.toUpperCase(),
+        item,
+      ]),
+    );
+
+  const requestsByKey =
+    new Map<
+      string,
+      MuseKnowledgeCitationRequest
+    >();
+
+  for (
+    const request of
+      result.knowledgeCitations ?? []
+  ) {
+    const citationKey =
+      cleanString(
+        request.citationKey,
+        8,
+      ).toUpperCase();
+
+    const source =
+      retrievedByKey.get(
+        citationKey,
+      );
+
+    if (!source) {
+      continue;
+    }
+
+    requestsByKey.set(
+      citationKey,
+      {
+        citationKey,
+        supportedClaim:
+          cleanString(
+            request.supportedClaim,
+            500,
+          ) ||
+          fallbackSupportedClaim({
+            reply: result.reply,
+            citationKey,
+            sourceTitle:
+              source.title,
+          }),
+      },
+    );
+  }
+
+  // The model occasionally cites a valid retrieved key in the prose
+  // but omits it from the structured knowledgeCitations array.
+  // Reconcile those keys on the server so every visible citation
+  // resolves to its exact retrieved source.
+  for (
+    const citationKey of
+      citationKeysFromReply(
+        result.reply,
+      )
+  ) {
+    if (
+      requestsByKey.has(
+        citationKey,
+      )
+    ) {
+      continue;
+    }
+
+    const source =
+      retrievedByKey.get(
+        citationKey,
+      );
+
+    if (!source) {
+      continue;
+    }
+
+    requestsByKey.set(
+      citationKey,
+      {
+        citationKey,
+        supportedClaim:
+          fallbackSupportedClaim({
+            reply: result.reply,
+            citationKey,
+            sourceTitle:
+              source.title,
+          }),
+      },
+    );
+  }
+
+  return Array.from(
+    requestsByKey.values(),
+  );
 }
 
 const MEMORY_COMMITMENT_TYPES = new Set([
@@ -916,9 +1101,11 @@ Guidance for the structured fields:
 - knowledgeCitations: include every supplied knowledge citation key actually
   used in the reply or structured findings, with a brief supportedClaim.
   Use no more than five keys and leave the array empty when no library source
-  was used.
+  was used. Before returning, verify that every bracketed citation key used
+  anywhere in the reply appears exactly once in knowledgeCitations.
 - When relying on a library item, place its key immediately after the supported
   statement in the reply, such as [K1]. Never invent or alter a citation key.
+  Do not cite a key in the reply unless it is also present in knowledgeCitations.
 - Treat primary texts, material artifacts, institutional histories, scholarly
   references, editorial syntheses, and personal sources as distinct evidence.
   Do not present editorial synthesis or later reception as ancient fact.
@@ -1930,10 +2117,20 @@ export async function POST(request: Request) {
           context,
         });
 
+      const citationRequests =
+        reconcileKnowledgeCitationRequests({
+          result,
+          retrieved:
+            knowledgeSearch.results,
+        });
+
+      result.knowledgeCitations =
+        citationRequests;
+
       const knowledgeCitations =
         resolveKnowledgeCitations({
           requests:
-            result.knowledgeCitations,
+            citationRequests,
           retrieved:
             knowledgeSearch.results,
         });
@@ -2125,6 +2322,16 @@ export async function POST(request: Request) {
         context,
       });
 
+    const citationRequests =
+      reconcileKnowledgeCitationRequests({
+        result,
+        retrieved:
+          knowledgeSearch.results,
+      });
+
+    result.knowledgeCitations =
+      citationRequests;
+
     const assistantMessage =
       await insertMessage({
         supabase,
@@ -2154,7 +2361,7 @@ export async function POST(request: Request) {
     const knowledgeCitations =
       resolveKnowledgeCitations({
         requests:
-          result.knowledgeCitations,
+          citationRequests,
         retrieved:
           knowledgeSearch.results,
       });
