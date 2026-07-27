@@ -35,6 +35,44 @@ const CONCEPT_ALIASES: Record<
   string[]
 > = {
 
+
+  prosody: [
+    "natural word stress",
+    "natural stress",
+    "musical stress",
+    "word stress vs musical stress",
+    "stress mismatch",
+    "written to be sung",
+    "fits the melody",
+    "fit the melody",
+    "sung naturally",
+  ],
+  "syllabic stress": [
+    "stressed syllable",
+    "stressed syllables",
+    "unstressed syllable",
+    "unstressed syllables",
+    "weak syllable",
+    "weak syllables",
+    "strong syllable",
+    "strong syllables",
+    "spoken stress",
+    "word stress",
+    "mark stressed syllables",
+  ],
+  "melodic accent": [
+    "musical stress",
+    "strongest note",
+    "strong note",
+    "musical peak",
+    "melodic peak",
+    "melodic climax",
+    "emotional peak",
+    "high note",
+    "strong beat",
+    "peak lands",
+  ],
+
   register: [
     "narrative voice",
     "original narrative voice",
