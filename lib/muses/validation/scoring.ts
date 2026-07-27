@@ -34,6 +34,91 @@ const CONCEPT_ALIASES: Record<
   string,
   string[]
 > = {
+
+  register: [
+    "narrative voice",
+    "original narrative voice",
+    "plain contemporary telling",
+    "local phrasing",
+    "speaker's phrasing",
+    "dialect",
+    "archival language",
+    "period phrase",
+    "period phrasing",
+  ],
+  clarity: [
+    "intelligibility",
+    "intelligible",
+    "clear",
+    "likely clear",
+    "understand",
+    "understandable",
+    "without stumbling",
+    "simplify",
+    "translate",
+    "explains itself",
+  ],
+  "selective detail": [
+    "anchor every phrase",
+    "anchor every archival or period phrase",
+    "tangible detail",
+    "concrete detail",
+    "one object",
+    "one scene",
+    "period words earn their place",
+    "phrase earns its place",
+    "keep translate or frame",
+    "isolated period flavor",
+    "decorative",
+  ],
+
+  vernacular: [
+    "local vocabulary",
+    "local phrase",
+    "local phrases",
+    "local word",
+    "local words",
+    "dialect word",
+    "dialect words",
+    "repeated saying",
+    "speaker's phrasing",
+    "oral phrasing",
+    "inherited toast",
+    "nickname",
+  ],
+  "material culture": [
+    "object",
+    "objects",
+    "tool",
+    "tools",
+    "objects and tools",
+    "rooms meals tools routes",
+    "occupational detail",
+    "occupational details",
+    "harvest basket",
+    "heirloom",
+    "coffee tin",
+    "ledger",
+    "oven",
+    "factory door",
+  ],
+  specificity: [
+    "specific",
+    "specific sensory",
+    "specific sensory and occupational details",
+    "concrete",
+    "concrete detail",
+    "particular",
+    "particulars",
+    "sensory anchor",
+    "sensory anchors",
+    "place-name",
+    "one place-name",
+    "one object",
+    "single object",
+    "single place-name",
+  ],
+
   "changed meaning": [
     "mean something different",
     "means something different",
@@ -322,14 +407,26 @@ function includesConcept(
 function citationKeysFromReply(
   reply: string,
 ): string[] {
+  const keys: string[] = [];
+
+  for (
+    const bracketMatch of reply.matchAll(
+      /\[([^\]]+)\]/g,
+    )
+  ) {
+    const bracketContent =
+      bracketMatch[1] ?? "";
+
+    const bracketKeys =
+      bracketContent.match(
+        /\bK[1-9][0-9]?\b/g,
+      ) ?? [];
+
+    keys.push(...bracketKeys);
+  }
+
   return Array.from(
-    new Set(
-      reply.match(
-        /\[K[1-9][0-9]?\]/g,
-      ) ?? [],
-    ),
-  ).map((key) =>
-    key.slice(1, -1),
+    new Set(keys),
   );
 }
 
