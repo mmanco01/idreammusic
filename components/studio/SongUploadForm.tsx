@@ -74,7 +74,7 @@ export function SongUploadForm({
   const [writerNote, setWriterNote] = useState("");
   const [noteVisibility, setNoteVisibility] =
     useState<Visibility>("private");
-  const [sharePublicly, setSharePublicly] = useState(true);
+  const [sharePublicly, setSharePublicly] = useState(false);
   const [file, setFile] = useState<File | null>(null);
 
   const [status, setStatus] = useState<
@@ -138,6 +138,7 @@ export function SongUploadForm({
         "id, slug, title_working, title_final, current_stage, status, created_at",
       )
       .eq("owner_user_id", userId)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -225,6 +226,7 @@ export function SongUploadForm({
             )
             .eq("id", existingSongId)
             .eq("owner_user_id", user.id)
+            .is("deleted_at", null)
             .single();
 
         if (existingSongError || !existingSong) {
