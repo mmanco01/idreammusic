@@ -710,7 +710,12 @@ function FeaturedPortfolioSong({
   );
 }
 
-export default async function StudioPage() {
+export default async function StudioPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ trashed?: string }>;
+}) {
+  const { trashed } = await searchParams;
   const { user, profile } = await getServerAuthContext();
   const rawMySongs = user ? await getMySongs(user.id) : [];
   const mySongs = Array.from(
@@ -772,6 +777,12 @@ export default async function StudioPage() {
             }
           }
         `}</style>
+
+        {trashed === "1" ? (
+          <div className="statusMessage statusSuccess">
+            The item was moved to Trash. You can begin a new Spark whenever you are ready.
+          </div>
+        ) : null}
 
         <section
           className="card"

@@ -7,6 +7,8 @@ import { saveSongEdits } from "./actions";
 import { SongIntelligencePanel } from "@/components/studio/SongIntelligencePanel";
 import { MuseChatPanel } from "@/components/studio/MuseChatPanel";
 import { ProductionCreditsEditor } from "@/components/studio/ProductionCreditsEditor";
+import { SongDangerZone } from "@/components/studio/SongDangerZone";
+import { buildPublicAssetUrl } from "@/lib/storage";
 import type { ProductionCreditRow } from "@/lib/production-credits";
 
 export default async function EditSongPage({
@@ -43,6 +45,7 @@ export default async function EditSongPage({
       song_origin,
       owner_user_id,
       muse_id,
+      deleted_at,
       song_versions (
         id,
         version_number,
@@ -82,6 +85,7 @@ export default async function EditSongPage({
     `)
     .eq("slug", slug)
     .eq("owner_user_id", user.id)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (songError || !song) {
@@ -200,6 +204,10 @@ export default async function EditSongPage({
 
   const audioAttachments = (song.attachments ?? []).filter(
     (attachment: any) => attachment.file_type === "audio",
+  );
+
+  const supportingAttachments = (song.attachments ?? []).filter(
+    (attachment: any) => attachment.file_type !== "audio",
   );
 
   const transcriptCount = (song.song_transcripts ?? []).length;
@@ -756,6 +764,116 @@ export default async function EditSongPage({
           </form>
         </section>
 
+        <section id="captured-materials" className="card">
+          <div className="eyebrow">Captured materials</div>
+          <h2 className="h2">Recordings, documents, and notes</h2>
+          <p className="copy" style={{ maxWidth: 880 }}>
+            Everything gathered during Spark Capture stays with this song.
+          </p>
+
+          <div
+            className="two-col"
+            style={{ alignItems: "start", marginTop: "1rem" }}
+          >
+            <div className="subsection">
+              <h3 className="h3">Files</h3>
+              {song.attachments?.length ? (
+                <div className="stack-list">
+                  {(song.attachments ?? []).map((attachment: any) => {
+                    const assetUrl = buildPublicAssetUrl(
+                      attachment.storage_path,
+                      attachment.bucket || "song-assets",
+                    );
+
+                    return (
+                      <div key={attachment.id}>
+                        <strong>
+                          {attachment.title ||
+                            (attachment.file_type === "audio"
+                              ? "Audio recording"
+                              : "Captured document")}
+                        </strong>
+                        <div
+                          className="copy"
+                          style={{ fontSize: "0.86rem", marginTop: "0.2rem" }}
+                        >
+                          {attachment.file_type === "audio"
+                            ? "Audio"
+                            : attachment.file_type === "pdf"
+                              ? "PDF"
+                              : "Document"}
+                          {attachment.created_at
+                            ? ` · ${new Date(attachment.created_at).toLocaleDateString()}`
+                            : ""}
+                        </div>
+                        {attachment.file_type === "audio" && assetUrl ? (
+                          <audio
+                            controls
+                            preload="metadata"
+                            className="audioPlayer"
+                            style={{ marginTop: "0.55rem" }}
+                          >
+                            <source
+                              src={assetUrl}
+                              type={attachment.mime_type || "audio/mpeg"}
+                            />
+                          </audio>
+                        ) : assetUrl ? (
+                          <div style={{ marginTop: "0.55rem" }}>
+                            <a
+                              className="textLink"
+                              href={assetUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open file
+                            </a>
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="copy">No recordings or documents yet.</p>
+              )}
+              {supportingAttachments.length ? (
+                <p className="copy" style={{ fontSize: "0.86rem" }}>
+                  {supportingAttachments.length} supporting document
+                  {supportingAttachments.length === 1 ? "" : "s"} attached.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="subsection">
+              <h3 className="h3">Notes</h3>
+              {song.writer_notes?.length ? (
+                <div className="stack-list">
+                  {[...(song.writer_notes ?? [])]
+                    .sort(
+                      (a: any, b: any) =>
+                        new Date(b.created_at).getTime() -
+                        new Date(a.created_at).getTime(),
+                    )
+                    .map((note: any) => (
+                      <div key={note.id}>
+                        <strong>{note.title || "Capture note"}</strong>
+                        <p
+                          className="copy"
+                          style={{ whiteSpace: "pre-wrap", marginBottom: 0 }}
+                        >
+                          {note.body}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="copy">No additional notes yet.</p>
+              )}
+            </div>
+          </div>
+        </section>
+
         <section id="intelligence">
           <div
             className="card"
@@ -912,6 +1030,12 @@ export default async function EditSongPage({
             </h2>
           </section>
         )}
+
+        <SongDangerZone
+          songId={song.id}
+          songTitle={songTitle}
+          currentStage={song.current_stage}
+        />
       </div>
     </section>
   );

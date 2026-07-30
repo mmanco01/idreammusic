@@ -54,6 +54,7 @@ export default async function EditSongPage({
     `)
     .eq('slug', slug)
     .eq('owner_user_id', user.id)
+    .is('deleted_at', null)
     .maybeSingle();
 
   if (songError || !song) {

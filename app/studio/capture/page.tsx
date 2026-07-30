@@ -1,6 +1,7 @@
-import { muses } from '@/content/site';
-import { SongUploadForm } from '@/components/studio/SongUploadForm';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { muses } from "@/content/site";
+import { SongUploadForm } from "@/components/studio/SongUploadForm";
+import { SparkCaptureForm } from "@/components/studio/SparkCaptureForm";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export default async function CapturePage({
   searchParams,
@@ -10,34 +11,65 @@ export default async function CapturePage({
   const { song, stage } = await searchParams;
 
   const selectedStage =
-    stage === 'draft' || stage === 'final' || stage === 'spark'
+    stage === "draft" || stage === "final" || stage === "spark"
       ? stage
-      : 'spark';
+      : "spark";
 
-  const isExistingSongFlow = Boolean(song);
+  const museOptions = muses.map((muse) => ({
+    slug: muse.slug,
+    name: muse.name,
+    label: muse.label,
+  }));
+
+  if (!song) {
+    return (
+      <section className="section-tight">
+        <div className="container pageStack">
+          <div className="page-intro">
+            <div>
+              <div className="eyebrow">Expanded Spark Capture</div>
+              <h1 className="h2">Catch it before it disappears</h1>
+              <p className="copy" style={{ maxWidth: 820 }}>
+                Begin with words only, record directly from this device, or
+                gather several recordings and documents into one private Spark.
+              </p>
+            </div>
+          </div>
+
+          <SparkCaptureForm museOptions={museOptions} />
+        </div>
+      </section>
+    );
+  }
 
   let existingSongMuseSlug: string | null = null;
   let existingSongTitle: string | null = null;
 
-  if (song) {
-    const supabase = await createServerSupabaseClient();
+  const supabase = await createServerSupabaseClient();
 
-    if (supabase) {
-      const { data: existingSong } = await supabase
-        .from('songs')
-        .select('id, muse_slug, title_working, title_final')
-        .eq('id', song)
+  if (supabase) {
+    const { data: existingSong } = await (supabase as any)
+      .from("songs")
+      .select("id, muse_id, title_working, title_final, deleted_at")
+      .eq("id", song)
+      .is("deleted_at", null)
+      .maybeSingle();
+
+    existingSongTitle =
+      existingSong?.title_final ?? existingSong?.title_working ?? null;
+
+    if (existingSong?.muse_id) {
+      const { data: muse } = await (supabase as any)
+        .from("muses")
+        .select("slug")
+        .eq("id", existingSong.muse_id)
         .maybeSingle();
 
-      existingSongMuseSlug = existingSong?.muse_slug ?? null;
-      existingSongTitle =
-        existingSong?.title_final ??
-        existingSong?.title_working ??
-        null;
+      existingSongMuseSlug = muse?.slug ?? null;
     }
   }
 
-  const fallbackMuseSlug = muses[0]?.slug ?? 'calliope';
+  const fallbackMuseSlug = muses[0]?.slug ?? "calliope";
   const defaultMuseSlug = existingSongMuseSlug ?? fallbackMuseSlug;
 
   return (
@@ -45,34 +77,21 @@ export default async function CapturePage({
       <div className="container pageStack">
         <div className="page-intro">
           <div>
-            <div className="eyebrow">
-              {isExistingSongFlow ? 'Add version' : 'Quick capture'}
-            </div>
-            <h1 className="h2">
-              {isExistingSongFlow
-                ? `Add ${selectedStage} version`
-                : 'Upload to any Muse'}
-            </h1>
+            <div className="eyebrow">Add version</div>
+            <h1 className="h2">Add {selectedStage} version</h1>
             <p className="copy" style={{ maxWidth: 760 }}>
-              {isExistingSongFlow
-                ? `You are adding a new ${selectedStage} version to ${
-                    existingSongTitle ? `"${existingSongTitle}"` : 'an existing song'
-                  }.`
-                : 'Pick the current, upload the audio file, and the app creates the song, stage, version, and attachment records automatically in Supabase.'}
+              You are adding a new {selectedStage} version to{" "}
+              {existingSongTitle ? `“${existingSongTitle}”` : "an existing song"}.
             </p>
           </div>
         </div>
 
         <SongUploadForm
-          museOptions={muses.map((muse) => ({
-            slug: muse.slug,
-            name: muse.name,
-            label: muse.label,
-          }))}
-          existingSongId={song ?? null}
+          museOptions={museOptions}
+          existingSongId={song}
           initialStage={selectedStage}
           defaultMuseSlug={defaultMuseSlug}
-          lockedMuse={isExistingSongFlow}
+          lockedMuse
         />
       </div>
     </section>

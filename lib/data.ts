@@ -295,7 +295,6 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
 
     const audioAttachment =
       versionAttachments.find((attachment) => attachment.file_type === 'audio') ??
-      versionAttachments[0] ??
       null;
 
     return {
@@ -370,13 +369,15 @@ export const getMySongStats = cache(
       supabase
         .from('songs')
         .select('id', { count: 'exact', head: true })
-        .eq('owner_user_id', userId),
+        .eq('owner_user_id', userId)
+        .is('deleted_at', null),
 
       supabase
         .from('songs')
         .select('id', { count: 'exact', head: true })
         .eq('owner_user_id', userId)
-        .eq('current_stage', 'final'),
+        .eq('current_stage', 'final')
+        .is('deleted_at', null),
     ]);
 
     if (totalResult.error) {
@@ -413,6 +414,7 @@ export const getMySongs = cache(async (userId: string): Promise<SongSummary[]> =
     .from('songs')
     .select('id, slug, title_working, title_final, current_stage, summary, hook_line, muse_id, song_origin, updated_at')
     .eq('owner_user_id', userId)
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false });
    
 
