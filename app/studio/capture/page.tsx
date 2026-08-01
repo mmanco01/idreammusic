@@ -45,6 +45,11 @@ export default async function CapturePage({
           <SparkCaptureForm
             museOptions={museOptions}
             defaultMuseSlug={defaultCaptureMuseSlug}
+            returnPath={
+              defaultCaptureMuseSlug
+                ? `/studio/capture?muse=${encodeURIComponent(defaultCaptureMuseSlug)}`
+                : "/studio/capture"
+            }
           />
         </div>
       </section>

@@ -12,6 +12,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
+import {
+  clearSparkCaptureDraft,
+  loadSparkCaptureDraft,
+  saveSparkCaptureDraft,
+  type SparkCaptureDraft,
+} from "@/lib/spark-capture-draft";
 
 type MuseOption = {
   slug: string;
@@ -22,6 +28,7 @@ type MuseOption = {
 type Props = {
   museOptions: MuseOption[];
   defaultMuseSlug?: string;
+  returnPath?: string;
 };
 
 type CaptureFile = {
@@ -273,6 +280,7 @@ async function uploadFileWithProgress({
 export function SparkCaptureForm({
   museOptions,
   defaultMuseSlug = "",
+  returnPath = "/studio/capture",
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -284,6 +292,8 @@ export function SparkCaptureForm({
   const previewUrlsRef = useRef<Set<string>>(new Set());
   const discardRecordingRef = useRef(false);
   const mountedRef = useRef(true);
+  const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSnapshotRef = useRef<SparkCaptureDraft | null>(null);
 
   const [title, setTitle] = useState("");
   const [sparkText, setSparkText] = useState("");
@@ -301,11 +311,19 @@ export function SparkCaptureForm({
   const [isPaused, setIsPaused] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [createdSongSlug, setCreatedSongSlug] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftNotice, setDraftNotice] = useState("");
 
   const selectedMuse = useMemo(
     () => museOptions.find((option) => option.slug === museSlug) ?? null,
     [museOptions, museSlug],
   );
+
+  const currentCapturePath = returnPath || pathname || "/studio/capture";
+
+  const signInHref = `/auth/sign-in?next=${encodeURIComponent(
+    currentCapturePath,
+  )}`;
 
   const hasCaptureContent = useMemo(
     () =>
@@ -332,6 +350,110 @@ export function SparkCaptureForm({
 
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadSparkCaptureDraft()
+      .then((draft) => {
+        if (cancelled || !draft) return;
+
+        const restoredFiles = draft.files.map((item) => {
+          const previewUrl = createPreviewUrl(item.file);
+          if (previewUrl) previewUrlsRef.current.add(previewUrl);
+
+          return {
+            id: item.id,
+            file: item.file,
+            source: item.source,
+            previewUrl,
+          } satisfies CaptureFile;
+        });
+
+        setTitle(draft.title);
+        setSparkText(draft.sparkText);
+        setMuseSlug(draft.museSlug || defaultMuseSlug);
+        setNotes(draft.notes);
+        setFiles(restoredFiles);
+        setDraftNotice(
+          "Recovered your unfinished Spark from this browser. It will remain here while you sign in.",
+        );
+      })
+      .catch((error) => {
+        console.warn("Unable to restore the local Spark draft:", error);
+      })
+      .finally(() => {
+        if (!cancelled) setDraftReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [defaultMuseSlug]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+
+    if (draftSaveTimerRef.current) {
+      clearTimeout(draftSaveTimerRef.current);
+      draftSaveTimerRef.current = null;
+    }
+
+    if (!hasCaptureContent) {
+      draftSnapshotRef.current = null;
+      void clearSparkCaptureDraft();
+      return;
+    }
+
+    const snapshot: SparkCaptureDraft = {
+      version: 1,
+      savedAt: Date.now(),
+      title,
+      sparkText,
+      museSlug,
+      notes,
+      files: files.map((item) => ({
+        id: item.id,
+        file: item.file,
+        source: item.source,
+      })),
+    };
+
+    draftSnapshotRef.current = snapshot;
+    draftSaveTimerRef.current = setTimeout(() => {
+      void saveSparkCaptureDraft(snapshot).catch((error) => {
+        console.warn("Unable to save the local Spark draft:", error);
+      });
+    }, 500);
+
+    return () => {
+      if (draftSaveTimerRef.current) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+    };
+  }, [draftReady, files, hasCaptureContent, museSlug, notes, sparkText, title]);
+
+  useEffect(() => {
+    if (!draftReady) return;
+
+    const saveLatestDraft = () => {
+      const draft = draftSnapshotRef.current;
+      if (draft) void saveSparkCaptureDraft({ ...draft, savedAt: Date.now() });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") saveLatestDraft();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", saveLatestDraft);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", saveLatestDraft);
+    };
+  }, [draftReady]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -362,6 +484,44 @@ export function SparkCaptureForm({
   function stopMediaStream() {
     mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
     mediaStreamRef.current = null;
+  }
+
+  async function persistCurrentDraft() {
+    if (!hasCaptureContent) return;
+
+    const draft: SparkCaptureDraft = {
+      version: 1,
+      savedAt: Date.now(),
+      title,
+      sparkText,
+      museSlug,
+      notes,
+      files: files.map((item) => ({
+        id: item.id,
+        file: item.file,
+        source: item.source,
+      })),
+    };
+
+    draftSnapshotRef.current = draft;
+    await saveSparkCaptureDraft(draft);
+  }
+
+  async function continueToSignIn() {
+    try {
+      await persistCurrentDraft();
+      setDraftNotice(
+        "Your unfinished Spark is saved in this browser. Sign in, then you will return here.",
+      );
+      router.push(signInHref);
+    } catch (error) {
+      setStatus("error");
+      setMessage(
+        error instanceof Error
+          ? `Your Spark could not be stored on this device: ${error.message}`
+          : "Your Spark could not be stored on this device.",
+      );
+    }
   }
 
   function addFiles(
@@ -586,6 +746,9 @@ export function SparkCaptureForm({
     setMessage("");
     setCreatedSongSlug(null);
     setRecordingSeconds(0);
+    setDraftNotice("");
+    draftSnapshotRef.current = null;
+    void clearSparkCaptureDraft();
   }
 
   async function uploadCaptureFile({
@@ -692,8 +855,21 @@ export function SparkCaptureForm({
     } = await supabase.auth.getUser();
 
     if (!user) {
-      setStatus("error");
-      setMessage("Sign in first, then return to this Spark Capture screen.");
+      try {
+        await persistCurrentDraft();
+        setStatus("idle");
+        setMessage(
+          "Your unfinished Spark is saved in this browser. Sign in to finish saving it to iDreamMusic.",
+        );
+        router.push(signInHref);
+      } catch (error) {
+        setStatus("error");
+        setMessage(
+          error instanceof Error
+            ? `Your Spark could not be stored on this device: ${error.message}`
+            : "Your Spark could not be stored on this device.",
+        );
+      }
       return;
     }
 
@@ -864,6 +1040,8 @@ export function SparkCaptureForm({
 
       setStatus("success");
       setMessage("Your Spark is safe. Opening it now…");
+      draftSnapshotRef.current = null;
+      await clearSparkCaptureDraft();
       router.push(`/studio/songs/${songSlug}/edit?capture=saved`);
       router.refresh();
     } catch (error) {
@@ -889,6 +1067,18 @@ export function SparkCaptureForm({
     Math.floor(recordingSeconds / 60),
   ).padStart(2, "0")}:${String(recordingSeconds % 60).padStart(2, "0")}`;
 
+  if (!draftReady) {
+    return (
+      <div className="card formCard">
+        <div className="eyebrow">Spark Capture</div>
+        <h2 className="h2">Checking for an unfinished Spark…</h2>
+        <p className="copy">
+          Restoring anything this browser kept safe for you.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <form className="card formCard" onSubmit={handleSubmit}>
       <div className="eyebrow">Catch first. Shape later.</div>
@@ -907,15 +1097,23 @@ export function SparkCaptureForm({
       {hasSupabaseEnv() && !isSignedIn ? (
         <div className="statusMessage" style={{ marginTop: "1rem" }}>
           <strong>Sign in is required to save.</strong>{" "}
-          <Link
-            className="textLink"
-            href={`/auth/sign-in?next=${encodeURIComponent(
-              pathname || "/studio/capture",
-            )}`}
-          >
-            Sign in here
-          </Link>{" "}
-          before building a Spark you do not want to lose.
+          Your unfinished Spark is stored only in this browser profile while you
+          authenticate.
+          <div className="button-row" style={{ marginTop: "0.75rem" }}>
+            <button
+              className="button primary button-small"
+              type="button"
+              onClick={() => void continueToSignIn()}
+            >
+              Save this Spark and sign in
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {draftNotice ? (
+        <div className="statusMessage statusSuccess" style={{ marginTop: "1rem" }}>
+          {draftNotice}
         </div>
       ) : null}
 
