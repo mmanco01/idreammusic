@@ -19,6 +19,10 @@ import {
   type MuseTaskActionState,
 } from "@/components/studio/MuseIntelligenceDetails";
 import { MuseAudioBridgeCard } from "@/components/studio/MuseAudioBridgeCard";
+import {
+  MuseCouncilOverview,
+  type MuseCouncilEntry,
+} from "@/components/studio/MuseCouncilOverview";
 
 export type MuseChatOption = {
   slug: string;
@@ -89,6 +93,23 @@ type MuseChatResponse = {
   memories?: MemoryCandidate[];
   taskAction?: MuseTaskActionState;
   knowledgeCitations?: MuseKnowledgeCitation[];
+};
+
+type MuseCouncilResponse = {
+  status?: string;
+  message?: string;
+  councilEntries?: Array<{
+    id: string;
+    museSlug: string;
+    museName: string;
+    domain: string;
+    kind: "primary" | "collaborator" | "synthesis" | "system";
+    content: string;
+    question?: string | null;
+    comparisonWith?: string | null;
+    structuredResult?: unknown;
+    createdAt: string;
+  }>;
 };
 
 type MuseHistoryResponse = {
@@ -167,6 +188,24 @@ function memoryAcceptLabel(
   );
 }
 
+function compactResponseSummary(message: ChatMessage) {
+  const source =
+    message.intelligence?.primaryObservation.statement ||
+    message.intelligence?.recommendations[0]?.title ||
+    message.content;
+  const clean = source.replace(/\s+/g, " ").trim();
+  const firstSentence =
+    clean.match(/^(.+?[.!?])(?:\s|$)/)?.[1] ?? clean;
+
+  if (firstSentence.length <= 145) {
+    return firstSentence;
+  }
+
+  return `${firstSentence
+    .slice(0, 145)
+    .replace(/\s+\S*$/, "")}…`;
+}
+
 export function MuseChatPanel({
   defaultMuseSlug,
   museOptions,
@@ -211,6 +250,12 @@ export function MuseChatPanel({
     >("idle");
   const [collaborationError, setCollaborationError] =
     useState("");
+  const [councilEntries, setCouncilEntries] =
+    useState<MuseCouncilEntry[]>([]);
+  const [councilStatus, setCouncilStatus] =
+    useState<"idle" | "loading" | "error">("idle");
+  const [councilRefreshKey, setCouncilRefreshKey] =
+    useState(0);
 
   const selectedMuse =
     museOptions.find(
@@ -237,6 +282,10 @@ export function MuseChatPanel({
     historyStatus === "loading";
   const canSend =
     input.trim().length > 0 && !isBusy;
+  const latestAssistantMessageId =
+    [...messages]
+      .reverse()
+      .find((message) => message.role === "assistant")?.id ?? null;
 
   const conversationContext = useMemo(
     () =>
@@ -372,6 +421,90 @@ export function MuseChatPanel({
     museNameBySlug,
   ]);
 
+  useEffect(() => {
+    if (!songId) {
+      setCouncilEntries([]);
+      setCouncilStatus("idle");
+      return;
+    }
+
+    const activeSongId = songId;
+    let cancelled = false;
+
+    async function loadCouncil() {
+      setCouncilStatus("loading");
+
+      try {
+        const params = new URLSearchParams({
+          songId: activeSongId,
+          scope: "council",
+        });
+
+        const response = await fetch(
+          `/api/muses/chat?${params.toString()}`,
+          {
+            method: "GET",
+            cache: "no-store",
+          },
+        );
+
+        const result =
+          (await response
+            .json()
+            .catch(() => null)) as
+            | MuseCouncilResponse
+            | null;
+
+        if (
+          !response.ok ||
+          result?.status !== "success"
+        ) {
+          throw new Error(
+            result?.message ||
+              "The Muse Council summary could not be loaded.",
+          );
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        setCouncilEntries(
+          (result.councilEntries ?? []).map((entry) => ({
+            id: entry.id,
+            museSlug: entry.museSlug,
+            museName: entry.museName,
+            domain: entry.domain,
+            kind: entry.kind,
+            content: entry.content,
+            question: entry.question ?? undefined,
+            comparisonWith:
+              entry.comparisonWith ?? undefined,
+            createdAt: entry.createdAt,
+            intelligence: isMuseIntelligenceResult(
+              entry.structuredResult,
+            )
+              ? entry.structuredResult
+              : undefined,
+          })),
+        );
+        setCouncilStatus("idle");
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        setCouncilStatus("error");
+      }
+    }
+
+    void loadCouncil();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [songId, councilRefreshKey]);
+
   function clearInteractionState() {
     setInput("");
     setStatus("idle");
@@ -439,6 +572,7 @@ export function MuseChatPanel({
     clearInteractionState();
     setConversationId(null);
     setMessages([]);
+    setCouncilRefreshKey((current) => current + 1);
   }
 
   function getFirstAvailableCollaborator(
@@ -593,6 +727,7 @@ export function MuseChatPanel({
         },
       ]);
 
+      setCouncilRefreshKey((current) => current + 1);
       setStatus("idle");
     } catch (error) {
       setStatus("error");
@@ -730,6 +865,7 @@ export function MuseChatPanel({
         },
       ]);
 
+      setCouncilRefreshKey((current) => current + 1);
       setCollaborationStatus("idle");
       setCollaborationSourceId(null);
       setCollaboratorMuseSlug("");
@@ -986,6 +1122,15 @@ export function MuseChatPanel({
       </p>
 
       {isSongConversation && songId ? (
+        <MuseCouncilOverview
+          leadMuse={safeDefaultMuse ?? selectedMuse}
+          entries={councilEntries}
+          status={councilStatus}
+          onOpenMuse={changeMuse}
+        />
+      ) : null}
+
+      {isSongConversation && songId ? (
         <MuseAudioBridgeCard
           songId={songId}
         />
@@ -1125,9 +1270,57 @@ export function MuseChatPanel({
                   width: "min(100%, 900px)",
                 }}
               >
-                <div
-                  style={{
+                <details
+                  open={
+                    !isAssistant ||
+                    message.id === latestAssistantMessageId
+                  }
+                  style={
+                    isAssistant
+                      ? { width: "100%" }
+                      : { display: "contents" }
+                  }
+                >
+                  <summary
+                    className="copy"
+                    style={
+                      isAssistant
+                        ? {
+                            cursor: "pointer",
+                            padding: "0.75rem 0.9rem",
+                            borderRadius: 14,
+                            border:
+                              message.kind === "collaborator"
+                                ? "1px solid rgba(154, 134, 220, 0.55)"
+                                : "1px solid rgba(220, 182, 92, 0.45)",
+                            background:
+                              message.kind === "collaborator"
+                                ? "rgba(105, 85, 170, 0.11)"
+                                : "rgba(137, 96, 31, 0.1)",
+                          }
+                        : { display: "none" }
+                    }
+                  >
+                    <span className="eyebrow">
+                      {message.kind === "collaborator"
+                        ? `${message.museName} — another Muse's perspective`
+                        : `${message.museName || "Muse"} — full response`}
+                    </span>
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: "0.3rem",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {compactResponseSummary(message)}
+                    </span>
+                  </summary>
+
+                  <div
+                    style={{
                     padding: "0.9rem 1rem",
+                    marginTop: isAssistant ? "0.55rem" : undefined,
                     borderRadius: 16,
                     border: isAssistant
                       ? message.kind ===
@@ -1530,6 +1723,7 @@ export function MuseChatPanel({
                     )}
                   </div>
                 ) : null}
+                </details>
               </div>
             );
           })}
