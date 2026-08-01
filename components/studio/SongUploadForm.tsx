@@ -203,6 +203,21 @@ export function SongUploadForm({
         return;
       }
 
+      const { data: creatorProfile, error: creatorProfileError } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (creatorProfileError) {
+        console.warn(
+          "Unable to load the signed-in creator name:",
+          creatorProfileError.message,
+        );
+      }
+
+      const creatorName = creatorProfile?.display_name?.trim() || null;
+
       let songId = existingSongId;
       let songSlug: string | null = null;
       let resolvedMuseSlug = museSlug;
@@ -400,6 +415,7 @@ export function SongUploadForm({
             slug: uniqueSlug,
             current_stage: stage,
             status: sharePublicly ? "published" : "private",
+            songwriter_name: creatorName,
             muse_id: muse.id,
             summary: summary || null,
             hook_line: hookLine || null,
