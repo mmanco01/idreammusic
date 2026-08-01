@@ -21,6 +21,7 @@ type MuseOption = {
 
 type Props = {
   museOptions: MuseOption[];
+  defaultMuseSlug?: string;
 };
 
 type CaptureFile = {
@@ -269,7 +270,10 @@ async function uploadFileWithProgress({
   });
 }
 
-export function SparkCaptureForm({ museOptions }: Props) {
+export function SparkCaptureForm({
+  museOptions,
+  defaultMuseSlug = "",
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -283,7 +287,7 @@ export function SparkCaptureForm({ museOptions }: Props) {
 
   const [title, setTitle] = useState("");
   const [sparkText, setSparkText] = useState("");
-  const [museSlug, setMuseSlug] = useState("");
+  const [museSlug, setMuseSlug] = useState(defaultMuseSlug);
   const [notes, setNotes] = useState<CaptureNote[]>([]);
   const [files, setFiles] = useState<CaptureFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
@@ -573,7 +577,7 @@ export function SparkCaptureForm({ museOptions }: Props) {
 
     setTitle("");
     setSparkText("");
-    setMuseSlug("");
+    setMuseSlug(defaultMuseSlug);
     setNotes([]);
     setFiles([]);
     setUploadProgress({});
@@ -696,6 +700,21 @@ export function SparkCaptureForm({ museOptions }: Props) {
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
 
+    const { data: creatorProfile, error: creatorProfileError } = await supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (creatorProfileError) {
+      console.warn(
+        "Unable to load the signed-in creator name:",
+        creatorProfileError.message,
+      );
+    }
+
+    const creatorName = creatorProfile?.display_name?.trim() || null;
+
     if (!accessToken) {
       setStatus("error");
       setMessage("Your sign-in session could not be confirmed. Refresh and try again.");
@@ -737,6 +756,7 @@ export function SparkCaptureForm({ museOptions }: Props) {
           slug: uniqueSlug,
           current_stage: "spark",
           status: "private",
+          songwriter_name: creatorName,
           muse_id: museId,
           summary: summarySource.slice(0, 500) || null,
           hook_line: null,

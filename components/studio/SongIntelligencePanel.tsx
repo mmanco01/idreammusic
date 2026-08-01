@@ -952,6 +952,59 @@ function SongTasksManager({
   );
 }
 
+function IntelligenceDisclosure({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details
+      style={{
+        border: '1px solid var(--line)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        background: 'rgba(255,255,255,0.02)',
+      }}
+    >
+      <summary
+        style={{
+          cursor: 'pointer',
+          padding: '1rem',
+          fontWeight: 800,
+          listStylePosition: 'inside',
+        }}
+      >
+        {title}
+        <span
+          className="copy"
+          style={{
+            display: 'block',
+            marginTop: '0.3rem',
+            marginLeft: '1.25rem',
+            fontSize: '0.9rem',
+            fontWeight: 500,
+            opacity: 0.82,
+          }}
+        >
+          {description}
+        </span>
+      </summary>
+      <div
+        style={{
+          padding: '0 1rem 1rem',
+          borderTop: '1px solid var(--line)',
+        }}
+      >
+        {children}
+      </div>
+    </details>
+  );
+}
+
 function IntelligenceResults({
   result,
   taskState,
@@ -971,7 +1024,7 @@ function IntelligenceResults({
       <div>
         <div className="eyebrow">AI Song Intelligence</div>
         <h3 className="h2" style={{ marginTop: '0.25rem' }}>
-          Song Intelligence Report
+          At a Glance
         </h3>
         <p className="copy" style={{ maxWidth: 900 }}>
           {result.summary}
@@ -1017,59 +1070,7 @@ function IntelligenceResults({
             borderRadius: 16,
           }}
         >
-          <div className="eyebrow">Primary Muse</div>
-          <h3 style={{ margin: '0.3rem 0' }}>
-            {result.muse_analysis.primary.name}{' '}
-            <span style={{ fontWeight: 500 }}>
-              ({percent(result.muse_analysis.primary.confidence)})
-            </span>
-          </h3>
-          <p className="copy">{result.muse_analysis.primary.rationale}</p>
-          <p className="copy">
-            <strong>{result.muse_analysis.primary.name} says:</strong>{' '}
-            {result.muse_analysis.primary.guidance}
-          </p>
-          <TextList items={result.muse_analysis.primary.supporting_lines} />
-        </div>
-
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
-        >
-          <div className="eyebrow">Secondary Muse</div>
-          <h3 style={{ margin: '0.3rem 0' }}>
-            {result.muse_analysis.secondary.name}{' '}
-            <span style={{ fontWeight: 500 }}>
-              ({percent(result.muse_analysis.secondary.confidence)})
-            </span>
-          </h3>
-          <p className="copy">{result.muse_analysis.secondary.rationale}</p>
-          <p className="copy">
-            <strong>{result.muse_analysis.secondary.name} says:</strong>{' '}
-            {result.muse_analysis.secondary.guidance}
-          </p>
-          <TextList items={result.muse_analysis.secondary.supporting_lines} />
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
-        >
-          <div className="eyebrow">Strengths</div>
+          <div className="eyebrow">What is already working</div>
           <TextList items={result.strengths} />
         </div>
 
@@ -1080,9 +1081,9 @@ function IntelligenceResults({
             borderRadius: 16,
           }}
         >
-          <div className="eyebrow">Work Needed</div>
+          <div className="eyebrow">Best next moves</div>
           {result.work_needed.length ? (
-            <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.6rem' }}>
+            <div style={{ display: 'grid', gap: '0.9rem', marginTop: '0.6rem' }}>
               {result.work_needed.map((item, index) => (
                 <div key={`${item.area}-${index}`}>
                   <strong>
@@ -1113,181 +1114,217 @@ function IntelligenceResults({
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
+      {result.rights_caution.flag ? (
         <div
+          role="note"
           style={{
             padding: '1rem',
-            border: '1px solid var(--line)',
+            border: '1px solid #e8b45f',
             borderRadius: 16,
           }}
         >
-          <div className="eyebrow">Story</div>
-          <p className="copy">
-            <strong>Core theme:</strong> {result.story.core_theme}
-          </p>
-          <p className="copy">
-            <strong>Emotional arc:</strong> {result.story.emotional_arc}
-          </p>
-          <p className="copy">
-            <strong>Narrative clarity:</strong> {result.story.narrative_clarity}
-          </p>
-          <p className="copy">
-            <strong>Strongest moment:</strong> {result.story.strongest_story_moment}
-          </p>
-          <p className="copy">
-            <strong>Missing element:</strong> {result.story.missing_story_element}
-          </p>
+          <strong>Rights review recommended</strong>
+          <div className="copy">{result.rights_caution.note}</div>
         </div>
+      ) : null}
 
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
+      <div style={{ display: 'grid', gap: '0.75rem' }}>
+        <IntelligenceDisclosure
+          title="Muse Direction"
+          description={`${result.muse_analysis.primary.name} leads, supported by ${result.muse_analysis.secondary.name}.`}
         >
-          <div className="eyebrow">Hook</div>
-          <p className="copy">
-            <strong>Hook:</strong> {result.hook.hook_text || 'Not clearly isolated'}
-          </p>
-          <p className="copy">
-            <strong>Strength:</strong> {result.hook.strength}
-          </p>
-          <p className="copy">
-            <strong>Memorability:</strong> {result.hook.memorability}
-          </p>
-          <p className="copy">
-            <strong>Commercial potential:</strong> {result.hook.commercial_potential}
-          </p>
-          <p className="copy">
-            <strong>Improvement:</strong> {result.hook.improvement}
-          </p>
-        </div>
-      </div>
-
-      <div
-        style={{
-          padding: '1rem',
-          border: '1px solid var(--line)',
-          borderRadius: 16,
-        }}
-      >
-        <div className="eyebrow">Muse Guidance</div>
-        <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.6rem' }}>
-          {result.muse_guidance.map((item, index) => (
-            <div key={`${item.muse}-${index}`}>
-              <strong>
-                {item.muse} · Priority {item.priority}
-              </strong>
-              <div className="copy">{item.message}</div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '0.75rem',
+              marginTop: '1rem',
+            }}
+          >
+            <div>
+              <div className="eyebrow">Primary Muse</div>
+              <h3 style={{ margin: '0.3rem 0' }}>
+                {result.muse_analysis.primary.name}{' '}
+                <span style={{ fontWeight: 500 }}>
+                  ({percent(result.muse_analysis.primary.confidence)})
+                </span>
+              </h3>
+              <p className="copy">{result.muse_analysis.primary.rationale}</p>
+              <p className="copy">
+                <strong>{result.muse_analysis.primary.name} says:</strong>{' '}
+                {result.muse_analysis.primary.guidance}
+              </p>
+              <TextList items={result.muse_analysis.primary.supporting_lines} />
             </div>
-          ))}
-        </div>
-      </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
-        >
-          <div className="eyebrow">Lyric Craft</div>
-          <p className="copy">
-            <strong>Rhyme density:</strong> {result.lyrics.rhyme_density}
-          </p>
-          <p className="copy">
-            <strong>Internal rhyme:</strong> {result.lyrics.internal_rhyme_notes}
-          </p>
-          <p className="copy">
-            <strong>Alliteration:</strong> {result.lyrics.alliteration_notes}
-          </p>
-          <p className="copy">
-            <strong>Metaphor:</strong> {result.lyrics.metaphor_notes}
-          </p>
-          <p className="copy">
-            <strong>Reading grade:</strong>{' '}
-            {result.lyrics.reading_grade_level.toFixed(1)}
-          </p>
-          <p className="copy">
-            <strong>Singability:</strong> {result.lyrics.singability_notes}
-          </p>
-        </div>
+            <div>
+              <div className="eyebrow">Secondary Muse</div>
+              <h3 style={{ margin: '0.3rem 0' }}>
+                {result.muse_analysis.secondary.name}{' '}
+                <span style={{ fontWeight: 500 }}>
+                  ({percent(result.muse_analysis.secondary.confidence)})
+                </span>
+              </h3>
+              <p className="copy">{result.muse_analysis.secondary.rationale}</p>
+              <p className="copy">
+                <strong>{result.muse_analysis.secondary.name} says:</strong>{' '}
+                {result.muse_analysis.secondary.guidance}
+              </p>
+              <TextList items={result.muse_analysis.secondary.supporting_lines} />
+            </div>
+          </div>
 
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
-        >
-          <div className="eyebrow">Musical Direction</div>
-          <p className="copy">
-            <strong>Tempo feel:</strong> {result.musical_suggestions.tempo_feel}
-          </p>
-          <p className="copy">
-            <strong>Suggested BPM:</strong>{' '}
-            {result.musical_suggestions.suggested_bpm_min}–
-            {result.musical_suggestions.suggested_bpm_max}
-          </p>
-          <p className="copy">
-            <strong>Genre fit:</strong>{' '}
-            {result.musical_suggestions.genre_fit.join(', ')}
-          </p>
-          <p className="copy">
-            <strong>Vocal guidance:</strong>{' '}
-            {result.musical_suggestions.vocal_range_guidance}
-          </p>
-          <p className="copy">
-            <strong>Arrangement arc:</strong>{' '}
-            {result.musical_suggestions.arrangement_arc}
-          </p>
-          <p className="copy">
-            <strong>Production:</strong> {result.musical_suggestions.production_notes}
-          </p>
-        </div>
-      </div>
+          {result.muse_analysis.competing_muses.length ? (
+            <div style={{ marginTop: '1rem' }}>
+              <div className="eyebrow">Other active Muses</div>
+              {result.muse_analysis.competing_muses.map((item, index) => (
+                <p className="copy" key={`${item.name}-${index}`}>
+                  <strong>{item.name} ({percent(item.confidence)}):</strong>{' '}
+                  {item.rationale}
+                </p>
+              ))}
+            </div>
+          ) : null}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
-        >
-          <div className="eyebrow">Rewrite Opportunities</div>
-          {result.rewrite_opportunities.length ? (
+          <div style={{ marginTop: '1rem' }}>
+            <div className="eyebrow">Muse Guidance</div>
             <div style={{ display: 'grid', gap: '0.75rem', marginTop: '0.6rem' }}>
+              {result.muse_guidance.map((item, index) => (
+                <div key={`${item.muse}-${index}`}>
+                  <strong>
+                    {item.muse} · Priority {item.priority}
+                  </strong>
+                  <div className="copy">{item.message}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </IntelligenceDisclosure>
+
+        <IntelligenceDisclosure
+          title="Story & Hook"
+          description="Theme, emotional movement, narrative clarity, and the central memorable idea."
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: '1rem',
+              marginTop: '1rem',
+            }}
+          >
+            <div>
+              <div className="eyebrow">Story</div>
+              <p className="copy"><strong>Core theme:</strong> {result.story.core_theme}</p>
+              <p className="copy"><strong>Emotional arc:</strong> {result.story.emotional_arc}</p>
+              <p className="copy"><strong>Narrative clarity:</strong> {result.story.narrative_clarity}</p>
+              <p className="copy"><strong>Point of view:</strong> {result.story.point_of_view}</p>
+              <p className="copy"><strong>Strongest moment:</strong> {result.story.strongest_story_moment}</p>
+              <p className="copy"><strong>Missing element:</strong> {result.story.missing_story_element}</p>
+            </div>
+            <div>
+              <div className="eyebrow">Hook</div>
+              <p className="copy"><strong>Hook:</strong> {result.hook.hook_text || 'Not clearly isolated'}</p>
+              <p className="copy"><strong>Strength:</strong> {result.hook.strength}</p>
+              <p className="copy"><strong>Memorability:</strong> {result.hook.memorability}</p>
+              <p className="copy"><strong>Commercial potential:</strong> {result.hook.commercial_potential}</p>
+              <p className="copy"><strong>Improvement:</strong> {result.hook.improvement}</p>
+            </div>
+          </div>
+        </IntelligenceDisclosure>
+
+        <IntelligenceDisclosure
+          title="Lyrics & Craft"
+          description="Strong and weak lines, rhyme, language, metaphor, repetition, and singability."
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: '1rem',
+              marginTop: '1rem',
+            }}
+          >
+            <div>
+              <div className="eyebrow">Strongest lines</div>
+              <TextList items={result.lyrics.strongest_lines} />
+            </div>
+            <div>
+              <div className="eyebrow">Lines needing work</div>
+              <TextList items={result.lyrics.weakest_lines} />
+            </div>
+            <div>
+              <div className="eyebrow">Clichés detected</div>
+              <TextList items={result.lyrics.cliches_detected} />
+            </div>
+            <div>
+              <div className="eyebrow">Rhymes needing work</div>
+              <TextList items={result.lyrics.rhymes_needing_work} />
+            </div>
+            <div>
+              <div className="eyebrow">Repeated phrases</div>
+              <TextList items={result.lyrics.repeated_phrases} />
+            </div>
+            <div>
+              <div className="eyebrow">Craft readout</div>
+              <p className="copy"><strong>Rhyme density:</strong> {result.lyrics.rhyme_density}</p>
+              <p className="copy"><strong>Internal rhyme:</strong> {result.lyrics.internal_rhyme_notes}</p>
+              <p className="copy"><strong>Alliteration:</strong> {result.lyrics.alliteration_notes}</p>
+              <p className="copy"><strong>Metaphor:</strong> {result.lyrics.metaphor_notes}</p>
+              <p className="copy"><strong>Reading grade:</strong> {result.lyrics.reading_grade_level.toFixed(1)}</p>
+              <p className="copy"><strong>Singability:</strong> {result.lyrics.singability_notes}</p>
+            </div>
+          </div>
+        </IntelligenceDisclosure>
+
+        <IntelligenceDisclosure
+          title="Musical Direction"
+          description="Tempo, genre, vocal range, instrumentation, arrangement, and production ideas."
+        >
+          <div style={{ marginTop: '1rem' }}>
+            <p className="copy"><strong>Tempo feel:</strong> {result.musical_suggestions.tempo_feel}</p>
+            <p className="copy"><strong>Suggested BPM:</strong> {result.musical_suggestions.suggested_bpm_min}–{result.musical_suggestions.suggested_bpm_max}</p>
+            <p className="copy"><strong>Genre fit:</strong> {result.musical_suggestions.genre_fit.join(', ')}</p>
+            <p className="copy"><strong>Vocal guidance:</strong> {result.musical_suggestions.vocal_range_guidance}</p>
+            <div className="eyebrow" style={{ marginTop: '1rem' }}>Instrumentation ideas</div>
+            <TextList items={result.musical_suggestions.instrumentation_ideas} />
+            <p className="copy"><strong>Arrangement arc:</strong> {result.musical_suggestions.arrangement_arc}</p>
+            <p className="copy"><strong>Production:</strong> {result.musical_suggestions.production_notes}</p>
+          </div>
+        </IntelligenceDisclosure>
+
+        <IntelligenceDisclosure
+          title="Audience & Style"
+          description="Likely listeners, playlist and sync fit, radio potential, and comparable artists."
+        >
+          <div style={{ marginTop: '1rem' }}>
+            <p className="copy"><strong>Likely listeners:</strong> {result.audience.likely_listeners.join(', ')}</p>
+            <p className="copy"><strong>Radio potential:</strong> {result.audience.radio_potential}</p>
+            <p className="copy"><strong>Playlist fit:</strong> {result.audience.streaming_playlist_fit.join(', ')}</p>
+            <p className="copy"><strong>Sync opportunities:</strong> {result.audience.sync_opportunities.join(', ')}</p>
+            <div style={{ marginTop: '0.8rem' }}>
+              <strong>Stylistic comparisons</strong>
+              {result.similar_artists.map((item, index) => (
+                <div className="copy" key={`${item.artist}-${index}`}>
+                  {item.artist} ({Math.round(item.similarity)}%): {item.reason}
+                </div>
+              ))}
+            </div>
+          </div>
+        </IntelligenceDisclosure>
+
+        <IntelligenceDisclosure
+          title="Rewrite Opportunities"
+          description={`${result.rewrite_opportunities.length} focused rewrite direction${result.rewrite_opportunities.length === 1 ? '' : 's'} identified.`}
+        >
+          {result.rewrite_opportunities.length ? (
+            <div style={{ display: 'grid', gap: '1rem', marginTop: '1rem' }}>
               {result.rewrite_opportunities.map((item, index) => (
                 <div key={`${item.section}-${index}`}>
                   <strong>{item.section}</strong>
                   <div className="copy">{item.issue}</div>
-                  <div className="copy">
-                    <em>Direction:</em> {item.direction}
-                  </div>
-                  <div className="copy">
-                    <em>Strategy:</em> {item.example_strategy}
-                  </div>
+                  <div className="copy"><em>Direction:</em> {item.direction}</div>
+                  <div className="copy"><em>Strategy:</em> {item.example_strategy}</div>
                   <CreateTaskButton
                     taskKey={`rewrite-${index}`}
                     taskState={taskState}
@@ -1304,103 +1341,88 @@ function IntelligenceResults({
               ))}
             </div>
           ) : (
-            <p className="copy">No focused rewrites identified.</p>
+            <p className="copy" style={{ marginTop: '1rem' }}>No focused rewrites identified.</p>
           )}
-        </div>
+        </IntelligenceDisclosure>
 
-        <div
-          style={{
-            padding: '1rem',
-            border: '1px solid var(--line)',
-            borderRadius: 16,
-          }}
+        <IntelligenceDisclosure
+          title="Emotional Curve & Analysis Details"
+          description="Section-by-section emotion, scoring detail, confidence, source basis, and analysis limits."
         >
-          <div className="eyebrow">Audience & Style</div>
-          <p className="copy">
-            <strong>Likely listeners:</strong>{' '}
-            {result.audience.likely_listeners.join(', ')}
-          </p>
-          <p className="copy">
-            <strong>Radio potential:</strong> {result.audience.radio_potential}
-          </p>
-          <p className="copy">
-            <strong>Playlist fit:</strong>{' '}
-            {result.audience.streaming_playlist_fit.join(', ')}
-          </p>
-          <p className="copy">
-            <strong>Sync opportunities:</strong>{' '}
-            {result.audience.sync_opportunities.join(', ')}
-          </p>
-          <div style={{ marginTop: '0.8rem' }}>
-            <strong>Stylistic comparisons</strong>
-            {result.similar_artists.map((item, index) => (
-              <div className="copy" key={`${item.artist}-${index}`}>
-                {item.artist} ({Math.round(item.similarity)}%): {item.reason}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '0.65rem',
+              marginTop: '1rem',
+            }}
+          >
+            {result.emotional_curve.map((point, index) => (
+              <div
+                key={`${point.section}-${index}`}
+                style={{
+                  padding: '0.75rem',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                }}
+              >
+                <strong>{point.section}</strong>
+                <div style={{ fontSize: '1.35rem', fontWeight: 700 }}>
+                  {Math.round(point.score)}
+                </div>
+                <div className="copy" style={{ fontSize: '0.88rem' }}>
+                  {point.description}
+                </div>
               </div>
             ))}
           </div>
-        </div>
-      </div>
 
-      <div
-        style={{
-          padding: '1rem',
-          border: '1px solid var(--line)',
-          borderRadius: 16,
-        }}
-      >
-        <div className="eyebrow">Emotional Curve</div>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '0.65rem',
-            marginTop: '0.75rem',
-          }}
-        >
-          {result.emotional_curve.map((point, index) => (
+          <div style={{ marginTop: '1rem' }}>
+            <div className="eyebrow">Detailed scores</div>
             <div
-              key={`${point.section}-${index}`}
               style={{
-                padding: '0.75rem',
-                border: '1px solid var(--line)',
-                borderRadius: 12,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                gap: '0.75rem',
+                marginTop: '0.75rem',
               }}
             >
-              <strong>{point.section}</strong>
-              <div style={{ fontSize: '1.35rem', fontWeight: 700 }}>
-                {Math.round(point.score)}
-              </div>
-              <div className="copy" style={{ fontSize: '0.88rem' }}>
-                {point.description}
-              </div>
+              {Object.entries(result.scores).map(([key, detail]) => (
+                <div
+                  key={key}
+                  style={{
+                    padding: '0.75rem',
+                    border: '1px solid var(--line)',
+                    borderRadius: 12,
+                  }}
+                >
+                  <strong>{key.replaceAll('_', ' ')}</strong>
+                  <div className="copy">{scoreLabel(detail.score)}</div>
+                  <div className="copy" style={{ fontSize: '0.88rem' }}>{detail.rationale}</div>
+                  <div className="copy" style={{ fontSize: '0.82rem', opacity: 0.8 }}>
+                    Confidence {percent(detail.confidence)}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <p className="copy"><strong>Analysis basis:</strong> {result.analysis_basis.replaceAll('_', ' ')}</p>
+            <p className="copy"><strong>Estimated length:</strong> {Math.round(result.metrics.estimated_song_length_seconds)} seconds</p>
+            <p className="copy"><strong>Word count:</strong> {result.metrics.word_count}</p>
+            <p className="copy"><strong>Unique word ratio:</strong> {percent(result.metrics.unique_word_ratio)}</p>
+            <p className="copy"><strong>Chorus repetition:</strong> {result.metrics.chorus_repetition_analysis}</p>
+            {result.limitations.length ? (
+              <p className="copy"><strong>Analysis limits:</strong> {result.limitations.join(' ')}</p>
+            ) : null}
+          </div>
+        </IntelligenceDisclosure>
       </div>
-
-      {result.rights_caution.flag ? (
-        <div
-          role="note"
-          style={{
-            padding: '1rem',
-            border: '1px solid #e8b45f',
-            borderRadius: 16,
-          }}
-        >
-          <strong>Rights review recommended</strong>
-          <div className="copy">{result.rights_caution.note}</div>
-        </div>
-      ) : null}
-
-      {result.limitations.length ? (
-        <div className="copy" style={{ fontSize: '0.9rem', opacity: 0.85 }}>
-          <strong>Analysis limits:</strong> {result.limitations.join(' ')}
-        </div>
-      ) : null}
     </div>
   );
 }
+
 
 export function SongIntelligencePanel({
   songId,
@@ -2108,11 +2130,6 @@ export function SongIntelligencePanel({
         </div>
       ) : null}
 
-      <AudienceIntelligencePanel
-        metrics={audienceMetrics}
-        intelligence={analyticsState.result}
-      />
-
       {analyticsState.result ? (
         <IntelligenceResults
           result={analyticsState.result}
@@ -2121,14 +2138,81 @@ export function SongIntelligencePanel({
         />
       ) : null}
 
-      <SongTasksManager
-        tasks={songTasks}
-        state={taskListState}
-        onRefresh={() => {
-          void loadSongTasks();
+      <details
+        style={{
+          marginTop: '1.25rem',
+          border: '1px solid var(--line)',
+          borderRadius: 16,
+          padding: '0 1rem 1rem',
         }}
-        onUpdateStatus={handleUpdateTaskStatus}
-      />
+      >
+        <summary
+          style={{
+            cursor: 'pointer',
+            padding: '1rem 0',
+            fontWeight: 800,
+          }}
+        >
+          Listener Response &amp; Audience Fit
+          <span
+            className="copy"
+            style={{
+              display: 'block',
+              marginTop: '0.3rem',
+              marginLeft: '1.25rem',
+              fontSize: '0.9rem',
+              fontWeight: 500,
+              opacity: 0.82,
+            }}
+          >
+            Real listener activity, likely audiences, playlists, and sync possibilities.
+          </span>
+        </summary>
+        <AudienceIntelligencePanel
+          metrics={audienceMetrics}
+          intelligence={analyticsState.result}
+        />
+      </details>
+
+      <details
+        style={{
+          marginTop: '0.75rem',
+          border: '1px solid var(--line)',
+          borderRadius: 16,
+          padding: '0 1rem 1rem',
+        }}
+      >
+        <summary
+          style={{
+            cursor: 'pointer',
+            padding: '1rem 0',
+            fontWeight: 800,
+          }}
+        >
+          Song Tasks ({songTasks.length})
+          <span
+            className="copy"
+            style={{
+              display: 'block',
+              marginTop: '0.3rem',
+              marginLeft: '1.25rem',
+              fontSize: '0.9rem',
+              fontWeight: 500,
+              opacity: 0.82,
+            }}
+          >
+            Turn selected recommendations into manageable development work.
+          </span>
+        </summary>
+        <SongTasksManager
+          tasks={songTasks}
+          state={taskListState}
+          onRefresh={() => {
+            void loadSongTasks();
+          }}
+          onUpdateStatus={handleUpdateTaskStatus}
+        />
+      </details>
     </div>
   );
 }

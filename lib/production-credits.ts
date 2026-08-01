@@ -2,13 +2,13 @@ export const PRODUCTION_CREDIT_FIELDS = [
   {
     key: "lyrics_songwriting",
     label: "Lyrics / songwriting",
-    placeholder: "Mike Mancour",
+    placeholder: "Songwriter or co-writers",
     help: "The human writer or writers responsible for the words and song.",
   },
   {
     key: "creative_direction",
     label: "Creative direction",
-    placeholder: "Mike Mancour",
+    placeholder: "Creative director",
     help: "The person who shaped the concept, meaning, choices, and final direction.",
   },
   {
@@ -21,19 +21,19 @@ export const PRODUCTION_CREDIT_FIELDS = [
   {
     key: "arrangement_production",
     label: "Arrangement / production",
-    placeholder: "Suno; edited and directed by Mike Mancour",
+    placeholder: "Producer, arranger, or tools used",
     help: "Arrangement, instrumentation, production, or substantial human production work.",
   },
   {
     key: "lead_vocal",
     label: "Lead vocal / performance",
-    placeholder: "Mike Mancour",
+    placeholder: "Vocalist or credited vocal source",
     help: "The human performer, generated singer, or credited vocal source.",
   },
   {
     key: "voice_model",
     label: "Voice model / vocal transformation",
-    placeholder: "Mike Mancour authorized voice model using Kits AI",
+    placeholder: "Authorized voice model and tool used",
     help: "Voice-clone or vocal-transformation technology used with authorization.",
     listId: "voice-tools",
   },

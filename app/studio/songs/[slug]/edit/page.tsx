@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getServerAuthContext } from "@/lib/auth";
 import { MUSE_OPTIONS } from "@/lib/muses";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { saveSongEdits } from "./actions";
 import { SongIntelligencePanel } from "@/components/studio/SongIntelligencePanel";
 import { MuseChatPanel } from "@/components/studio/MuseChatPanel";
 import { ProductionCreditsEditor } from "@/components/studio/ProductionCreditsEditor";
 import { SongDangerZone } from "@/components/studio/SongDangerZone";
+import { SongUnavailable } from "@/components/songs/SongUnavailable";
 import { buildPublicAssetUrl } from "@/lib/storage";
 import type { ProductionCreditRow } from "@/lib/production-credits";
 
@@ -17,16 +17,14 @@ export default async function EditSongPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const { user } = await getServerAuthContext();
+  const { user, profile, supabase } = await getServerAuthContext();
 
   if (!user) {
-    notFound();
+    redirect(`/auth/sign-in?next=${encodeURIComponent(`/studio/songs/${slug}/edit`)}`);
   }
 
-  const supabase = await createServerSupabaseClient();
-
   if (!supabase) {
-    notFound();
+    return <SongUnavailable isSignedIn />;
   }
 
   const { data: song, error: songError } = await (supabase as any)
@@ -89,7 +87,7 @@ export default async function EditSongPage({
     .maybeSingle();
 
   if (songError || !song) {
-    notFound();
+    return <SongUnavailable isSignedIn />;
   }
 
   let assignedMuseSlug = "calliope";
@@ -526,9 +524,13 @@ export default async function EditSongPage({
                   <input
                     id="songwriter_name"
                     name="songwriter_name"
-                    defaultValue={song.songwriter_name ?? ""}
+                    defaultValue={
+                      song.songwriter_name?.trim() ||
+                      profile?.display_name?.trim() ||
+                      ""
+                    }
                     className="input"
-                    placeholder="Mike Mancour"
+                    placeholder="Your name or co-writers"
                   />
 
                   <label className="copy" htmlFor="genre">
@@ -1019,7 +1021,9 @@ export default async function EditSongPage({
             versionNumber={primaryVersion.version_number}
             existingCredits={productionCredits}
             defaultSongwriter={
-              song.songwriter_name || "Mike Mancour"
+              song.songwriter_name?.trim() ||
+              profile?.display_name?.trim() ||
+              null
             }
           />
         ) : (

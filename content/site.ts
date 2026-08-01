@@ -14,6 +14,7 @@ export const siteMeta = {
 export const mainNav = [
   { href: '/', label: 'Home' },
   { href: '/nine-muses', label: 'Nine Muses' },
+  { href: '/book', label: 'Book' },
   { href: '/listen', label: 'Listen' },
   { href: '/studio', label: 'Studio' },
   { href: '/about', label: 'About' },

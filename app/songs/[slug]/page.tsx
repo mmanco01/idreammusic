@@ -1,9 +1,11 @@
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
 import { getSongBySlug } from '@/lib/data';
 import { submitSongResponse } from './actions';
 import { PublicProductionCredits } from '@/components/song/ProductionCredits';
+import { SongUnavailable } from '@/components/songs/SongUnavailable';
+import { getServerAuthContext } from '@/lib/auth';
 
 const SONG_ORIGIN_LABELS: Record<string, string> = {
   dream: 'Dreamborn',
@@ -385,7 +387,25 @@ export default async function SongDetailPage({
   const { slug } = await params;
   const song = await getSongBySlug(slug);
 
-  if (!song) notFound();
+  if (!song) {
+    const { supabase, user } = await getServerAuthContext();
+
+    if (supabase && user) {
+      const { data: ownedSong } = await supabase
+        .from('songs')
+        .select('slug')
+        .eq('slug', slug)
+        .eq('owner_user_id', user.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (ownedSong?.slug) {
+        redirect(`/studio/songs/${ownedSong.slug}/edit`);
+      }
+    }
+
+    return <SongUnavailable isSignedIn={Boolean(user)} />;
+  }
 
   const versions = [...(song.versions ?? [])].sort(
     (a: any, b: any) => a.version_number - b.version_number

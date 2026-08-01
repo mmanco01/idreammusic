@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { muses } from "@/content/site";
 import MuseCard from "@/components/MuseCard";
@@ -60,6 +61,11 @@ const lifecycleSteps: readonly LifecycleStep[] = [
 
 export default async function HomePage() {
   const theme = await getMyMuseRepresentationTheme();
+  const configuredBookUrl = process.env.NEXT_PUBLIC_BOOK_PURCHASE_URL?.trim();
+  const bookPurchaseUrl =
+    configuredBookUrl && /^https?:\/\//i.test(configuredBookUrl)
+      ? configuredBookUrl
+      : null;
 
   return (
     <>
@@ -219,6 +225,58 @@ export default async function HomePage() {
                     Talk with a Muse
                   </Link>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section-tight">
+        <div className="container">
+          <div className="book-home-card">
+            <div className="book-home-cover">
+              <Image
+                src="/books/idreammusic-book-cover.webp"
+                alt="iDreamMusic book cover"
+                width={1024}
+                height={1536}
+                sizes="(max-width: 980px) 58vw, 220px"
+              />
+            </div>
+
+            <div>
+              <div className="eyebrow">
+                {bookPurchaseUrl
+                  ? "Now available in paperback"
+                  : "Coming soon in paperback"}
+              </div>
+              <h2 className="h2">The iDreamMusic Book</h2>
+              <p className="lead">
+                Songwriting in the Modality of the Muses
+              </p>
+              <p className="copy">
+                A songwriter’s companion for finding better ideas, writing better
+                songs, and becoming a better songwriter—through nine distinct
+                creative perspectives.
+              </p>
+              <div className="button-row">
+                <Link href="/book" className="button primary">
+                  Explore the Book
+                </Link>
+                {bookPurchaseUrl ? (
+                  <a
+                    href={bookPurchaseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="button"
+                  >
+                    Buy the Paperback
+                  </a>
+                ) : (
+                  <Link href="/book#release-updates" className="button">
+                    Get Release Updates
+                  </Link>
+                )}
               </div>
             </div>
           </div>
