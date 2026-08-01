@@ -1379,18 +1379,29 @@ export async function GET(request: Request) {
       url.searchParams.get("museSlug"),
       50,
     );
+    const scope = cleanString(
+      url.searchParams.get("scope"),
+      30,
+    );
+    const isCouncilRequest = scope === "council";
 
-    if (!songId || !museSlug) {
+    if (
+      !songId ||
+      (!isCouncilRequest && !museSlug)
+    ) {
       return NextResponse.json({
         status: "success",
         conversation: null,
         messages: [],
+        councilEntries: [],
       });
     }
 
-    const muse = getMuseBySlug(museSlug);
+    const muse = isCouncilRequest
+      ? null
+      : getMuseBySlug(museSlug);
 
-    if (!muse) {
+    if (!isCouncilRequest && !muse) {
       return NextResponse.json(
         {
           status: "error",
@@ -1446,12 +1457,93 @@ export async function GET(request: Request) {
       );
     }
 
+    if (isCouncilRequest) {
+      const { data: conversations, error: conversationError } =
+        await (supabase as any)
+          .from("muse_conversations")
+          .select("id, primary_muse_slug, last_message_at")
+          .eq("owner_user_id", user.id)
+          .eq("song_id", songId)
+          .eq("status", "active")
+          .order("last_message_at", { ascending: false });
+
+      if (conversationError) {
+        throw new Error(conversationError.message);
+      }
+
+      const conversationIds = (conversations ?? []).map(
+        (conversation: any) => conversation.id,
+      );
+
+      if (!conversationIds.length) {
+        return NextResponse.json({
+          status: "success",
+          councilEntries: [],
+        });
+      }
+
+      const conversationMuseById = new Map(
+        (conversations ?? []).map((conversation: any) => [
+          conversation.id,
+          conversation.primary_muse_slug,
+        ]),
+      );
+
+      const { data: councilMessages, error: councilMessageError } =
+        await (supabase as any)
+          .from("muse_messages")
+          .select(
+            "id, conversation_id, role, kind, muse_slug, content, question_text, comparison_with, structured_result, created_at",
+          )
+          .in("conversation_id", conversationIds)
+          .eq("role", "assistant")
+          .order("created_at", { ascending: false });
+
+      if (councilMessageError) {
+        throw new Error(councilMessageError.message);
+      }
+
+      const latestByMuse = new Map<string, any>();
+
+      for (const message of councilMessages ?? []) {
+        const messageMuseSlug =
+          message.muse_slug ||
+          conversationMuseById.get(message.conversation_id);
+        const messageMuse = getMuseBySlug(messageMuseSlug);
+
+        if (
+          !messageMuse ||
+          latestByMuse.has(messageMuse.slug)
+        ) {
+          continue;
+        }
+
+        latestByMuse.set(messageMuse.slug, {
+          id: message.id,
+          museSlug: messageMuse.slug,
+          museName: messageMuse.name,
+          domain: messageMuse.domain,
+          kind: message.kind,
+          content: message.content,
+          question: message.question_text,
+          comparisonWith: message.comparison_with,
+          structuredResult: message.structured_result,
+          createdAt: message.created_at,
+        });
+      }
+
+      return NextResponse.json({
+        status: "success",
+        councilEntries: Array.from(latestByMuse.values()),
+      });
+    }
+
     const conversation =
       await findConversation({
         supabase,
         userId: user.id,
         songId,
-        museSlug: muse.slug,
+        museSlug: muse!.slug,
       });
 
     if (!conversation) {
