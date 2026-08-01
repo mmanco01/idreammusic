@@ -1,5 +1,6 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { sanitizeNextPath } from "@/lib/auth-redirect";
 
 type CookieToSet = {
   name: string;
@@ -9,15 +10,14 @@ type CookieToSet = {
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get('code');
-  const next = requestUrl.searchParams.get('next') ?? '/studio';
-
-  const response = NextResponse.redirect(new URL(next, request.url));
+  const code = requestUrl.searchParams.get("code");
+  const next = sanitizeNextPath(requestUrl.searchParams.get("next"), "/studio");
 
   if (!code) {
-    return response;
+    return NextResponse.redirect(new URL(next, request.url));
   }
 
+  const response = NextResponse.redirect(new URL(next, request.url));
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -32,10 +32,17 @@ export async function GET(request: NextRequest) {
           });
         },
       },
-    }
+    },
   );
 
-  await supabase.auth.exchangeCodeForSession(code);
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    const signInUrl = new URL("/auth/sign-in", request.url);
+    signInUrl.searchParams.set("next", next);
+    signInUrl.searchParams.set("error", "link-expired");
+    return NextResponse.redirect(signInUrl);
+  }
 
   return response;
 }
