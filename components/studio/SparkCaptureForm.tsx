@@ -21,6 +21,7 @@ type MuseOption = {
 
 type Props = {
   museOptions: MuseOption[];
+  defaultMuseSlug?: string;
 };
 
 type CaptureFile = {
@@ -269,7 +270,10 @@ async function uploadFileWithProgress({
   });
 }
 
-export function SparkCaptureForm({ museOptions }: Props) {
+export function SparkCaptureForm({
+  museOptions,
+  defaultMuseSlug = "",
+}: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -283,7 +287,7 @@ export function SparkCaptureForm({ museOptions }: Props) {
 
   const [title, setTitle] = useState("");
   const [sparkText, setSparkText] = useState("");
-  const [museSlug, setMuseSlug] = useState("");
+  const [museSlug, setMuseSlug] = useState(defaultMuseSlug);
   const [notes, setNotes] = useState<CaptureNote[]>([]);
   const [files, setFiles] = useState<CaptureFile[]>([]);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>(
@@ -573,7 +577,7 @@ export function SparkCaptureForm({ museOptions }: Props) {
 
     setTitle("");
     setSparkText("");
-    setMuseSlug("");
+    setMuseSlug(defaultMuseSlug);
     setNotes([]);
     setFiles([]);
     setUploadProgress({});

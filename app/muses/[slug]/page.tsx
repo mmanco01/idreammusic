@@ -35,7 +35,7 @@ export default async function MusePage({ params }: MusePageProps) {
             </div>
 
             <div className="button-row">
-              <Link className="button primary" href="/studio/capture">
+              <Link className="button primary" href={`/studio/capture?muse=${muse.slug}`}>
                 Capture a song
               </Link>
 

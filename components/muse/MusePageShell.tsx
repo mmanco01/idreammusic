@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { muses } from '@/content/site';
 import { getPublicSongsByMuse } from '@/lib/data';
-import { SongUploadForm } from '@/components/studio/SongUploadForm';
 import { MuseChatPanel } from '@/components/studio/MuseChatPanel';
 import { getMyMuseRepresentationTheme } from '@/lib/profile';
 import { resolveMuseImage } from '@/lib/muse-representation';
@@ -18,12 +17,6 @@ export async function MusePageShell({ slug }: Props) {
   if (!muse) notFound();
 
   const songs = await getPublicSongsByMuse(slug);
-  const museOptions = muses.map((item) => ({
-    slug: item.slug,
-    name: item.name,
-    label: item.label,
-  }));
-
   const theme = await getMyMuseRepresentationTheme();
   const museImage = resolveMuseImage(muse.slug, muse.image, theme);
 
@@ -133,13 +126,18 @@ export async function MusePageShell({ slug }: Props) {
         <div className="section-tight" />
 
         <div className="card">
-          <div className="eyebrow">Upload directly here</div>
-          <h2 className="h2">Catch and share in this Muse</h2>
+          <div className="eyebrow">One Spark Capture</div>
+          <h2 className="h2">Catch this Spark with {muse.name}</h2>
           <p className="copy" style={{ maxWidth: 760 }}>
-            This page is now a real entry point. Authenticated users can upload an audio file straight into {muse.name},
-            create the song record, and decide whether it should appear publicly right away.
+            Every new Spark now begins in the same private capture flow. Start with
+            words, record directly, or add several recordings and documents. {muse.name}
+            will already be selected, and you can change or remove that choice before saving.
           </p>
-          <SongUploadForm defaultMuseSlug={muse.slug} lockedMuse museOptions={museOptions} />
+          <div className="button-row" style={{ marginTop: '1rem' }}>
+            <Link className="button primary" href={`/studio/capture?muse=${muse.slug}`}>
+              Open Spark Capture
+            </Link>
+          </div>
         </div>
 
         <div className="section-tight" />

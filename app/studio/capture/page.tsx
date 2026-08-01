@@ -6,20 +6,26 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 export default async function CapturePage({
   searchParams,
 }: {
-  searchParams: Promise<{ song?: string; stage?: string }>;
+  searchParams: Promise<{ song?: string; stage?: string; muse?: string }>;
 }) {
-  const { song, stage } = await searchParams;
+  const { song, stage, muse } = await searchParams;
 
   const selectedStage =
     stage === "draft" || stage === "final" || stage === "spark"
       ? stage
       : "spark";
 
-  const museOptions = muses.map((muse) => ({
-    slug: muse.slug,
-    name: muse.name,
-    label: muse.label,
+  const museOptions = muses.map((museOption) => ({
+    slug: museOption.slug,
+    name: museOption.name,
+    label: museOption.label,
   }));
+
+  const defaultCaptureMuseSlug = museOptions.some(
+    (option) => option.slug === muse,
+  )
+    ? muse
+    : undefined;
 
   if (!song) {
     return (
@@ -36,7 +42,10 @@ export default async function CapturePage({
             </div>
           </div>
 
-          <SparkCaptureForm museOptions={museOptions} />
+          <SparkCaptureForm
+            museOptions={museOptions}
+            defaultMuseSlug={defaultCaptureMuseSlug}
+          />
         </div>
       </section>
     );

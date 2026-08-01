@@ -2,17 +2,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { veiledMuse } from '@/content/site';
 import { getPublicSongsByMuse } from '@/lib/data';
-import { SongUploadForm } from '@/components/studio/SongUploadForm';
-import { selectableMuses } from '@/content/site';
 
 export default async function VeiledMusePage() {
   const songs = await getPublicSongsByMuse('veiled');
-
-  const museOptions = selectableMuses.map((item) => ({
-    slug: item.slug,
-    name: item.name,
-    label: item.label,
-  }));
 
   return (
     <section className="section">
@@ -86,18 +78,18 @@ export default async function VeiledMusePage() {
         <div className="section-tight" />
 
         <div className="card">
-          <div className="eyebrow">Upload directly here</div>
+          <div className="eyebrow">One Spark Capture</div>
           <h2 className="h2">Catch a song before it is named</h2>
           <p className="copy" style={{ maxWidth: 760 }}>
-            Use The Veiled Muse for sparks that are real but not yet ready to be classified under one of the named
-            currents.
+            Every new Spark now begins in the same private capture flow. The Veiled
+            Muse will already be selected for ideas that are real but not yet ready
+            to be classified under one of the named currents.
           </p>
-
-          <SongUploadForm
-            defaultMuseSlug="veiled"
-            lockedMuse
-            museOptions={museOptions}
-          />
+          <div className="button-row" style={{ marginTop: '1rem' }}>
+            <Link className="button primary" href="/studio/capture?muse=veiled">
+              Open Spark Capture
+            </Link>
+          </div>
         </div>
 
         <div className="section-tight" />
