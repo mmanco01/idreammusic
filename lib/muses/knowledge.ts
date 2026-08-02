@@ -213,7 +213,7 @@ export async function retrieveMuseKnowledge({
 
   if (error) {
     throw new Error(
-      `Polyhymnia's knowledge library could not be searched: ${error.message}`,
+      `The ${museSlug} knowledge library could not be searched: ${error.message}`,
     );
   }
 
