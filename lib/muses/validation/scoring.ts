@@ -523,6 +523,45 @@ const CONCEPT_ALIASES: Record<
     "weakens the grief",
   ],
 
+
+  "phrase shape": [
+    "vocal phrase that repeats",
+    "lyric breath",
+    "staggered phrase",
+    "breath cycle",
+    "maps a step the body can follow",
+    "odd grouping",
+    "phrase for breathlessness",
+  ],
+  repetition: [
+    "repeating pathway",
+    "repeats",
+    "repeat the grouping",
+    "several bars",
+    "8-bar loop",
+    "limbs learn the cycle",
+    "reliable anchor",
+  ],
+  "accent cycle": [
+    "reference pulse",
+    "perceive the reference pulse",
+    "find the pulse",
+    "predict the downbeat",
+    "kick bass or hand-clap",
+    "3+2 pattern",
+    "grouping for several bars",
+    "anchor the rest can push drag or syncopate against",
+  ],
+  text: [
+    "tie the odd grouping to lyric breath",
+    "meter matches feeling",
+    "make the oddness explain a human gesture",
+    "staggered phrase for breathlessness",
+    "vocal phrase",
+    "lyric breath",
+    "human gesture",
+  ],
+
   prosody: [
     "natural word stress",
     "natural stress",
