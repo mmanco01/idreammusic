@@ -11,10 +11,12 @@ type Props = {
   museLabel: string;
   firstAudioAttachmentId?: string | null;
   hasTranscript: boolean;
+  hasReviewedTranscript: boolean;
   hasCapturedText: boolean;
 };
 
 type RunState = "idle" | "transcribing" | "analyzing" | "success" | "error";
+type PrimaryMode = "transcribe" | "review" | "analyze";
 
 export function SparkSavedNextSteps({
   songId,
@@ -23,21 +25,98 @@ export function SparkSavedNextSteps({
   museLabel,
   firstAudioAttachmentId,
   hasTranscript,
+  hasReviewedTranscript,
   hasCapturedText,
 }: Props) {
   const router = useRouter();
   const [state, setState] = useState<RunState>("idle");
   const [message, setMessage] = useState("");
-  const [transcriptReady, setTranscriptReady] = useState(hasTranscript);
+  const hasAudio = Boolean(firstAudioAttachmentId);
+  const primaryMode: PrimaryMode =
+    hasAudio && !hasTranscript
+      ? "transcribe"
+      : hasAudio && !hasReviewedTranscript
+        ? "review"
+        : "analyze";
   const isBusy = state === "transcribing" || state === "analyzing";
 
+  const heading =
+    primaryMode === "transcribe"
+      ? "Transcribe what you caught"
+      : primaryMode === "review"
+        ? "Review the words first"
+        : "Understand what you caught";
+
+  const description =
+    primaryMode === "transcribe"
+      ? hasCapturedText
+        ? "Song Intelligence can use your saved words now, but the recording may contain more. Transcribe it first, review what was heard, and then combine all of the material in one stronger analysis."
+        : "Song Intelligence needs the words in your recording. Transcribe it first, then review what was heard before the song is analyzed."
+      : primaryMode === "review"
+        ? "The recording has been transcribed. Check the words against what you actually sang or said, correct anything that was misheard, and mark the transcript reviewed before analysis."
+        : hasAudio
+          ? "Your reviewed transcript is ready. Song Intelligence can now combine it with the title, words, notes, and other material saved with this Spark."
+          : "Song Intelligence can analyze the title, words, notes, lyrics, and document context already saved with this Spark. No recording or transcript is required.";
+
+  const buttonLabel =
+    state === "transcribing"
+      ? "Transcribing your recording…"
+      : state === "analyzing"
+        ? "Understanding your Spark…"
+        : state === "success"
+          ? "Song Intelligence ready"
+          : primaryMode === "transcribe"
+            ? hasCapturedText
+              ? "Transcribe and Strengthen Analysis"
+              : "Transcribe My Recording"
+            : primaryMode === "review"
+              ? "Review Transcript"
+              : "Run Song Intelligence";
+
   async function runSongIntelligence() {
+    setState("analyzing");
+    const analysisBody = new FormData();
+    analysisBody.append("song_id", songId);
+
+    const analysisResponse = await fetch("/api/song-analytics/generate", {
+      method: "POST",
+      body: analysisBody,
+    });
+    const analysisResult = (await analysisResponse
+      .json()
+      .catch(() => null)) as { status?: string; message?: string } | null;
+
+    if (!analysisResponse.ok || analysisResult?.status !== "success") {
+      throw new Error(
+        analysisResult?.message ||
+          `Song Intelligence could not finish (status ${analysisResponse.status}).`,
+      );
+    }
+
+    setState("success");
+    setMessage("Song Intelligence is ready. Opening your results…");
+    router.replace(`/studio/songs/${slug}/edit?analysis=ready#intelligence`);
+    router.refresh();
+  }
+
+  async function handlePrimaryAction() {
     if (isBusy) return;
 
     try {
       setMessage("");
 
-      if (firstAudioAttachmentId && !transcriptReady) {
+      if (primaryMode === "review") {
+        router.push(
+          `/studio/songs/${slug}/edit?workspace=open&transcript=review#intelligence`,
+        );
+        return;
+      }
+
+      if (primaryMode === "transcribe") {
+        if (!firstAudioAttachmentId) {
+          throw new Error("No audio recording was found for this Spark.");
+        }
+
         setState("transcribing");
         const transcriptBody = new FormData();
         transcriptBody.append("song_id", songId);
@@ -53,50 +132,27 @@ export function SparkSavedNextSteps({
           .catch(() => null)) as { status?: string; message?: string } | null;
 
         if (!transcriptResponse.ok || transcriptResult?.status !== "success") {
-          if (!hasCapturedText) {
-            throw new Error(
-              transcriptResult?.message ||
-                `The recording could not be transcribed (status ${transcriptResponse.status}).`,
-            );
-          }
-
-          setMessage(
-            "The recording could not be transcribed, so Song Intelligence is continuing with the words and notes already saved.",
+          throw new Error(
+            transcriptResult?.message ||
+              `The recording could not be transcribed (status ${transcriptResponse.status}).`,
           );
-        } else {
-          setTranscriptReady(true);
         }
-      }
 
-      setState("analyzing");
-      const analysisBody = new FormData();
-      analysisBody.append("song_id", songId);
-
-      const analysisResponse = await fetch("/api/song-analytics/generate", {
-        method: "POST",
-        body: analysisBody,
-      });
-      const analysisResult = (await analysisResponse
-        .json()
-        .catch(() => null)) as { status?: string; message?: string } | null;
-
-      if (!analysisResponse.ok || analysisResult?.status !== "success") {
-        throw new Error(
-          analysisResult?.message ||
-            `Song Intelligence could not finish (status ${analysisResponse.status}).`,
+        setMessage("Transcript created. Review the words before Song Intelligence runs.");
+        router.replace(
+          `/studio/songs/${slug}/edit?workspace=open&transcript=review#intelligence`,
         );
+        router.refresh();
+        return;
       }
 
-      setState("success");
-      setMessage("Song Intelligence is ready. Opening your results…");
-      router.replace(`/studio/songs/${slug}/edit?analysis=ready#intelligence`);
-      router.refresh();
+      await runSongIntelligence();
     } catch (error) {
       setState("error");
       setMessage(
         error instanceof Error
           ? error.message
-          : "Song Intelligence could not be completed.",
+          : "The next step could not be completed.",
       );
     }
   }
@@ -124,6 +180,7 @@ export function SparkSavedNextSteps({
       <div className="pillRow" style={{ marginTop: "0.8rem" }}>
         <span className="pill">Private Spark</span>
         <span className="pill">{museLabel}</span>
+        {hasAudio ? <span className="pill">Recording captured</span> : null}
       </div>
 
       <div
@@ -137,29 +194,20 @@ export function SparkSavedNextSteps({
       >
         <div className="eyebrow">Recommended next move</div>
         <h2 className="h3" style={{ marginTop: "0.45rem" }}>
-          Understand what you caught
+          {heading}
         </h2>
         <p className="copy" style={{ maxWidth: 780 }}>
-          Song Intelligence can analyze the title, words, notes, and available
-          recording evidence already saved with this Spark. Attached documents
-          remain safely with the Spark as supporting material. A recording is
-          helpful, but typed words are enough.
+          {description}
         </p>
 
         <button
           type="button"
           className="button primary"
-          onClick={runSongIntelligence}
+          onClick={handlePrimaryAction}
           disabled={isBusy}
           style={{ cursor: isBusy ? "wait" : "pointer" }}
         >
-          {state === "transcribing"
-            ? "Listening to your recording…"
-            : state === "analyzing"
-              ? "Understanding your Spark…"
-              : state === "success"
-                ? "Song Intelligence ready"
-                : "Run Song Intelligence"}
+          {buttonLabel}
         </button>
       </div>
 
@@ -178,7 +226,7 @@ export function SparkSavedNextSteps({
           href={`/studio/songs/${slug}/edit?workspace=open#song-details`}
           className="button"
         >
-          Add more words or notes
+          Add more to this Spark
         </Link>
         <Link href="/studio" className="button">
           Save and return to Studio

@@ -229,7 +229,11 @@ export default async function EditSongPage({
     (attachment: any) => attachment.file_type !== "audio",
   );
 
-  const transcriptCount = (song.song_transcripts ?? []).length;
+  const transcripts = song.song_transcripts ?? [];
+  const transcriptCount = transcripts.length;
+  const reviewedTranscriptCount = transcripts.filter(
+    (transcript: any) => transcript.is_reviewed,
+  ).length;
   const hasLyrics = Boolean(primaryVersion?.lyrics?.trim());
   const hasMeaningfulTitle = Boolean(
     songTitle.trim() && !/^Untitled Spark\s*[—-]/i.test(songTitle.trim()),
@@ -253,17 +257,19 @@ export default async function EditSongPage({
     .limit(1)
     .maybeSingle();
 
-  const recommendedNextMove = !latestAnalysis
-    ? "Run Song Intelligence to understand the Spark, see provisional ratings, and discover the most useful Muse direction."
-    : !audioAttachments.length
-    ? "Add a recording so the song can be heard and transcribed."
-    : !transcriptCount
-      ? "Generate a transcript, review it, and run Song Intelligence."
-      : !hasLyrics
-        ? "Separate the remembered or performed lyric from the transcript and save it as the working lyric."
-        : String(song.current_stage || "").toLowerCase() !== "final"
-          ? "Review Song Intelligence, choose one development task, and create the next version."
-          : "Review Muse guidance and listener response before deciding whether the song needs another revision.";
+  const recommendedNextMove = !latestAnalysis && audioAttachments.length && !transcriptCount
+    ? "Transcribe the recording, review the words, and then run Song Intelligence."
+    : !latestAnalysis && audioAttachments.length && !reviewedTranscriptCount
+      ? "Review and correct the transcript before running Song Intelligence."
+      : !latestAnalysis
+        ? "Run Song Intelligence to understand the Spark, see provisional ratings, and discover the most useful Muse direction."
+        : !audioAttachments.length
+          ? "Add a recording when you are ready to strengthen the analysis with melody and performance evidence."
+          : !hasLyrics
+            ? "Separate the remembered or performed lyric from the transcript and save it as the working lyric."
+            : String(song.current_stage || "").toLowerCase() !== "final"
+              ? "Review Song Intelligence, choose one development task, and create the next version."
+              : "Review Muse guidance and listener response before deciding whether the song needs another revision.";
 
   if (showFreshCaptureHandoff) {
     return (
@@ -279,7 +285,15 @@ export default async function EditSongPage({
                 : "Muse direction pending"
             }
             firstAudioAttachmentId={audioAttachments[0]?.id ?? null}
-            hasTranscript={transcriptCount > 0}
+            hasTranscript={transcripts.some(
+              (transcript: any) =>
+                transcript.attachment_id === audioAttachments[0]?.id,
+            )}
+            hasReviewedTranscript={transcripts.some(
+              (transcript: any) =>
+                transcript.attachment_id === audioAttachments[0]?.id &&
+                transcript.is_reviewed,
+            )}
             hasCapturedText={hasCapturedText}
           />
         </div>
