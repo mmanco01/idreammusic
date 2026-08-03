@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MODEL_NAME = process.env.OPENAI_ANALYTICS_MODEL || 'gpt-5.6-terra';
-const ANALYSIS_VERSION = '2.0';
+const ANALYSIS_VERSION = '2.1';
 
 const MUSE_NAMES = [
   'Calliope',
@@ -54,7 +54,19 @@ type MuseRecommendation = {
 };
 
 type SongIntelligenceResult = {
-  analysis_basis: 'lyrics_and_transcript' | 'lyrics_only' | 'transcript_only';
+  analysis_basis:
+    | 'lyrics_and_transcript'
+    | 'lyrics_only'
+    | 'transcript_only'
+    | 'captured_text'
+    | 'mixed_material';
+  analysis_stage: 'spark' | 'draft' | 'final';
+  source_types: string[];
+  material_completeness: 'limited' | 'developing' | 'substantial';
+  recommended_next_move: string;
+  lead_muse: MuseName;
+  lead_muse_reason: string;
+  starter_question: string;
   limitations: string[];
   overall_score: number;
   ready_for_release_score: number;
@@ -219,8 +231,30 @@ const songIntelligenceSchema = {
   properties: {
     analysis_basis: {
       type: 'string',
-      enum: ['lyrics_and_transcript', 'lyrics_only', 'transcript_only'],
+      enum: [
+        'lyrics_and_transcript',
+        'lyrics_only',
+        'transcript_only',
+        'captured_text',
+        'mixed_material',
+      ],
     },
+    analysis_stage: {
+      type: 'string',
+      enum: ['spark', 'draft', 'final'],
+    },
+    source_types: {
+      type: 'array',
+      items: { type: 'string' },
+    },
+    material_completeness: {
+      type: 'string',
+      enum: ['limited', 'developing', 'substantial'],
+    },
+    recommended_next_move: { type: 'string' },
+    lead_muse: { type: 'string', enum: MUSE_NAMES },
+    lead_muse_reason: { type: 'string' },
+    starter_question: { type: 'string' },
     limitations: {
       type: 'array',
       items: { type: 'string' },
@@ -496,6 +530,13 @@ const songIntelligenceSchema = {
   },
   required: [
     'analysis_basis',
+    'analysis_stage',
+    'source_types',
+    'material_completeness',
+    'recommended_next_move',
+    'lead_muse',
+    'lead_muse_reason',
+    'starter_question',
     'limitations',
     'overall_score',
     'ready_for_release_score',
@@ -550,7 +591,13 @@ Important analytical rules:
 6. Use the full 0–100 scale honestly. A promising draft need not score like a release-ready master.
 7. The Muse guidance should sound specific to each Muse's domain, not like generic advice.
 8. When a transcript appears to repeat choruses, account for repetition rather than treating it as accidental.
-9. Preserve the songwriter's voice. Recommend direction and strategy more often than replacement lines.`;
+9. Preserve the songwriter's voice. Recommend direction and strategy more often than replacement lines.
+10. For a Spark, treat scores as provisional evidence of creative promise, not a verdict on a finished song.
+11. recommended_next_move must be one concrete action the songwriter can take next.
+12. lead_muse must match muse_analysis.primary.name. lead_muse_reason should briefly explain the fit.
+13. starter_question must be a useful first question the songwriter can ask the lead Muse about this exact material.
+14. Never invent missing lyrics, events, characters, melody, harmony, or production evidence.
+15. When material is limited, use conditional language, lower confidence appropriately, and make the limitations explicit.`;
 
 function extractOutputText(payload: OpenAIResponse): string {
   if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
@@ -625,6 +672,259 @@ async function markRunFailed(
     .eq('id', runId);
 }
 
+type ResolvedSongMaterial = {
+  song: {
+    id: string;
+    title_working: string | null;
+    title_final: string | null;
+    hook_line: string | null;
+    summary: string | null;
+    current_stage: string | null;
+    song_origin: string | null;
+  };
+  version: {
+    id: string;
+    title: string | null;
+    lyrics: string | null;
+    arrangement_notes: string | null;
+    story_behind_song: string | null;
+    stage: string | null;
+  } | null;
+  transcript: {
+    id: string;
+    song_version_id: string | null;
+    transcript_text: string | null;
+    is_reviewed: boolean;
+  } | null;
+  notes: Array<{ title: string | null; body: string | null }>;
+  attachments: Array<{
+    title: string | null;
+    file_type: string | null;
+    mime_type: string | null;
+  }>;
+  title: string;
+  savedLyrics: string;
+  transcriptText: string;
+  sourceTypes: string[];
+  analysisBasis: SongIntelligenceResult['analysis_basis'];
+  analysisStage: SongIntelligenceResult['analysis_stage'];
+  materialCompleteness: SongIntelligenceResult['material_completeness'];
+};
+
+function normalizeAnalysisStage(value: unknown): SongIntelligenceResult['analysis_stage'] {
+  return value === 'draft' || value === 'final' ? value : 'spark';
+}
+
+async function resolveSongMaterial(
+  supabase: any,
+  userId: string,
+  songId: string,
+  requestedTranscriptId?: string
+): Promise<ResolvedSongMaterial> {
+  const { data: song, error: songError } = await supabase
+    .from('songs')
+    .select(
+      'id, owner_user_id, title_working, title_final, hook_line, summary, current_stage, song_origin'
+    )
+    .eq('id', songId)
+    .eq('owner_user_id', userId)
+    .maybeSingle();
+
+  if (songError || !song) {
+    throw new Error(songError?.message || 'Song not found or not owned by you.');
+  }
+
+  let transcript: ResolvedSongMaterial['transcript'] = null;
+
+  if (requestedTranscriptId) {
+    const { data, error } = await supabase
+      .from('song_transcripts')
+      .select('id, song_version_id, transcript_text, is_reviewed, updated_at')
+      .eq('id', requestedTranscriptId)
+      .eq('song_id', songId)
+      .maybeSingle();
+
+    if (error || !data) {
+      throw new Error(error?.message || 'Saved transcript not found.');
+    }
+
+    transcript = data;
+  } else {
+    const { data, error } = await supabase
+      .from('song_transcripts')
+      .select('id, song_version_id, transcript_text, is_reviewed, updated_at')
+      .eq('song_id', songId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Transcript lookup failed: ${error.message}`);
+    }
+
+    transcript = data || null;
+  }
+
+  let version: ResolvedSongMaterial['version'] = null;
+
+  if (transcript?.song_version_id) {
+    const { data, error } = await supabase
+      .from('song_versions')
+      .select('id, title, lyrics, arrangement_notes, story_behind_song, stage')
+      .eq('id', transcript.song_version_id)
+      .eq('song_id', songId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Song version lookup failed: ${error.message}`);
+    }
+
+    version = data || null;
+  }
+
+  if (!version) {
+    const { data, error } = await supabase
+      .from('song_versions')
+      .select('id, title, lyrics, arrangement_notes, story_behind_song, stage, version_number')
+      .eq('song_id', songId)
+      .order('is_stage_primary', { ascending: false })
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Song version lookup failed: ${error.message}`);
+    }
+
+    version = data || null;
+  }
+
+  const [{ data: notesData, error: notesError }, { data: attachmentData, error: attachmentError }] =
+    await Promise.all([
+      supabase
+        .from('writer_notes')
+        .select('title, body, created_at')
+        .eq('song_id', songId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('attachments')
+        .select('title, file_type, mime_type, created_at')
+        .eq('song_id', songId)
+        .order('created_at', { ascending: true }),
+    ]);
+
+  if (notesError) {
+    throw new Error(`Writer-note lookup failed: ${notesError.message}`);
+  }
+
+  if (attachmentError) {
+    throw new Error(`Attachment lookup failed: ${attachmentError.message}`);
+  }
+
+  const notes = (notesData || []) as ResolvedSongMaterial['notes'];
+  const attachments = (attachmentData || []) as ResolvedSongMaterial['attachments'];
+  const title = song.title_final || song.title_working || version?.title || 'Untitled song';
+  const hasMeaningfulTitle = Boolean(
+    title.trim() && !/^Untitled Spark\s*[—-]/i.test(title.trim())
+  );
+  const savedLyrics = String(version?.lyrics || '').trim();
+  const transcriptText = String(transcript?.transcript_text || '').trim();
+  const sourceTypes = new Set<string>();
+
+  if (hasMeaningfulTitle) sourceTypes.add('title');
+  if (song.summary?.trim()) sourceTypes.add('summary');
+  if (song.hook_line?.trim()) sourceTypes.add('hook');
+  if (savedLyrics) sourceTypes.add('captured_text');
+  if (transcriptText) sourceTypes.add('transcript');
+  if (version?.story_behind_song?.trim()) sourceTypes.add('story');
+  const arrangementNotes = String(version?.arrangement_notes || '').trim();
+  const meaningfulArrangementNotes =
+    arrangementNotes &&
+    arrangementNotes !== 'Captured in expanded Spark Capture.'
+      ? arrangementNotes
+      : '';
+
+  if (meaningfulArrangementNotes) sourceTypes.add('arrangement_notes');
+  if (notes.some((note) => String(note.body || '').trim())) sourceTypes.add('writer_notes');
+  if (attachments.some((attachment) => attachment.file_type === 'audio')) sourceTypes.add('audio');
+  if (attachments.some((attachment) => attachment.file_type !== 'audio')) sourceTypes.add('documents');
+
+  const summaryText = String(song.summary || '').trim();
+  const nonDuplicateSummary =
+    summaryText && (!savedLyrics || !savedLyrics.startsWith(summaryText))
+      ? summaryText
+      : '';
+  const capturedTextParts = [
+    nonDuplicateSummary,
+    song.hook_line,
+    version?.story_behind_song,
+    meaningfulArrangementNotes,
+    ...notes.flatMap((note) => [note.title, note.body]),
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+  const analysisStage = normalizeAnalysisStage(song.current_stage || version?.stage);
+  const hasNonTranscriptText = Boolean(savedLyrics || capturedTextParts.length);
+
+  const analysisBasis: SongIntelligenceResult['analysis_basis'] =
+    analysisStage === 'spark'
+      ? transcriptText
+        ? hasNonTranscriptText
+          ? 'mixed_material'
+          : 'transcript_only'
+        : 'captured_text'
+      : savedLyrics && transcriptText
+        ? capturedTextParts.length
+          ? 'mixed_material'
+          : 'lyrics_and_transcript'
+        : savedLyrics
+          ? capturedTextParts.length
+            ? 'mixed_material'
+            : 'lyrics_only'
+          : transcriptText
+            ? capturedTextParts.length
+              ? 'mixed_material'
+              : 'transcript_only'
+            : 'captured_text';
+
+  const attachmentContext = attachments
+    .filter((attachment) => attachment.file_type !== 'audio')
+    .map((attachment) => String(attachment.title || attachment.mime_type || '').trim())
+    .filter(Boolean);
+  const signalText = [
+    hasMeaningfulTitle ? title : '',
+    savedLyrics,
+    transcriptText,
+    ...capturedTextParts,
+    ...attachmentContext,
+  ]
+    .join('\n')
+    .trim();
+
+  if (!signalText) {
+    throw new Error('Add a title, a few words, a note, a document, or a recording before running Song Intelligence.');
+  }
+
+  const signalLength = signalText.length;
+  const materialCompleteness: SongIntelligenceResult['material_completeness'] =
+    signalLength < 160 ? 'limited' : signalLength < 1500 ? 'developing' : 'substantial';
+
+  return {
+    song,
+    version,
+    transcript,
+    notes,
+    attachments,
+    title,
+    savedLyrics,
+    transcriptText,
+    sourceTypes: [...sourceTypes],
+    analysisBasis,
+    analysisStage,
+    materialCompleteness,
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -650,19 +950,38 @@ export async function GET(request: Request) {
     const songId = url.searchParams.get('song_id') || '';
     const transcriptId = url.searchParams.get('transcript_id') || '';
 
-    if (!songId || !transcriptId) {
+    if (!songId) {
       return NextResponse.json(
-        { status: 'error', message: 'Song and transcript are required.' },
+        { status: 'error', message: 'Song is required.' },
         { status: 400 }
       );
     }
 
-    const { data: run, error } = await supabase
+    const { data: ownedSong } = await supabase
+      .from('songs')
+      .select('id')
+      .eq('id', songId)
+      .eq('owner_user_id', user.id)
+      .maybeSingle();
+
+    if (!ownedSong) {
+      return NextResponse.json(
+        { status: 'error', message: 'Song not found or not owned by you.' },
+        { status: 404 }
+      );
+    }
+
+    let query = supabase
       .from('ai_analysis_runs')
-      .select('id, model_name, analysis_version, raw_result, completed_at')
+      .select('id, model_name, analysis_version, raw_result, completed_at, transcript_id')
       .eq('song_id', songId)
-      .eq('transcript_id', transcriptId)
-      .eq('status', 'ready')
+      .eq('status', 'ready');
+
+    if (transcriptId) {
+      query = query.eq('transcript_id', transcriptId);
+    }
+
+    const { data: run, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -737,91 +1056,27 @@ export async function POST(request: Request) {
     const songId = String(formData.get('song_id') || '');
     const transcriptId = String(formData.get('transcript_id') || '');
 
-    if (!songId || !transcriptId) {
+    if (!songId) {
       return NextResponse.json(
-        { status: 'error', message: 'A saved transcript is required for analysis.' },
+        { status: 'error', message: 'A song is required for analysis.' },
         { status: 400 }
       );
     }
 
-    const { data: song, error: songError } = await supabase
-      .from('songs')
-      .select(
-        'id, owner_user_id, title_working, title_final, hook_line, summary, current_stage, song_origin'
-      )
-      .eq('id', songId)
-      .eq('owner_user_id', user.id)
-      .maybeSingle();
+    let material: ResolvedSongMaterial;
 
-    if (songError || !song) {
-      return NextResponse.json(
-        {
-          status: 'error',
-          message: songError?.message || 'Song not found or not owned by you.',
-        },
-        { status: 404 }
+    try {
+      material = await resolveSongMaterial(
+        supabase,
+        user.id,
+        songId,
+        transcriptId || undefined
       );
-    }
-
-    const { data: transcript, error: transcriptError } = await supabase
-      .from('song_transcripts')
-      .select(
-        'id, song_id, song_version_id, attachment_id, transcript_text, is_reviewed, updated_at'
-      )
-      .eq('id', transcriptId)
-      .eq('song_id', songId)
-      .maybeSingle();
-
-    if (transcriptError || !transcript) {
+    } catch (error) {
       return NextResponse.json(
         {
           status: 'error',
-          message: transcriptError?.message || 'Saved transcript not found.',
-        },
-        { status: 404 }
-      );
-    }
-
-    let version:
-      | {
-          id: string;
-          title: string | null;
-          lyrics: string | null;
-          arrangement_notes: string | null;
-          story_behind_song: string | null;
-          stage: string | null;
-        }
-      | null = null;
-
-    if (transcript.song_version_id) {
-      const { data: versionData, error: versionError } = await supabase
-        .from('song_versions')
-        .select('id, title, lyrics, arrangement_notes, story_behind_song, stage')
-        .eq('id', transcript.song_version_id)
-        .eq('song_id', songId)
-        .maybeSingle();
-
-      if (versionError) {
-        return NextResponse.json(
-          {
-            status: 'error',
-            message: `Song version lookup failed: ${versionError.message}`,
-          },
-          { status: 500 }
-        );
-      }
-
-      version = versionData;
-    }
-
-    const transcriptText = String(transcript.transcript_text || '').trim();
-    const savedLyrics = String(version?.lyrics || '').trim();
-
-    if (!transcriptText && !savedLyrics) {
-      return NextResponse.json(
-        {
-          status: 'error',
-          message: 'The saved transcript and lyrics are empty.',
+          message: error instanceof Error ? error.message : 'Song material could not be resolved.',
         },
         { status: 400 }
       );
@@ -831,8 +1086,8 @@ export async function POST(request: Request) {
       .from('ai_analysis_runs')
       .insert({
         song_id: songId,
-        song_version_id: transcript.song_version_id || null,
-        transcript_id: transcriptId,
+        song_version_id: material.version?.id || null,
+        transcript_id: material.transcript?.id || null,
         requested_by: user.id,
         model_name: MODEL_NAME,
         analysis_version: ANALYSIS_VERSION,
@@ -853,33 +1108,50 @@ export async function POST(request: Request) {
 
     runId = createdRun.id;
 
-    const title = song.title_final || song.title_working || version?.title || 'Untitled song';
-    const analysisBasis =
-      savedLyrics && transcriptText
-        ? 'lyrics_and_transcript'
-        : savedLyrics
-          ? 'lyrics_only'
-          : 'transcript_only';
+    const noteText = material.notes
+      .map((note, index) => {
+        const title = String(note.title || '').trim() || `Note ${index + 1}`;
+        const body = String(note.body || '').trim();
+        return body ? `${title}\n${body}` : '';
+      })
+      .filter(Boolean)
+      .join('\n\n');
 
-    const userPrompt = `Analyze this song for iDreamMusic Song Intelligence.
+    const documentNames = material.attachments
+      .filter((attachment) => attachment.file_type !== 'audio')
+      .map((attachment) => attachment.title || attachment.mime_type || 'Captured document')
+      .join(', ');
+
+    const userPrompt = `Analyze this song material for iDreamMusic Song Intelligence.
 
 SONG METADATA
-Title: ${title}
-Current stage: ${song.current_stage || 'unknown'}
-Origin: ${song.song_origin || 'unknown'}
-Existing hook field: ${song.hook_line || 'not supplied'}
-Existing summary: ${song.summary || 'not supplied'}
-Transcript reviewed by songwriter: ${transcript.is_reviewed ? 'yes' : 'no'}
-Available basis: ${analysisBasis}
+Title: ${material.title}
+Current stage: ${material.analysisStage}
+Origin: ${material.song.song_origin || 'unknown'}
+Existing hook field: ${material.song.hook_line || 'not supplied'}
+Existing summary: ${material.song.summary || 'not supplied'}
+Transcript reviewed by songwriter: ${material.transcript?.is_reviewed ? 'yes' : 'no'}
+Available basis: ${material.analysisBasis}
+Source types: ${material.sourceTypes.join(', ') || 'title'}
+Material completeness: ${material.materialCompleteness}
 
-${savedLyrics ? `OFFICIAL SAVED LYRICS\n${savedLyrics.slice(0, 50000)}\n` : ''}
-${transcriptText ? `RECORDING TRANSCRIPT\n${transcriptText.slice(0, 50000)}\n` : ''}
-${version?.story_behind_song ? `STORY BEHIND THE SONG\n${version.story_behind_song.slice(0, 10000)}\n` : ''}
-${version?.arrangement_notes ? `ARRANGEMENT NOTES\n${version.arrangement_notes.slice(0, 10000)}\n` : ''}
+${material.savedLyrics ? `CAPTURED WORDS OR SAVED LYRICS\n${material.savedLyrics.slice(0, 50000)}\n` : ''}
+${material.transcriptText ? `RECORDING TRANSCRIPT\n${material.transcriptText.slice(0, 50000)}\n` : ''}
+${material.version?.story_behind_song ? `STORY BEHIND THE SONG\n${material.version.story_behind_song.slice(0, 10000)}\n` : ''}
+${material.version?.arrangement_notes && material.version.arrangement_notes !== 'Captured in expanded Spark Capture.' ? `ARRANGEMENT OR CAPTURE NOTES\n${material.version.arrangement_notes.slice(0, 10000)}\n` : ''}
+${noteText ? `WRITER NOTES\n${noteText.slice(0, 30000)}\n` : ''}
+${documentNames ? `ATTACHED DOCUMENTS\n${documentNames}\nDocument filenames are available, but their full contents were not extracted for this analysis.\n` : ''}
 
-Return the complete structured analysis. Use ${analysisBasis} for analysis_basis.
-Treat BPM, vocal range, melody, and production as recommendations unless directly supported by supplied notes.
-Use short lyric excerpts only when citing strongest lines, weakest lines, or Muse evidence.`;
+Return the complete structured analysis.
+Set analysis_basis to ${material.analysisBasis}.
+Set analysis_stage to ${material.analysisStage}.
+Set source_types to exactly ${JSON.stringify(material.sourceTypes)}.
+Set material_completeness to ${material.materialCompleteness}.
+For Spark-stage material, describe ratings as provisional and developmental.
+Treat BPM, vocal range, melody, arrangement, performance, and production as recommendations unless directly supported by supplied notes.
+Use short excerpts only when citing strongest lines, weakest lines, or Muse evidence.
+Choose one practical recommended_next_move.
+Set lead_muse to the same Muse as muse_analysis.primary and generate one specific starter_question for that Muse.`;
 
     const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -978,6 +1250,30 @@ Use short lyric excerpts only when citing strongest lines, weakest lines, or Mus
         { status: 502 }
       );
     }
+
+    result.analysis_basis = material.analysisBasis;
+    result.analysis_stage = material.analysisStage;
+    result.source_types = material.sourceTypes;
+    result.material_completeness = material.materialCompleteness;
+    result.lead_muse = result.muse_analysis.primary.name;
+    result.lead_muse_reason = String(
+      result.lead_muse_reason || result.muse_analysis.primary.rationale
+    )
+      .trim()
+      .slice(0, 800);
+    result.recommended_next_move = String(
+      result.recommended_next_move ||
+        result.work_needed[0]?.recommended_action ||
+        'Choose one promising direction and add the next piece of the song.'
+    )
+      .trim()
+      .slice(0, 600);
+    result.starter_question = String(
+      result.starter_question ||
+        `Based on this ${material.analysisStage} and its Song Intelligence, what is the most promising direction, and what should I develop next?`
+    )
+      .trim()
+      .slice(0, 900);
 
     const scoreRows = SCORE_DIMENSIONS.map((dimension) => ({
       analysis_run_id: runId,
@@ -1083,7 +1379,7 @@ Use short lyric excerpts only when citing strongest lines, weakest lines, or Mus
 
     return NextResponse.json({
       status: 'success',
-      message: 'AI Song Intelligence generated and saved.',
+      message: 'Song Intelligence generated and saved.',
       run_id: runId,
       model_name: MODEL_NAME,
       analysis_version: ANALYSIS_VERSION,
@@ -1092,7 +1388,7 @@ Use short lyric excerpts only when citing strongest lines, weakest lines, or Mus
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : 'AI Song Intelligence failed.';
+      error instanceof Error ? error.message : 'Song Intelligence failed.';
 
     await markRunFailed(supabase, runId, message);
 

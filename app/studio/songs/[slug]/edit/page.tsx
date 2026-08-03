@@ -7,16 +7,29 @@ import { SongIntelligencePanel } from "@/components/studio/SongIntelligencePanel
 import { MuseChatPanel } from "@/components/studio/MuseChatPanel";
 import { ProductionCreditsEditor } from "@/components/studio/ProductionCreditsEditor";
 import { SongDangerZone } from "@/components/studio/SongDangerZone";
+import { SparkSavedNextSteps } from "@/components/studio/SparkSavedNextSteps";
 import { SongUnavailable } from "@/components/songs/SongUnavailable";
 import { buildPublicAssetUrl } from "@/lib/storage";
 import type { ProductionCreditRow } from "@/lib/production-credits";
 
 export default async function EditSongPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{
+    capture?: string;
+    analysis?: string;
+    muse?: string;
+    question?: string;
+    workspace?: string;
+  }>;
 }) {
   const { slug } = await params;
+  const query = await searchParams;
+  const isFreshlyCaptured = query.capture === "saved";
+  const showFreshCaptureHandoff =
+    isFreshlyCaptured && query.workspace !== "open";
   const { user, profile, supabase } = await getServerAuthContext();
 
   if (!user) {
@@ -112,6 +125,14 @@ export default async function EditSongPage({
   const assignedMuse =
     MUSE_OPTIONS.find((option) => option.slug === assignedMuseSlug) ??
     MUSE_OPTIONS[0];
+  const hasAssignedMuse = Boolean(song.muse_id);
+
+  const requestedMuseSlug = MUSE_OPTIONS.some(
+    (option) => option.slug === query.muse,
+  )
+    ? query.muse
+    : undefined;
+  const initialMuseQuestion = query.question?.trim() || undefined;
 
   const { data: engagementSummary } = await (supabase as any)
     .from("song_engagement_summaries")
@@ -210,8 +231,31 @@ export default async function EditSongPage({
 
   const transcriptCount = (song.song_transcripts ?? []).length;
   const hasLyrics = Boolean(primaryVersion?.lyrics?.trim());
+  const hasMeaningfulTitle = Boolean(
+    songTitle.trim() && !/^Untitled Spark\s*[—-]/i.test(songTitle.trim()),
+  );
+  const hasCapturedText = Boolean(
+    hasMeaningfulTitle ||
+      primaryVersion?.lyrics?.trim() ||
+      song.summary?.trim() ||
+      song.hook_line?.trim() ||
+      primaryVersion?.story_behind_song?.trim() ||
+      (song.writer_notes ?? []).some((note: any) => note.body?.trim()) ||
+      supportingAttachments.length,
+  );
 
-  const recommendedNextMove = !audioAttachments.length
+  const { data: latestAnalysis } = await (supabase as any)
+    .from("ai_analysis_runs")
+    .select("id, completed_at")
+    .eq("song_id", song.id)
+    .eq("status", "ready")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const recommendedNextMove = !latestAnalysis
+    ? "Run Song Intelligence to understand the Spark, see provisional ratings, and discover the most useful Muse direction."
+    : !audioAttachments.length
     ? "Add a recording so the song can be heard and transcribed."
     : !transcriptCount
       ? "Generate a transcript, review it, and run Song Intelligence."
@@ -220,6 +264,28 @@ export default async function EditSongPage({
         : String(song.current_stage || "").toLowerCase() !== "final"
           ? "Review Song Intelligence, choose one development task, and create the next version."
           : "Review Muse guidance and listener response before deciding whether the song needs another revision.";
+
+  if (showFreshCaptureHandoff) {
+    return (
+      <section className="section">
+        <div className="container pageStack">
+          <SparkSavedNextSteps
+            songId={song.id}
+            slug={slug}
+            songTitle={songTitle}
+            museLabel={
+              hasAssignedMuse
+                ? `${assignedMuse?.name ?? "Muse"} — ${assignedMuse?.domain ?? "Creative partner"}`
+                : "Muse direction pending"
+            }
+            firstAudioAttachmentId={audioAttachments[0]?.id ?? null}
+            hasTranscript={transcriptCount > 0}
+            hasCapturedText={hasCapturedText}
+          />
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="section">
@@ -290,8 +356,9 @@ export default async function EditSongPage({
 
               <div className="pillRow" style={{ marginTop: "0.7rem" }}>
                 <span className="pill">
-                  {assignedMuse?.name ?? "Muse"} —{" "}
-                  {assignedMuse?.domain ?? "Creative partner"}
+                  {hasAssignedMuse
+                    ? `${assignedMuse?.name ?? "Muse"} — ${assignedMuse?.domain ?? "Creative partner"}`
+                    : "Muse not yet assigned"}
                 </span>
                 <span className="pill">
                   {song.current_stage ?? "spark"}
@@ -893,10 +960,11 @@ export default async function EditSongPage({
             </h2>
 
             <p className="copy" style={{ maxWidth: 900 }}>
-              Move from the source recording to a reviewed transcript,
-              then use Song Intelligence to identify strengths,
-              development opportunities, audience fit, and practical
-              next steps.
+              Use the words, notes, documents, and recordings already saved
+              with this song. Audio can add evidence, but it is not required
+              before Song Intelligence can identify strengths, development
+              opportunities, audience fit, Muse direction, and practical next
+              steps.
             </p>
           </div>
 
@@ -906,6 +974,12 @@ export default async function EditSongPage({
             audioAttachments={audioAttachments}
             transcripts={song.song_transcripts ?? []}
             audienceMetrics={audienceMetrics}
+            hasCapturedText={hasCapturedText}
+            analysisStage={
+              song.current_stage === "draft" || song.current_stage === "final"
+                ? song.current_stage
+                : "spark"
+            }
           />
         </section>
 
@@ -924,10 +998,9 @@ export default async function EditSongPage({
             <h2 className="h2">Your Creative Council</h2>
 
             <p className="copy" style={{ maxWidth: 900 }}>
-              Begin with {assignedMuse?.name ?? "the assigned Muse"},{" "}
-              the song’s primary creative partner. Then invite another
-              Muse to reveal how a different specialty changes the
-              recommendation.
+              {hasAssignedMuse
+                ? `Begin with ${assignedMuse?.name ?? "the assigned Muse"}, the song’s primary creative partner. Then invite another Muse to reveal how a different specialty changes the recommendation.`
+                : "Song Intelligence can recommend the strongest lead Muse for this Spark. You can also choose any Muse directly when you are ready to collaborate."}
             </p>
           </div>
 
@@ -935,6 +1008,8 @@ export default async function EditSongPage({
             songId={song.id}
             songTitle={songTitle}
             defaultMuseSlug={assignedMuseSlug}
+            initialMuseSlug={requestedMuseSlug}
+            initialQuestion={initialMuseQuestion}
             museOptions={MUSE_OPTIONS}
           />
         </section>
