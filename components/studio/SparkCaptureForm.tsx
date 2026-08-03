@@ -102,14 +102,6 @@ function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function slugify(input: string) {
-  return input
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60);
-}
 
 function sanitizeFileName(name: string) {
   const clean = name.toLowerCase().replace(/[^a-z0-9.\-_]+/g, "-");
@@ -876,21 +868,6 @@ export function SparkCaptureForm({
     const { data: sessionData } = await supabase.auth.getSession();
     const accessToken = sessionData.session?.access_token;
 
-    const { data: creatorProfile, error: creatorProfileError } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (creatorProfileError) {
-      console.warn(
-        "Unable to load the signed-in creator name:",
-        creatorProfileError.message,
-      );
-    }
-
-    const creatorName = creatorProfile?.display_name?.trim() || null;
-
     if (!accessToken) {
       setStatus("error");
       setMessage("Your sign-in session could not be confirmed. Refresh and try again.");
@@ -898,107 +875,58 @@ export function SparkCaptureForm({
     }
 
     const resolvedTitle = title.trim() || createUntitledSparkTitle();
-    const uniqueSlug = `${slugify(resolvedTitle) || "untitled-spark"}-${Date.now().toString(36)}`;
-    const firstNoteText = notes.find((note) => note.body.trim())?.body.trim();
-    const summarySource = sparkText.trim() || firstNoteText || "";
 
     let songId: string | null = null;
     let songSlug: string | null = null;
-    let versionCreated = false;
+    let versionId: string | null = null;
 
     try {
-      let museId: string | null = null;
-
-      if (museSlug) {
-        const { data: muse, error: museError } = await supabase
-          .from("muses")
-          .select("id")
-          .eq("slug", museSlug)
-          .single();
-
-        if (museError || !muse) {
-          throw museError || new Error("The selected Muse could not be found.");
-        }
-
-        museId = muse.id;
-      }
-
-      const { data: insertedSong, error: songError } = await supabase
-        .from("songs")
-        .insert({
-          owner_user_id: user.id,
-          title_working: resolvedTitle,
-          title_final: null,
-          slug: uniqueSlug,
-          current_stage: "spark",
-          status: "private",
-          songwriter_name: creatorName,
-          muse_id: museId,
-          summary: summarySource.slice(0, 500) || null,
-          hook_line: null,
-          published_at: null,
-        })
-        .select("id, slug")
-        .single();
-
-      if (songError || !insertedSong) {
-        throw songError || new Error("Could not create the Spark record.");
-      }
-
-      songId = insertedSong.id;
-      songSlug = insertedSong.slug;
-      setCreatedSongSlug(songSlug);
-
-      const { error: stageError } = await supabase.from("song_stages").insert({
-        song_id: songId,
-        stage: "spark",
-        is_current: true,
+      const createResponse = await fetch("/api/studio/sparks", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: resolvedTitle,
+          sparkText,
+          museSlug,
+          notes: notes.map((note) => ({
+            title: note.title,
+            body: note.body,
+          })),
+        }),
       });
 
-      if (stageError) throw stageError;
+      const createResult = (await createResponse.json().catch(() => null)) as
+        | {
+            status?: string;
+            message?: string;
+            songId?: string;
+            songSlug?: string;
+            versionId?: string;
+            museSlug?: string;
+          }
+        | null;
 
-      const { data: version, error: versionError } = await supabase
-        .from("song_versions")
-        .insert({
-          song_id: songId,
-          version_number: 1,
-          stage: "spark",
-          title: resolvedTitle,
-          lyrics: sparkText.trim() || null,
-          visibility: "private",
-          is_stage_primary: true,
-          arrangement_notes: "Captured in expanded Spark Capture.",
-          created_by: user.id,
-        })
-        .select("id")
-        .single();
-
-      if (versionError || !version) {
-        throw versionError || new Error("Could not create the first Spark version.");
+      if (
+        !createResponse.ok ||
+        createResult?.status !== "success" ||
+        !createResult.songId ||
+        !createResult.songSlug ||
+        !createResult.versionId
+      ) {
+        throw new Error(
+          createResult?.message ||
+            `The Spark could not be created (status ${createResponse.status}).`,
+        );
       }
 
-      versionCreated = true;
+      songId = createResult.songId;
+      songSlug = createResult.songSlug;
+      versionId = createResult.versionId;
+      setCreatedSongSlug(songSlug);
 
-      const noteRows = notes
-        .filter((note) => note.title.trim() || note.body.trim())
-        .map((note, index) => ({
-          song_id: songId,
-          song_version_id: version.id,
-          author_user_id: user.id,
-          title: note.title.trim() || `Capture note ${index + 1}`,
-          body: note.body.trim() || note.title.trim(),
-          visibility: "private",
-        }));
-
-      if (noteRows.length) {
-        const { error: notesError } = await supabase
-          .from("writer_notes")
-          .insert(noteRows);
-
-        if (notesError) throw notesError;
-      }
-
-      const resolvedMuseSlug = selectedMuse?.slug || "unassigned";
+      const resolvedMuseSlug = createResult.museSlug || selectedMuse?.slug || "unassigned";
       const failedUploads: string[] = [];
 
       for (let index = 0; index < files.length; index += 1) {
@@ -1011,8 +939,8 @@ export function SparkCaptureForm({
           await uploadCaptureFile({
             item,
             userId: user.id,
-            songId: insertedSong.id,
-            versionId: version.id,
+            songId,
+            versionId,
             resolvedMuseSlug,
             accessToken,
             sortOrder: index,
@@ -1045,18 +973,10 @@ export function SparkCaptureForm({
       router.push(`/studio/songs/${songSlug}/edit?capture=saved`);
       router.refresh();
     } catch (error) {
-      if (songId && !versionCreated) {
-        await supabase.from("songs").delete().eq("id", songId);
-        setCreatedSongSlug(null);
-      }
-
       setActiveUploadLabel("");
       setStatus("error");
-      const prefix = versionCreated
-        ? "The Spark was saved, but capture did not fully finish."
-        : "The Spark could not be saved.";
       setMessage(
-        `${prefix} ${
+        `The Spark could not be saved. ${
           error instanceof Error ? error.message : "Please try again."
         }`,
       );

@@ -35,6 +35,8 @@ export type MuseChatOption = {
 
 type Props = {
   defaultMuseSlug: string;
+  initialMuseSlug?: string;
+  initialQuestion?: string;
   museOptions: readonly MuseChatOption[];
   songId?: string;
   songTitle?: string;
@@ -208,6 +210,8 @@ function compactResponseSummary(message: ChatMessage) {
 
 export function MuseChatPanel({
   defaultMuseSlug,
+  initialMuseSlug,
+  initialQuestion,
   museOptions,
   songId,
   songTitle,
@@ -218,15 +222,19 @@ export function MuseChatPanel({
       (option) => option.slug === defaultMuseSlug,
     ) ?? museOptions[0];
 
+  const safeInitialMuse =
+    museOptions.find((option) => option.slug === initialMuseSlug) ??
+    safeDefaultMuse;
+
   const [selectedMuseSlug, setSelectedMuseSlug] =
     useState(
-      safeDefaultMuse?.slug ?? "calliope",
+      safeInitialMuse?.slug ?? "calliope",
     );
   const [conversationId, setConversationId] =
     useState<string | null>(null);
   const [messages, setMessages] =
     useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(initialQuestion ?? "");
   const [status, setStatus] = useState<
     "idle" | "sending" | "error"
   >("idle");
@@ -256,6 +264,28 @@ export function MuseChatPanel({
     useState<"idle" | "loading" | "error">("idle");
   const [councilRefreshKey, setCouncilRefreshKey] =
     useState(0);
+
+  useEffect(() => {
+    if (!initialMuseSlug) return;
+
+    const nextMuse = museOptions.find(
+      (option) => option.slug === initialMuseSlug,
+    );
+
+    if (!nextMuse || nextMuse.slug === selectedMuseSlug) return;
+
+    setSelectedMuseSlug(nextMuse.slug);
+    setMessages([]);
+    setConversationId(null);
+    setStatus("idle");
+    setErrorMessage("");
+  }, [initialMuseSlug, museOptions, selectedMuseSlug]);
+
+  useEffect(() => {
+    if (initialQuestion?.trim()) {
+      setInput(initialQuestion.trim());
+    }
+  }, [initialQuestion]);
 
   const selectedMuse =
     museOptions.find(

@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFormStatus } from 'react-dom';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   saveSongTranscript,
@@ -45,7 +46,19 @@ type ScoreDetail = {
 };
 
 type SongIntelligenceResult = {
-  analysis_basis: 'lyrics_and_transcript' | 'lyrics_only' | 'transcript_only';
+  analysis_basis:
+    | 'lyrics_and_transcript'
+    | 'lyrics_only'
+    | 'transcript_only'
+    | 'captured_text'
+    | 'mixed_material';
+  analysis_stage?: 'spark' | 'draft' | 'final';
+  source_types?: string[];
+  material_completeness?: 'limited' | 'developing' | 'substantial';
+  recommended_next_move?: string;
+  lead_muse?: MuseName;
+  lead_muse_reason?: string;
+  starter_question?: string;
   limitations: string[];
   overall_score: number;
   ready_for_release_score: number;
@@ -179,6 +192,8 @@ type Props = {
   audioAttachments: AudioAttachment[];
   transcripts: Transcript[];
   audienceMetrics: AudienceMetrics;
+  hasCapturedText: boolean;
+  analysisStage: 'spark' | 'draft' | 'final';
 };
 
 const initialSaveState: TranscriptSaveState = {
@@ -1007,10 +1022,12 @@ function IntelligenceDisclosure({
 
 function IntelligenceResults({
   result,
+  slug,
   taskState,
   onCreateTask,
 }: {
   result: SongIntelligenceResult;
+  slug: string;
   taskState: TaskCreateState;
   onCreateTask: (
     taskKey: string,
@@ -1019,6 +1036,22 @@ function IntelligenceResults({
     priority: number
   ) => void;
 }) {
+  const leadMuse = result.lead_muse || result.muse_analysis.primary.name;
+  const leadMuseSlug = leadMuse.toLowerCase();
+  const leadMuseReason =
+    result.lead_muse_reason || result.muse_analysis.primary.rationale;
+  const starterQuestion = String(
+    result.starter_question ||
+      `Based on this song and its Song Intelligence, what is the most promising direction, and what should I develop next?`
+  )
+    .trim()
+    .slice(0, 900);
+  const recommendedNextMove =
+    result.recommended_next_move ||
+    result.work_needed[0]?.recommended_action ||
+    'Choose one promising direction and add the next piece of the song.';
+  const isSparkAssessment = result.analysis_stage === 'spark';
+
   return (
     <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem' }}>
       <div>
@@ -1029,6 +1062,13 @@ function IntelligenceResults({
         <p className="copy" style={{ maxWidth: 900 }}>
           {result.summary}
         </p>
+        {isSparkAssessment ? (
+          <p className="copy" style={{ maxWidth: 900, fontWeight: 700 }}>
+            Spark-stage assessment: these ratings reflect the promise visible in
+            the material currently captured. They will evolve as you add lyrics,
+            structure, melody, recordings, and creative decisions.
+          </p>
+        ) : null}
       </div>
 
       <div
@@ -1054,6 +1094,30 @@ function IntelligenceResults({
           value={result.metrics.singability_score}
           detail={`AI confidence ${percent(result.metrics.ai_confidence)}`}
         />
+      </div>
+
+      <div
+        style={{
+          padding: '1rem',
+          border: '1px solid rgba(156, 137, 220, 0.55)',
+          borderRadius: 16,
+          background: 'linear-gradient(145deg, rgba(86, 67, 145, 0.16), rgba(255,255,255,0.025))',
+        }}
+      >
+        <div className="eyebrow">Recommended creative partner</div>
+        <h3 className="h3" style={{ marginTop: '0.35rem' }}>
+          {leadMuse}
+        </h3>
+        <p className="copy">{leadMuseReason}</p>
+        <p className="copy">
+          <strong>Recommended next move:</strong> {recommendedNextMove}
+        </p>
+        <Link
+          className="button primary"
+          href={`/studio/songs/${slug}/edit?muse=${encodeURIComponent(leadMuseSlug)}&question=${encodeURIComponent(starterQuestion)}#muses`}
+        >
+          Explore this with {leadMuse}
+        </Link>
       </div>
 
       <div
@@ -1430,6 +1494,8 @@ export function SongIntelligencePanel({
   audioAttachments,
   transcripts,
   audienceMetrics,
+  hasCapturedText,
+  analysisStage,
 }: Props) {
   const router = useRouter();
   const [saveState, saveFormAction] = useActionState(
@@ -1531,26 +1597,12 @@ export function SongIntelligencePanel({
 
   useEffect(() => {
     const transcriptId = selectedTranscript?.id;
-
-    if (!transcriptId) {
-      setAnalyticsState({
-        status: 'idle',
-        message: '',
-        result: null,
-        runId: null,
-      });
-      setTaskCreateState({});
-      return;
-    }
-
     let cancelled = false;
 
-    async function loadLatestAnalysis(id: string) {
+    async function loadLatestAnalysis() {
       try {
-        const query = new URLSearchParams({
-          song_id: songId,
-          transcript_id: id,
-        });
+        const query = new URLSearchParams({ song_id: songId });
+        if (transcriptId) query.set('transcript_id', transcriptId);
 
         const response = await fetch(
           `/api/song-analytics/generate?${query.toString()}`,
@@ -1612,7 +1664,7 @@ export function SongIntelligencePanel({
       }
     }
 
-    void loadLatestAnalysis(transcriptId);
+    void loadLatestAnalysis();
 
     return () => {
       cancelled = true;
@@ -1672,10 +1724,10 @@ export function SongIntelligencePanel({
   }
 
   async function handleRunAnalytics() {
-    if (!selectedTranscript?.id) {
+    if (!selectedTranscript?.id && !hasCapturedText && !audioAttachments.length) {
       setAnalyticsState({
         status: 'error',
-        message: 'Save or generate a transcript before running AI Song Intelligence.',
+        message: 'Add a title, a few words, a note, a document, or a recording before running Song Intelligence.',
         result: null,
         runId: null,
       });
@@ -1693,7 +1745,9 @@ export function SongIntelligencePanel({
       const requestBody = new FormData();
       requestBody.append('song_id', songId);
       requestBody.append('slug', slug);
-      requestBody.append('transcript_id', selectedTranscript.id);
+      if (selectedTranscript?.id) {
+        requestBody.append('transcript_id', selectedTranscript.id);
+      }
 
       const response = await fetch('/api/song-analytics/generate', {
         method: 'POST',
@@ -1875,11 +1929,103 @@ export function SongIntelligencePanel({
     return (
       <div className="card" style={{ gridColumn: '1 / -1' }}>
         <div className="eyebrow">Song intelligence</div>
-        <h2 className="h2">Transcript &amp; AI Song Intelligence</h2>
-        <p className="copy">
-          Upload an audio version of this song first. Once a recording exists, it
-          can be transcribed, reviewed, and analyzed here.
+        <h2 className="h2">Understand what you caught</h2>
+        <p className="copy" style={{ maxWidth: 840 }}>
+          Analyze the title, captured words, lyrics, summary, hook, writer notes,
+          and attached-document context already saved with this song. No
+          recording or transcript is required.
         </p>
+
+        <div className="pillRow" style={{ marginTop: '0.75rem' }}>
+          <span className="pill">{analysisStage} assessment</span>
+          <span className="pill">
+            {hasCapturedText ? 'Saved text available' : 'Limited material'}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          className="button primary"
+          onClick={handleRunAnalytics}
+          disabled={analyticsState.status === 'loading'}
+          style={{
+            marginTop: '1rem',
+            cursor: analyticsState.status === 'loading' ? 'wait' : 'pointer',
+          }}
+        >
+          {analyticsState.status === 'loading'
+            ? 'Understanding your song…'
+            : analyticsState.status === 'success'
+              ? 'Regenerate Song Intelligence'
+              : 'Run Song Intelligence'}
+        </button>
+
+        {analyticsState.message ? (
+          <div
+            role="status"
+            style={{
+              marginTop: '1rem',
+              padding: '0.85rem 1rem',
+              borderRadius: 14,
+              border: '1px solid var(--line)',
+              color:
+                analyticsState.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+              background:
+                analyticsState.status === 'error'
+                  ? 'rgba(160, 40, 40, 0.18)'
+                  : 'rgba(40, 130, 60, 0.18)',
+            }}
+          >
+            {analyticsState.message}
+          </div>
+        ) : null}
+
+        {analyticsState.result ? (
+          <IntelligenceResults
+            result={analyticsState.result}
+            slug={slug}
+            taskState={taskCreateState}
+            onCreateTask={handleCreateSongTask}
+          />
+        ) : null}
+
+        <details
+          style={{
+            marginTop: '1.25rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+            padding: '0 1rem 1rem',
+          }}
+        >
+          <summary style={{ cursor: 'pointer', padding: '1rem 0', fontWeight: 800 }}>
+            Listener Response &amp; Audience Fit
+          </summary>
+          <AudienceIntelligencePanel
+            metrics={audienceMetrics}
+            intelligence={analyticsState.result}
+          />
+        </details>
+
+        <details
+          style={{
+            marginTop: '0.75rem',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+            padding: '0 1rem 1rem',
+          }}
+        >
+          <summary style={{ cursor: 'pointer', padding: '1rem 0', fontWeight: 800 }}>
+            Song Tasks ({songTasks.length})
+          </summary>
+          <SongTasksManager
+            tasks={songTasks}
+            state={taskListState}
+            onRefresh={() => {
+              void loadSongTasks();
+            }}
+            onUpdateStatus={handleUpdateTaskStatus}
+          />
+        </details>
       </div>
     );
   }
@@ -1887,11 +2033,12 @@ export function SongIntelligencePanel({
   return (
     <div className="card" style={{ gridColumn: '1 / -1' }}>
       <div className="eyebrow">Song intelligence</div>
-      <h2 className="h2">Transcript &amp; AI Song Intelligence</h2>
+      <h2 className="h2">Transcript &amp; Song Intelligence</h2>
       <p className="copy" style={{ maxWidth: 820 }}>
-        Choose a recording, save or correct its transcript, then run the
-        iDreamMusic Song Intelligence Engine for scores, Muse recommendations,
-        story and hook analysis, audience fit, and development guidance.
+        Use saved words immediately, or add a reviewed transcript for richer
+        audio evidence. Song Intelligence provides provisional scores, Muse
+        direction, story and hook analysis, audience fit, and development
+        guidance.
       </p>
 
       <label className="copy" htmlFor="intelligence-audio">
@@ -2003,42 +2150,42 @@ export function SongIntelligencePanel({
             className="button"
             onClick={handleRunAnalytics}
             disabled={
-              !selectedTranscript ||
+              (!selectedTranscript && !hasCapturedText) ||
               analyticsState.status === 'loading'
             }
             title={
-              selectedTranscript
+              selectedTranscript || hasCapturedText
                 ? 'Generates and automatically saves a new Song Intelligence report'
-                : 'Save or generate a transcript first'
+                : 'Add captured text or generate a transcript first'
             }
             style={{
               cursor:
-                !selectedTranscript ||
+                (!selectedTranscript && !hasCapturedText) ||
                 analyticsState.status === 'loading'
                   ? 'not-allowed'
                   : 'pointer',
               opacity:
-                !selectedTranscript ||
+                (!selectedTranscript && !hasCapturedText) ||
                 analyticsState.status === 'loading'
                   ? 0.55
                   : 1,
               color:
-                !selectedTranscript ||
+                (!selectedTranscript && !hasCapturedText) ||
                 analyticsState.status === 'loading'
                   ? 'rgba(255,255,255,0.72)'
                   : '#17120a',
               background:
-                !selectedTranscript
+                !selectedTranscript && !hasCapturedText
                   ? 'rgba(255,255,255,0.06)'
                   : analyticsState.status === 'loading'
                     ? 'linear-gradient(135deg, #8f6a24 0%, #6f511b 100%)'
                     : 'linear-gradient(135deg, #ffd978 0%, #d9a12e 100%)',
               border:
-                !selectedTranscript
+                !selectedTranscript && !hasCapturedText
                   ? '1px solid var(--line)'
                   : '1px solid rgba(255, 221, 132, 0.9)',
               boxShadow:
-                !selectedTranscript ||
+                (!selectedTranscript && !hasCapturedText) ||
                 analyticsState.status === 'loading'
                   ? 'none'
                   : '0 8px 24px rgba(217, 161, 46, 0.25)',
@@ -2048,8 +2195,8 @@ export function SongIntelligencePanel({
             {analyticsState.status === 'loading'
               ? 'Analyzing & Saving…'
               : analyticsState.status === 'success'
-                ? 'Regenerate AI Song Intelligence'
-                : 'Run AI Song Intelligence'}
+                ? 'Regenerate Song Intelligence'
+                : 'Run Song Intelligence'}
           </button>
         </div>
       </form>
@@ -2133,6 +2280,7 @@ export function SongIntelligencePanel({
       {analyticsState.result ? (
         <IntelligenceResults
           result={analyticsState.result}
+          slug={slug}
           taskState={taskCreateState}
           onCreateTask={handleCreateSongTask}
         />
