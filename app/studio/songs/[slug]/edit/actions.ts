@@ -142,6 +142,9 @@ const { error: songUpdateError } = await supabase
 export type TranscriptSaveState = {
   status: 'idle' | 'success' | 'error';
   message: string;
+  transcriptId?: string;
+  runAnalytics?: boolean;
+  saveToken?: string;
 };
 
 export async function saveSongTranscript(
@@ -169,6 +172,8 @@ export async function saveSongTranscript(
     const transcriptId = String(formData.get('transcript_id') || '');
     const transcriptText = String(formData.get('transcript_text') || '').trim();
     const isReviewed = formData.get('is_reviewed') === 'on';
+    const nextAction = String(formData.get('next_action') || 'save');
+    const runAnalytics = nextAction === 'run_intelligence';
 
     if (!songId || !attachmentId) {
       return { status: 'error', message: 'A song and audio attachment are required.' };
@@ -176,6 +181,13 @@ export async function saveSongTranscript(
 
     if (!transcriptText) {
       return { status: 'error', message: 'Enter or paste a transcript before saving.' };
+    }
+
+    if (runAnalytics && !isReviewed) {
+      return {
+        status: 'error',
+        message: 'Review the transcript against the recording before running Song Intelligence.',
+      };
     }
 
     const { data: ownedSong, error: ownedSongError } = await supabase
@@ -222,6 +234,8 @@ export async function saveSongTranscript(
       updated_at: now,
     };
 
+    let savedTranscriptId = transcriptId;
+
     if (transcriptId) {
       const { error } = await supabase
         .from('song_transcripts')
@@ -241,17 +255,34 @@ export async function saveSongTranscript(
         return { status: 'error', message: `Transcript update failed: ${error.message}` };
       }
     } else {
-      const { error } = await supabase.from('song_transcripts').insert(transcriptPayload);
+      const { data: insertedTranscript, error } = await supabase
+        .from('song_transcripts')
+        .insert(transcriptPayload)
+        .select('id')
+        .single();
 
-      if (error) {
-        return { status: 'error', message: `Transcript insert failed: ${error.message}` };
+      if (error || !insertedTranscript) {
+        return {
+          status: 'error',
+          message: `Transcript insert failed: ${error?.message || 'No transcript returned.'}`,
+        };
       }
+
+      savedTranscriptId = insertedTranscript.id;
     }
 
     revalidatePath(`/studio/songs/${slug}/edit`);
     revalidatePath('/studio');
 
-    return { status: 'success', message: 'Transcript saved successfully.' };
+    return {
+      status: 'success',
+      message: runAnalytics
+        ? 'Transcript saved. Song Intelligence is starting…'
+        : 'Transcript saved successfully.',
+      transcriptId: savedTranscriptId,
+      runAnalytics,
+      saveToken: `${savedTranscriptId}:${now}`,
+    };
   } catch (error) {
     return {
       status: 'error',

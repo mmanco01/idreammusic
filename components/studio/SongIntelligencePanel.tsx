@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useCallback, useEffect, useMemo, useState } from 'react';
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -250,17 +250,40 @@ type TaskListState = {
   updatingTaskId: string | null;
 };
 
-function SaveTranscriptButton() {
+function SaveTranscriptButton({
+  runIntelligence = false,
+  disabled = false,
+}: {
+  runIntelligence?: boolean;
+  disabled?: boolean;
+}) {
   const { pending } = useFormStatus();
+  const isDisabled = pending || disabled;
 
   return (
     <button
       type="submit"
-      className="button primary"
-      disabled={pending}
-      style={{ cursor: pending ? 'wait' : 'pointer', opacity: pending ? 0.7 : 1 }}
+      name="next_action"
+      value={runIntelligence ? 'run_intelligence' : 'save'}
+      className={runIntelligence ? 'button primary' : 'button'}
+      disabled={isDisabled}
+      title={
+        runIntelligence && disabled
+          ? 'Review the transcript against the recording first.'
+          : undefined
+      }
+      style={{
+        cursor: isDisabled ? 'not-allowed' : 'pointer',
+        opacity: isDisabled ? 0.58 : 1,
+      }}
     >
-      {pending ? 'Saving…' : 'Save transcript'}
+      {pending
+        ? runIntelligence
+          ? 'Saving transcript…'
+          : 'Saving…'
+        : runIntelligence
+          ? 'Save Transcript and Run Song Intelligence'
+          : 'Save transcript'}
     </button>
   );
 }
@@ -1522,6 +1545,8 @@ export function SongIntelligencePanel({
   const [selectedAttachmentId, setSelectedAttachmentId] = useState(
     audioAttachments[0]?.id ?? ''
   );
+  const [isTranscriptReviewed, setIsTranscriptReviewed] = useState(false);
+  const handledSaveTokenRef = useRef('');
 
   const selectedAttachment = useMemo(
     () =>
@@ -1537,10 +1562,30 @@ export function SongIntelligencePanel({
   );
 
   useEffect(() => {
-    if (saveState.status === 'success') {
-      router.refresh();
+    setIsTranscriptReviewed(selectedTranscript?.is_reviewed ?? false);
+  }, [selectedAttachmentId, selectedTranscript?.id, selectedTranscript?.is_reviewed]);
+
+  useEffect(() => {
+    if (saveState.status !== 'success') return;
+
+    router.refresh();
+
+    if (
+      saveState.runAnalytics &&
+      saveState.transcriptId &&
+      saveState.saveToken &&
+      handledSaveTokenRef.current !== saveState.saveToken
+    ) {
+      handledSaveTokenRef.current = saveState.saveToken;
+      void handleRunAnalytics(saveState.transcriptId, true);
     }
-  }, [router, saveState.status]);
+  }, [
+    router,
+    saveState.runAnalytics,
+    saveState.saveToken,
+    saveState.status,
+    saveState.transcriptId,
+  ]);
 
   const loadSongTasks = useCallback(async () => {
     setTaskListState((current) => ({
@@ -1723,11 +1768,29 @@ export function SongIntelligencePanel({
     }
   }
 
-  async function handleRunAnalytics() {
-    if (!selectedTranscript?.id && !hasCapturedText && !audioAttachments.length) {
+  async function handleRunAnalytics(
+    transcriptIdOverride?: string,
+    reviewedOverride = false
+  ) {
+    const transcriptId = transcriptIdOverride || selectedTranscript?.id || '';
+    const transcriptReviewed =
+      reviewedOverride || selectedTranscript?.is_reviewed || false;
+
+    if (audioAttachments.length && (!transcriptId || !transcriptReviewed)) {
       setAnalyticsState({
         status: 'error',
-        message: 'Add a title, a few words, a note, a document, or a recording before running Song Intelligence.',
+        message:
+          'Transcribe the recording and review the words before running Song Intelligence.',
+        result: null,
+        runId: null,
+      });
+      return;
+    }
+
+    if (!transcriptId && !hasCapturedText && !audioAttachments.length) {
+      setAnalyticsState({
+        status: 'error',
+        message: 'Add a title, a few words, a note, or a document before running Song Intelligence.',
         result: null,
         runId: null,
       });
@@ -1745,8 +1808,8 @@ export function SongIntelligencePanel({
       const requestBody = new FormData();
       requestBody.append('song_id', songId);
       requestBody.append('slug', slug);
-      if (selectedTranscript?.id) {
-        requestBody.append('transcript_id', selectedTranscript.id);
+      if (transcriptId) {
+        requestBody.append('transcript_id', transcriptId);
       }
 
       const response = await fetch('/api/song-analytics/generate', {
@@ -1946,7 +2009,7 @@ export function SongIntelligencePanel({
         <button
           type="button"
           className="button primary"
-          onClick={handleRunAnalytics}
+          onClick={() => void handleRunAnalytics()}
           disabled={analyticsState.status === 'loading'}
           style={{
             marginTop: '1rem',
@@ -2033,189 +2096,76 @@ export function SongIntelligencePanel({
   return (
     <div className="card" style={{ gridColumn: '1 / -1' }}>
       <div className="eyebrow">Song intelligence</div>
-      <h2 className="h2">Transcript &amp; Song Intelligence</h2>
-      <p className="copy" style={{ maxWidth: 820 }}>
-        Use saved words immediately, or add a reviewed transcript for richer
-        audio evidence. Song Intelligence provides provisional scores, Muse
-        direction, story and hook analysis, audience fit, and development
-        guidance.
+      <h2 className="h2">Transcript first, then Song Intelligence</h2>
+      <p className="copy" style={{ maxWidth: 840 }}>
+        Song Intelligence reads the words in your recording. Transcribe the
+        audio, check what was heard, and correct anything that was misread
+        before the song is analyzed.
       </p>
 
-      <label className="copy" htmlFor="intelligence-audio">
-        Recording
-      </label>
-      <select
-        id="intelligence-audio"
-        className="input"
-        value={selectedAttachmentId}
-        onChange={(event) => setSelectedAttachmentId(event.target.value)}
+      <section
+        style={{
+          marginTop: '1rem',
+          padding: '1.1rem',
+          border: '1px solid rgba(220, 182, 92, 0.42)',
+          borderRadius: 18,
+          background: 'rgba(0,0,0,0.12)',
+        }}
       >
-        {audioAttachments.map((attachment) => (
-          <option key={attachment.id} value={attachment.id}>
-            {attachment.title ||
-              attachment.storage_path.split('/').pop() ||
-              'Audio recording'}
-          </option>
-        ))}
-      </select>
+        <div className="eyebrow">Step 1 · Transcribe and review</div>
+        <h3 className="h3" style={{ marginTop: '0.35rem' }}>
+          Make sure Song Intelligence hears the right words
+        </h3>
 
-      <div
-        className="pillRow"
-        style={{ marginTop: '0.75rem', marginBottom: '1rem' }}
-      >
-        <span className="pill">{selectedAttachment?.mime_type || 'audio'}</span>
-        {selectedTranscript ? (
-          <span className="pill">
-            {selectedTranscript.is_reviewed
-              ? 'Transcript reviewed'
-              : 'Transcript saved'}
-          </span>
-        ) : (
-          <span className="pill">No transcript yet</span>
-        )}
-      </div>
-
-      <form action={saveFormAction} key={`save-${selectedAttachmentId}`}>
-        <input type="hidden" name="song_id" value={songId} />
-        <input type="hidden" name="slug" value={slug} />
-        <input
-          type="hidden"
-          name="attachment_id"
+        <label className="copy" htmlFor="intelligence-audio">
+          Recording
+        </label>
+        <select
+          id="intelligence-audio"
+          className="input"
           value={selectedAttachmentId}
-        />
-        <input
-          type="hidden"
-          name="song_version_id"
-          value={selectedAttachment?.song_version_id ?? ''}
-        />
-        <input
-          type="hidden"
-          name="transcript_id"
-          value={selectedTranscript?.id ?? ''}
-        />
-
-        <label className="copy" htmlFor="transcript_text">
-          Full transcript
-        </label>
-        <textarea
-          id="transcript_text"
-          name="transcript_text"
-          className="textarea"
-          rows={14}
-          defaultValue={selectedTranscript?.transcript_text ?? ''}
-          placeholder="Paste or type the transcript here, or generate one from the recording."
-        />
-
-        <label
-          className="copy"
-          style={{
-            display: 'flex',
-            gap: '0.75rem',
-            alignItems: 'center',
-            marginTop: '0.75rem',
-          }}
+          onChange={(event) => setSelectedAttachmentId(event.target.value)}
         >
-          <input
-            type="checkbox"
-            name="is_reviewed"
-            defaultChecked={selectedTranscript?.is_reviewed ?? false}
-          />
-          <span>I reviewed this transcript against the recording.</span>
-        </label>
+          {audioAttachments.map((attachment) => (
+            <option key={attachment.id} value={attachment.id}>
+              {attachment.title ||
+                attachment.storage_path.split('/').pop() ||
+                'Audio recording'}
+            </option>
+          ))}
+        </select>
 
-        {saveState.message ? (
-          <div
-            role="status"
-            style={{
-              marginTop: '1rem',
-              padding: '0.85rem 1rem',
-              borderRadius: 14,
-              border: '1px solid var(--line)',
-              color:
-                saveState.status === 'error' ? '#ffb4b4' : '#d9f7d6',
-              background:
-                saveState.status === 'error'
-                  ? 'rgba(160, 40, 40, 0.18)'
-                  : 'rgba(40, 130, 60, 0.18)',
-            }}
-          >
-            {saveState.message}
-          </div>
-        ) : null}
-
-        <div className="button-row" style={{ marginTop: '1rem' }}>
-          <SaveTranscriptButton />
-          <button
-            type="button"
-            className="button"
-            onClick={handleRunAnalytics}
-            disabled={
-              (!selectedTranscript && !hasCapturedText) ||
-              analyticsState.status === 'loading'
-            }
-            title={
-              selectedTranscript || hasCapturedText
-                ? 'Generates and automatically saves a new Song Intelligence report'
-                : 'Add captured text or generate a transcript first'
-            }
-            style={{
-              cursor:
-                (!selectedTranscript && !hasCapturedText) ||
-                analyticsState.status === 'loading'
-                  ? 'not-allowed'
-                  : 'pointer',
-              opacity:
-                (!selectedTranscript && !hasCapturedText) ||
-                analyticsState.status === 'loading'
-                  ? 0.55
-                  : 1,
-              color:
-                (!selectedTranscript && !hasCapturedText) ||
-                analyticsState.status === 'loading'
-                  ? 'rgba(255,255,255,0.72)'
-                  : '#17120a',
-              background:
-                !selectedTranscript && !hasCapturedText
-                  ? 'rgba(255,255,255,0.06)'
-                  : analyticsState.status === 'loading'
-                    ? 'linear-gradient(135deg, #8f6a24 0%, #6f511b 100%)'
-                    : 'linear-gradient(135deg, #ffd978 0%, #d9a12e 100%)',
-              border:
-                !selectedTranscript && !hasCapturedText
-                  ? '1px solid var(--line)'
-                  : '1px solid rgba(255, 221, 132, 0.9)',
-              boxShadow:
-                (!selectedTranscript && !hasCapturedText) ||
-                analyticsState.status === 'loading'
-                  ? 'none'
-                  : '0 8px 24px rgba(217, 161, 46, 0.25)',
-              fontWeight: 750,
-            }}
-          >
-            {analyticsState.status === 'loading'
-              ? 'Analyzing & Saving…'
-              : analyticsState.status === 'success'
-                ? 'Regenerate Song Intelligence'
-                : 'Run Song Intelligence'}
-          </button>
+        <div
+          className="pillRow"
+          style={{ marginTop: '0.75rem', marginBottom: '1rem' }}
+        >
+          <span className="pill">{selectedAttachment?.mime_type || 'audio'}</span>
+          {selectedTranscript ? (
+            <span className="pill">
+              {selectedTranscript.is_reviewed
+                ? 'Transcript reviewed'
+                : 'Transcript ready for review'}
+            </span>
+          ) : (
+            <span className="pill">No transcript yet</span>
+          )}
         </div>
-      </form>
 
-      <div style={{ marginTop: '1rem' }}>
         <button
           type="button"
-          className="button primary"
+          className={selectedTranscript ? 'button' : 'button primary'}
           onClick={handleGenerateTranscript}
           disabled={generateState.status === 'loading'}
           style={{
-            cursor:
-              generateState.status === 'loading' ? 'wait' : 'pointer',
+            cursor: generateState.status === 'loading' ? 'wait' : 'pointer',
             opacity: generateState.status === 'loading' ? 0.7 : 1,
           }}
         >
           {generateState.status === 'loading'
-            ? 'Generating…'
-            : 'Generate Transcript'}
+            ? 'Transcribing your recording…'
+            : selectedTranscript
+              ? 'Regenerate Transcript'
+              : 'Transcribe My Recording'}
         </button>
 
         {generateState.message ? (
@@ -2237,7 +2187,137 @@ export function SongIntelligencePanel({
             {generateState.message}
           </div>
         ) : null}
-      </div>
+
+        <form
+          action={saveFormAction}
+          key={`save-${selectedAttachmentId}-${selectedTranscript?.updated_at ?? 'new'}`}
+          style={{ marginTop: '1rem' }}
+        >
+          <input type="hidden" name="song_id" value={songId} />
+          <input type="hidden" name="slug" value={slug} />
+          <input
+            type="hidden"
+            name="attachment_id"
+            value={selectedAttachmentId}
+          />
+          <input
+            type="hidden"
+            name="song_version_id"
+            value={selectedAttachment?.song_version_id ?? ''}
+          />
+          <input
+            type="hidden"
+            name="transcript_id"
+            value={selectedTranscript?.id ?? ''}
+          />
+
+          <label className="copy" htmlFor="transcript_text">
+            {selectedTranscript
+              ? 'Review and correct the transcript'
+              : 'Transcript — generate it above or enter it manually'}
+          </label>
+          <textarea
+            id="transcript_text"
+            name="transcript_text"
+            className="textarea"
+            rows={14}
+            defaultValue={selectedTranscript?.transcript_text ?? ''}
+            placeholder="The words from the recording will appear here. Correct anything that was misheard."
+          />
+
+          <label
+            className="copy"
+            style={{
+              display: 'flex',
+              gap: '0.75rem',
+              alignItems: 'center',
+              marginTop: '0.75rem',
+            }}
+          >
+            <input
+              type="checkbox"
+              name="is_reviewed"
+              checked={isTranscriptReviewed}
+              onChange={(event) => setIsTranscriptReviewed(event.target.checked)}
+            />
+            <span>I reviewed this transcript against the recording.</span>
+          </label>
+
+          {saveState.message ? (
+            <div
+              role="status"
+              style={{
+                marginTop: '1rem',
+                padding: '0.85rem 1rem',
+                borderRadius: 14,
+                border: '1px solid var(--line)',
+                color:
+                  saveState.status === 'error' ? '#ffb4b4' : '#d9f7d6',
+                background:
+                  saveState.status === 'error'
+                    ? 'rgba(160, 40, 40, 0.18)'
+                    : 'rgba(40, 130, 60, 0.18)',
+              }}
+            >
+              {saveState.message}
+            </div>
+          ) : null}
+
+          <div className="button-row" style={{ marginTop: '1rem' }}>
+            <SaveTranscriptButton />
+            <SaveTranscriptButton
+              runIntelligence
+              disabled={!isTranscriptReviewed}
+            />
+          </div>
+        </form>
+      </section>
+
+      <section
+        style={{
+          marginTop: '1rem',
+          padding: '1.1rem',
+          border: '1px solid var(--line)',
+          borderRadius: 18,
+          background: selectedTranscript?.is_reviewed
+            ? 'linear-gradient(145deg, rgba(220, 182, 92, 0.12), rgba(255,255,255,0.025))'
+            : 'rgba(255,255,255,0.025)',
+        }}
+      >
+        <div className="eyebrow">Step 2 · Understand the song</div>
+        <h3 className="h3" style={{ marginTop: '0.35rem' }}>
+          Run Song Intelligence
+        </h3>
+        <p className="copy" style={{ maxWidth: 820 }}>
+          {selectedTranscript?.is_reviewed
+            ? 'The reviewed transcript is ready. Song Intelligence will combine it with the title, captured words, notes, lyrics, and other saved material.'
+            : 'Review and save the transcript above to unlock ratings, Muse direction, story and hook analysis, and the recommended next move.'}
+        </p>
+        <button
+          type="button"
+          className="button primary"
+          onClick={() => void handleRunAnalytics()}
+          disabled={
+            !selectedTranscript?.is_reviewed || analyticsState.status === 'loading'
+          }
+          style={{
+            cursor:
+              !selectedTranscript?.is_reviewed || analyticsState.status === 'loading'
+                ? 'not-allowed'
+                : 'pointer',
+            opacity:
+              !selectedTranscript?.is_reviewed || analyticsState.status === 'loading'
+                ? 0.55
+                : 1,
+          }}
+        >
+          {analyticsState.status === 'loading'
+            ? 'Understanding your song…'
+            : analyticsState.status === 'success'
+              ? 'Regenerate Song Intelligence'
+              : 'Run Song Intelligence'}
+        </button>
+      </section>
 
       {analyticsState.message ? (
         <div
