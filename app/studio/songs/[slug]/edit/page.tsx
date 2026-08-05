@@ -1003,23 +1003,13 @@ export default async function EditSongPage({
         </section>
 
         <section id="muses">
-          <div
-            className="card"
-            style={{
-              marginBottom: "1rem",
-              border:
-                "1px solid rgba(156, 137, 220, 0.46)",
-              background:
-                "linear-gradient(145deg, rgba(86, 67, 145, 0.15), rgba(255,255,255,0.025))",
-            }}
-          >
+          <div className="council-section-intro">
             <div className="eyebrow">Collaborate</div>
             <h2 className="h2">Your Creative Council</h2>
-
-            <p className="copy" style={{ maxWidth: 900 }}>
+            <p className="copy">
               {hasAssignedMuse
-                ? `Begin with ${assignedMuse?.name ?? "the assigned Muse"}, the song’s primary creative partner. Then invite another Muse to reveal how a different specialty changes the recommendation.`
-                : "Song Intelligence can recommend the strongest lead Muse for this Spark. You can also choose any Muse directly when you are ready to collaborate."}
+                ? `Start with ${assignedMuse?.name ?? "the assigned Muse"}. The Council shows the clearest direction, most useful insights, and one recommended next move before the full responses.`
+                : "Song Intelligence can recommend the strongest lead Muse for this Spark. The Council will keep the guidance summary-first once you begin."}
             </p>
           </div>
 

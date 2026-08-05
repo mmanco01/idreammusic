@@ -1,6 +1,9 @@
 "use client";
 
-import type { MuseIntelligenceResult } from "@/lib/muses/intelligence";
+import type {
+  MuseIntelligenceResult,
+  MuseRecommendation,
+} from "@/lib/muses/intelligence";
 import { AnalysisLoadingState } from "@/components/ui/AnalysisLoadingState";
 
 export type MuseCouncilEntry = {
@@ -99,6 +102,69 @@ function entryInsight(entry: MuseCouncilEntry) {
     entry.intelligence?.recommendations[0]?.title ||
     firstSentence(entry.content)
   );
+}
+
+function recommendationForEntry(entry?: MuseCouncilEntry) {
+  if (!entry?.intelligence?.recommendations.length) {
+    return null;
+  }
+
+  return (
+    entry.intelligence.recommendations.find(
+      (recommendation) => recommendation.priority === "now",
+    ) ?? entry.intelligence.recommendations[0]
+  );
+}
+
+function recommendationText(recommendation: MuseRecommendation) {
+  const reasoning = recommendation.reasoning.trim();
+
+  if (!reasoning) {
+    return recommendation.title;
+  }
+
+  return `${recommendation.title} — ${reasoning}`;
+}
+
+function buildInsights(
+  entries: MuseCouncilEntry[],
+  leadEntry?: MuseCouncilEntry,
+) {
+  const candidates: string[] = [];
+
+  if (leadEntry?.intelligence?.primaryObservation.statement) {
+    candidates.push(leadEntry.intelligence.primaryObservation.statement);
+  } else if (leadEntry) {
+    candidates.push(entryInsight(leadEntry));
+  }
+
+  const leadRecommendation = recommendationForEntry(leadEntry);
+  if (leadRecommendation) {
+    candidates.push(recommendationText(leadRecommendation));
+  }
+
+  for (const entry of entries) {
+    if (entry.id === leadEntry?.id) continue;
+
+    candidates.push(entryInsight(entry));
+
+    const recommendation = recommendationForEntry(entry);
+    if (recommendation) {
+      candidates.push(recommendationText(recommendation));
+    }
+  }
+
+  const seen = new Set<string>();
+
+  return candidates
+    .map((candidate) => truncate(candidate, 230))
+    .filter((candidate) => {
+      const key = candidate.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3);
 }
 
 function stemToken(value: string) {
@@ -275,69 +341,53 @@ export function MuseCouncilOverview({
     return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
   });
 
-  const topInsights = orderedEntries.slice(0, 3);
+  const leadEntry = orderedEntries.find((entry) => entry.museSlug === leadMuse.slug);
+  const leadRecommendation = recommendationForEntry(leadEntry);
+  const fallbackRecommendation = orderedEntries
+    .map((entry) => recommendationForEntry(entry))
+    .find((recommendation): recommendation is MuseRecommendation => Boolean(recommendation));
+  const nextRecommendation = leadRecommendation ?? fallbackRecommendation;
+  const insights = buildInsights(orderedEntries, leadEntry);
   const alignment = findAlignment(orderedEntries);
   const difference = findDifference(orderedEntries);
-  const leadEntry = orderedEntries.find((entry) => entry.museSlug === leadMuse.slug);
 
-  const summary =
-    status === "loading"
-      ? "Gathering the latest Muse perspectives…"
-      : orderedEntries.length === 0
-        ? `${leadMuse.name} is your lead Muse. Ask the first question to begin the council.`
-        : orderedEntries.length === 1
-          ? `${leadMuse.name} has opened the council. Invite another Muse when the song needs a second creative lens.`
-          : `${orderedEntries.length} Muses have contributed. The clearest current direction begins with ${truncate(
-              entryInsight(leadEntry ?? orderedEntries[0]),
-              175,
-            )}`;
+  const headline =
+    orderedEntries.length === 0
+      ? `${leadMuse.name} is ready to help reveal what this song wants to become.`
+      : orderedEntries.length === 1
+        ? truncate(entryInsight(leadEntry ?? orderedEntries[0]), 220)
+        : `${orderedEntries.length} Muses have contributed. The clearest current direction is ${truncate(
+            entryInsight(leadEntry ?? orderedEntries[0]),
+            185,
+          )}`;
+
+  const nextTitle =
+    nextRecommendation?.title ||
+    (orderedEntries.length === 0
+      ? `Ask ${leadMuse.name} the first focused question`
+      : `Continue with ${leadMuse.name}`);
+
+  const nextDescription =
+    nextRecommendation?.reasoning ||
+    (orderedEntries.length === 0
+      ? `Start with the lead Muse. The Council will summarize the strongest insight and next move after the first response.`
+      : `Use the Council summary as your guide, then ask ${leadMuse.name} one focused follow-up question.`);
 
   return (
-    <section
-      style={{
-        marginTop: "1rem",
-        padding: "1rem",
-        borderRadius: 18,
-        border: "1px solid rgba(156, 137, 220, 0.48)",
-        background:
-          "linear-gradient(145deg, rgba(86, 67, 145, 0.16), rgba(0,0,0,0.12))",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "space-between",
-          gap: "0.75rem",
-          alignItems: "flex-start",
-        }}
-      >
-        <div style={{ maxWidth: 820 }}>
-          <div className="eyebrow">Council summary</div>
-          <h3 className="h3" style={{ margin: "0.35rem 0 0" }}>
-            Headline first. Full counsel when you need it.
+    <section className="council-overview" id="muse-council-summary">
+      <div className="council-overview__header">
+        <div className="council-overview__headline">
+          <div className="eyebrow">Council direction</div>
+          <h3 className="h3">
+            {orderedEntries.length ? "What the Council hears" : "Begin with the lead Muse"}
           </h3>
-          <p className="copy" style={{ margin: "0.55rem 0 0" }}>
-            {summary}
-          </p>
+          <p className="copy">{headline}</p>
         </div>
 
-        <div
-          style={{
-            minWidth: 210,
-            padding: "0.75rem 0.85rem",
-            borderRadius: 14,
-            border: "1px solid rgba(220, 182, 92, 0.4)",
-            background: "rgba(137, 96, 31, 0.12)",
-          }}
-        >
+        <div className="council-lead-muse">
           <div className="eyebrow">Lead Muse</div>
-          <strong className="copy" style={{ display: "block", marginTop: "0.25rem" }}>
-            {leadMuse.name} — {leadMuse.domain}
-          </strong>
-          <span className="pill" style={{ display: "inline-flex", marginTop: "0.45rem" }}>
-            Primary creative partner
-          </span>
+          <strong>{leadMuse.name} — {leadMuse.domain}</strong>
+          <span className="info-badge">Primary creative partner</span>
         </div>
       </div>
 
@@ -345,130 +395,85 @@ export function MuseCouncilOverview({
         <AnalysisLoadingState
           compact
           title="The Muse Council is refreshing"
-          messages={["Gathering the latest Muse perspectives and rebuilding the council summary."]}
+          messages={["Gathering the latest perspectives and rebuilding the Council direction."]}
         />
       ) : null}
 
       {status === "error" ? (
         <div className="statusMessage statusError" style={{ marginTop: "0.8rem" }}>
-          The council summary could not be refreshed. Individual Muse conversations are still available below.
+          The Council summary could not be refreshed. Your saved Muse conversations remain available below.
         </div>
       ) : null}
 
-      {topInsights.length ? (
-        <div style={{ marginTop: "1rem" }}>
-          <div className="eyebrow">Most relevant now</div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 235px), 1fr))",
-              gap: "0.7rem",
-              marginTop: "0.55rem",
-            }}
-          >
-            {topInsights.map((entry) => (
-              <article
-                key={entry.id}
-                style={{
-                  padding: "0.85rem",
-                  borderRadius: 14,
-                  border:
-                    entry.museSlug === leadMuse.slug
-                      ? "1px solid rgba(220, 182, 92, 0.5)"
-                      : "1px solid var(--line)",
-                  background:
-                    entry.museSlug === leadMuse.slug
-                      ? "rgba(137, 96, 31, 0.1)"
-                      : "rgba(255,255,255,0.025)",
-                }}
-              >
-                <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
-                  <span className="eyebrow">
-                    {entry.museName} — {entry.domain}
-                  </span>
-                  {entry.museSlug === leadMuse.slug ? (
-                    <span className="pill">Lead Muse</span>
-                  ) : null}
-                </div>
-                <p className="copy" style={{ margin: "0.45rem 0 0" }}>
-                  {truncate(entryInsight(entry), 210)}
-                </p>
-              </article>
-            ))}
+      {status !== "loading" ? (
+        <div className="recommended-action council-recommended-action">
+          <div className="recommended-action__eyebrow">Recommended next move</div>
+          <h4 className="recommended-action__title">{nextTitle}</h4>
+          <div className="recommended-action__description">
+            <p>{nextDescription}</p>
           </div>
+          <div className="recommended-action__controls">
+            <button
+              type="button"
+              className="button primary"
+              onClick={() => onOpenMuse(leadMuse.slug)}
+            >
+              {orderedEntries.length ? `Continue with ${leadMuse.name}` : `Ask ${leadMuse.name}`}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {insights.length ? (
+        <div className="council-insights">
+          <div className="eyebrow">Most useful insights</div>
+          <ol>
+            {insights.map((insight, index) => (
+              <li key={`${index}-${insight}`}>{insight}</li>
+            ))}
+          </ol>
         </div>
       ) : null}
 
       {orderedEntries.length > 1 ? (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))",
-            gap: "0.7rem",
-            marginTop: "0.9rem",
-          }}
-        >
-          <div
-            style={{
-              padding: "0.85rem",
-              borderRadius: 14,
-              border: "1px solid rgba(220, 182, 92, 0.34)",
-              background: "rgba(137, 96, 31, 0.07)",
-            }}
-          >
-            <div className="eyebrow">Areas of agreement</div>
-            <p className="copy" style={{ margin: "0.4rem 0 0" }}>
-              {alignment ||
-                "The Muses are not repeating one clear theme yet. That can be useful: the song may still be defining its central question."}
-            </p>
+        <details className="council-disclosure">
+          <summary>Where the Muses agree—and where they differ</summary>
+          <div className="council-alignment-grid">
+            <div>
+              <div className="eyebrow">Areas of agreement</div>
+              <p className="copy">
+                {alignment ||
+                  "The Muses are not repeating one clear theme yet. The song may still be defining its central question."}
+              </p>
+            </div>
+            <div>
+              <div className="eyebrow">Productive difference</div>
+              <p className="copy">
+                {difference ||
+                  "The perspectives currently reinforce one another more than they disagree. Invite another Muse only when the song needs a genuinely different lens."}
+              </p>
+            </div>
           </div>
-
-          <div
-            style={{
-              padding: "0.85rem",
-              borderRadius: 14,
-              border: "1px solid rgba(156, 137, 220, 0.42)",
-              background: "rgba(86, 67, 145, 0.08)",
-            }}
-          >
-            <div className="eyebrow">Productive difference</div>
-            <p className="copy" style={{ margin: "0.4rem 0 0" }}>
-              {difference ||
-                "Invite another Muse to expose a genuinely different priority or creative risk."}
-            </p>
-          </div>
-        </div>
+        </details>
       ) : null}
 
       {orderedEntries.length ? (
-        <details style={{ marginTop: "0.9rem" }}>
-          <summary className="copy" style={{ cursor: "pointer", fontWeight: 700 }}>
-            Latest full Muse responses · {orderedEntries.length}
-          </summary>
-
-          <div style={{ display: "grid", gap: "0.65rem", marginTop: "0.7rem" }}>
+        <details className="council-disclosure">
+          <summary>Full Muse counsel ({orderedEntries.length})</summary>
+          <div className="council-full-responses">
             {orderedEntries.map((entry) => (
-              <details
-                key={`full-${entry.id}`}
-                style={{
-                  padding: "0.75rem 0.85rem",
-                  borderRadius: 14,
-                  border: "1px solid var(--line)",
-                  background: "rgba(0,0,0,0.1)",
-                }}
-              >
-                <summary className="copy" style={{ cursor: "pointer", fontWeight: 700 }}>
-                  {entry.museName} — {truncate(entryInsight(entry), 115)}
+              <details key={`full-${entry.id}`} className="council-response">
+                <summary>
+                  <span>{entry.museName}</span>
+                  <span>{truncate(entryInsight(entry), 125)}</span>
                 </summary>
 
-                <div className="copy" style={{ marginTop: "0.65rem", whiteSpace: "pre-wrap" }}>
-                  {entry.content}
-                </div>
+                <div className="copy council-response__content">{entry.content}</div>
 
                 {entry.intelligence?.recommendations.length ? (
-                  <div style={{ marginTop: "0.75rem" }}>
+                  <div className="council-response__moves">
                     <div className="eyebrow">Recommended moves</div>
-                    <ul className="copy" style={{ margin: "0.35rem 0 0 1.1rem" }}>
+                    <ul className="copy">
                       {entry.intelligence.recommendations.map((recommendation) => (
                         <li key={`${entry.id}-${recommendation.title}`}>
                           <strong>{recommendation.title}</strong> — {recommendation.reasoning}
@@ -480,8 +485,7 @@ export function MuseCouncilOverview({
 
                 <button
                   type="button"
-                  className="button"
-                  style={{ marginTop: "0.75rem" }}
+                  className="button secondary"
                   onClick={() => onOpenMuse(entry.museSlug)}
                 >
                   Continue with {entry.museName}

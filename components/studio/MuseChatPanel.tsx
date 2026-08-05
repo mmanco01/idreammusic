@@ -209,6 +209,15 @@ function compactResponseSummary(message: ChatMessage) {
     .replace(/\s+\S*$/, "")}…`;
 }
 
+function messageRecommendedMove(message: ChatMessage) {
+  const recommendation =
+    message.intelligence?.recommendations.find(
+      (item) => item.priority === "now",
+    ) ?? message.intelligence?.recommendations[0];
+
+  return recommendation?.title ?? null;
+}
+
 export function MuseChatPanel({
   defaultMuseSlug,
   initialMuseSlug,
@@ -551,6 +560,41 @@ export function MuseChatPanel({
     setSelectedMuseSlug(nextMuseSlug);
     setMessages([]);
     setConversationId(null);
+  }
+
+  function openMuseFromCouncil(nextMuseSlug: string) {
+    if (nextMuseSlug !== selectedMuseSlug) {
+      changeMuse(nextMuseSlug);
+    }
+
+    window.setTimeout(() => {
+      const questionField = document.getElementById(
+        "muse-message",
+      ) as HTMLTextAreaElement | null;
+
+      questionField?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      questionField?.focus({ preventScroll: true });
+    }, nextMuseSlug === selectedMuseSlug ? 0 : 180);
+  }
+
+
+  function prepareQuestion(question: string) {
+    setInput(question);
+
+    window.setTimeout(() => {
+      const questionField = document.getElementById(
+        "muse-message",
+      ) as HTMLTextAreaElement | null;
+
+      questionField?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      questionField?.focus({ preventScroll: true });
+    }, 0);
   }
 
   async function startNewConversation() {
@@ -1106,7 +1150,8 @@ export function MuseChatPanel({
 
   return (
     <section
-      className="card"
+      id="muse-conversation"
+      className="card muse-council-panel"
       style={{
         border:
           "1px solid rgba(220, 182, 92, 0.55)",
@@ -1114,114 +1159,90 @@ export function MuseChatPanel({
           "linear-gradient(145deg, rgba(137, 96, 31, 0.16), rgba(255,255,255,0.025))",
       }}
     >
-      <div className="eyebrow">
-        {isSongConversation
-          ? isPrimaryMuse
-            ? "Your song's Muse"
-            : "Invited Muse specialist"
-          : `Conversation with the Muse of ${selectedMuse.domain}`}
+      <div className="muse-council-panel__intro">
+        <div>
+          <div className="eyebrow">
+            {isSongConversation
+              ? isPrimaryMuse
+                ? "Lead Muse conversation"
+                : "Invited Muse perspective"
+              : `Conversation with the Muse of ${selectedMuse.domain}`}
+          </div>
+          <h2 className="h2" style={{ marginBottom: "0.35rem" }}>
+            Ask {selectedMuse.name}
+          </h2>
+          <p className="copy" style={{ maxWidth: 760, marginBottom: 0 }}>
+            {isSongConversation ? (
+              <>
+                <strong>{selectedMuse.name}</strong> listens through the lens of{" "}
+                <strong>{selectedMuse.domain}</strong>. Ask one focused question; the
+                Council will surface the clearest insight and next move first.
+              </>
+            ) : (
+              <>
+                <strong>{selectedMuse.name}</strong> is the Muse of{" "}
+                <strong>{selectedMuse.domain}</strong>. {selectedMuse.label}.
+              </>
+            )}
+          </p>
+        </div>
+
+        {isSongConversation ? (
+          <span className="info-badge">
+            {isPrimaryMuse
+              ? `${selectedMuse.name} is the lead Muse`
+              : `${selectedMuse.name} is joining as a specialist`}
+          </span>
+        ) : null}
       </div>
-
-      <h2
-        className="h2"
-        style={{ marginBottom: "0.35rem" }}
-      >
-        Ask {selectedMuse.name}
-      </h2>
-
-      <p
-        className="copy"
-        style={{ maxWidth: 850 }}
-      >
-        <strong>{selectedMuse.name}</strong> is
-        the Muse of{" "}
-        <strong>{selectedMuse.domain}</strong>.{" "}
-        {selectedMuse.label}.
-        {isSongConversation && songTitle ? (
-          <>
-            {" "}
-            She will work with the saved
-            material for{" "}
-            <strong>{songTitle}</strong>,
-            remember approved creative
-            decisions, compare versions, and
-            expose her structured reasoning.
-          </>
-        ) : (
-          " Ask about songwriting, creative direction, a new idea, or a song you are developing."
-        )}
-      </p>
 
       {isSongConversation && songId ? (
         <MuseCouncilOverview
           leadMuse={safeDefaultMuse ?? selectedMuse}
           entries={councilEntries}
           status={councilStatus}
-          onOpenMuse={changeMuse}
+          onOpenMuse={openMuseFromCouncil}
         />
       ) : null}
 
       {isSongConversation && songId ? (
-        <MuseAudioBridgeCard
-          songId={songId}
-        />
+        <details className="council-disclosure council-tool-disclosure">
+          <summary>Audio evidence available to the Muses</summary>
+          <MuseAudioBridgeCard songId={songId} />
+        </details>
       ) : null}
 
       {!lockedMuse ? (
-        <div
-          style={{
-            marginTop: "0.85rem",
-            padding: "0.85rem",
-            border: "1px solid var(--line)",
-            borderRadius: 14,
-            background: "rgba(0,0,0,0.12)",
-          }}
-        >
-          <label
-            className="copy"
-            htmlFor="muse-selector"
-          >
-            Creative partner
-          </label>
-          <select
-            id="muse-selector"
-            className="input"
-            value={selectedMuse.slug}
-            disabled={isBusy}
-            onChange={(event) =>
-              changeMuse(event.target.value)
-            }
-            style={{ marginTop: "0.35rem" }}
-          >
-            {museOptions.map((option) => (
-              <option
-                key={option.slug}
-                value={option.slug}
-              >
-                {option.name} — {option.domain}
-                {option.slug ===
-                safeDefaultMuse?.slug
-                  ? " (Primary Muse)"
-                  : ""}
-              </option>
-            ))}
-          </select>
-
-          {!isPrimaryMuse &&
-          isSongConversation ? (
-            <p
-              className="copy"
-              style={{
-                marginTop: "0.45rem",
-                fontSize: "0.86rem",
-              }}
+        <details className="council-disclosure council-tool-disclosure">
+          <summary>Switch or invite a different Muse</summary>
+          <div className="council-selector-panel">
+            <label className="copy" htmlFor="muse-selector">
+              Creative partner
+            </label>
+            <select
+              id="muse-selector"
+              className="input"
+              value={selectedMuse.slug}
+              disabled={isBusy}
+              onChange={(event) => changeMuse(event.target.value)}
+              style={{ marginTop: "0.35rem" }}
             >
-              {selectedMuse.name} is joining as
-              a specialist. The song remains
-              assigned to {safeDefaultMuse?.name}.
-            </p>
-          ) : null}
-        </div>
+              {museOptions.map((option) => (
+                <option key={option.slug} value={option.slug}>
+                  {option.name} — {option.domain}
+                  {option.slug === safeDefaultMuse?.slug ? " (Lead Muse)" : ""}
+                </option>
+              ))}
+            </select>
+
+            {!isPrimaryMuse && isSongConversation ? (
+              <p className="copy" style={{ margin: "0.45rem 0 0", fontSize: "0.86rem" }}>
+                {selectedMuse.name} is joining as a specialist. The song remains assigned
+                to {safeDefaultMuse?.name}.
+              </p>
+            ) : null}
+          </div>
+        </details>
       ) : null}
 
       {historyStatus === "loading" ? (
@@ -1231,39 +1252,53 @@ export function MuseChatPanel({
           messages={["Bringing the saved questions, responses, and Muse guidance back into view."]}
         />
       ) : messages.length === 0 ? (
-        <div style={{ marginTop: "1rem" }}>
-          <p
-            className="copy"
-            style={{ fontStyle: "italic" }}
-          >
+        <div className="muse-first-question">
+          <p className="copy" style={{ fontStyle: "italic", marginBottom: 0 }}>
             “{selectedMuse.greeting}”
           </p>
-          <div
-            className="eyebrow"
-            style={{ marginTop: "0.85rem" }}
-          >
-            Start with a question
+
+          <div className="recommended-action">
+            <div className="recommended-action__eyebrow">Recommended first question</div>
+            <h3 className="recommended-action__title">
+              {input.trim() || selectedMuse.starterQuestions[0]}
+            </h3>
+            <div className="recommended-action__description">
+              <p>
+                Start here, or write your own focused question in the box below.
+              </p>
+            </div>
+            <div className="recommended-action__controls">
+              <button
+                type="button"
+                className="button primary"
+                disabled={isBusy}
+                onClick={() =>
+                  void sendMessage(input.trim() || selectedMuse.starterQuestions[0])
+                }
+              >
+                Ask {selectedMuse.name}
+              </button>
+            </div>
           </div>
-          <div
-            className="button-row"
-            style={{ marginTop: "0.55rem" }}
-          >
-            {selectedMuse.starterQuestions.map(
-              (question) => (
-                <button
-                  key={question}
-                  type="button"
-                  className="button"
-                  disabled={isBusy}
-                  onClick={() =>
-                    void sendMessage(question)
-                  }
-                >
-                  {question}
-                </button>
-              ),
-            )}
-          </div>
+
+          {selectedMuse.starterQuestions.length > 1 ? (
+            <details className="council-disclosure">
+              <summary>Other useful questions</summary>
+              <div className="button-row council-question-options">
+                {selectedMuse.starterQuestions.slice(1).map((question) => (
+                  <button
+                    key={question}
+                    type="button"
+                    className="button secondary"
+                    disabled={isBusy}
+                    onClick={() => prepareQuestion(question)}
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
+            </details>
+          ) : null}
         </div>
       ) : (
         <div
@@ -1293,10 +1328,7 @@ export function MuseChatPanel({
                 }}
               >
                 <details
-                  open={
-                    !isAssistant ||
-                    message.id === latestAssistantMessageId
-                  }
+                  open={!isAssistant}
                   style={
                     isAssistant
                       ? { width: "100%" }
@@ -1326,7 +1358,8 @@ export function MuseChatPanel({
                     <span className="eyebrow">
                       {message.kind === "collaborator"
                         ? `${message.museName} — another Muse's perspective`
-                        : `${message.museName || "Muse"} — full response`}
+                        : `${message.museName || "Muse"} — guidance`}
+                      {message.id === latestAssistantMessageId ? " · Latest" : ""}
                     </span>
                     <span
                       style={{
@@ -1336,6 +1369,14 @@ export function MuseChatPanel({
                       }}
                     >
                       {compactResponseSummary(message)}
+                    </span>
+                    {messageRecommendedMove(message) ? (
+                      <span className="council-message-next-move">
+                        Recommended now: {messageRecommendedMove(message)}
+                      </span>
+                    ) : null}
+                    <span className="council-message-expand-hint">
+                      Open full response, reasoning, and actions
                     </span>
                   </summary>
 
