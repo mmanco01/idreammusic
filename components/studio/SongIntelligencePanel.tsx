@@ -4,6 +4,8 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { AnalysisLoadingState, AnimatedDots } from '@/components/ui/AnalysisLoadingState';
+import { RecommendedNextAction } from '@/components/ui/RecommendedNextAction';
 import {
   saveSongTranscript,
   type TranscriptSaveState,
@@ -267,6 +269,7 @@ function SaveTranscriptButton({
       value={runIntelligence ? 'run_intelligence' : 'save'}
       className={runIntelligence ? 'button primary' : 'button'}
       disabled={isDisabled}
+      aria-busy={pending}
       title={
         runIntelligence && disabled
           ? 'Review the transcript against the recording first.'
@@ -277,13 +280,16 @@ function SaveTranscriptButton({
         opacity: isDisabled ? 0.58 : 1,
       }}
     >
-      {pending
-        ? runIntelligence
-          ? 'Saving transcript…'
-          : 'Saving…'
-        : runIntelligence
-          ? 'Save Transcript and Run Song Intelligence'
-          : 'Save transcript'}
+      {pending ? (
+        <>
+          {runIntelligence ? 'Saving transcript and preparing analysis' : 'Saving transcript'}
+          <AnimatedDots label="Saving transcript" />
+        </>
+      ) : runIntelligence ? (
+        'Save Transcript and Run Song Intelligence'
+      ) : (
+        'Save transcript'
+      )}
     </button>
   );
 }
@@ -362,35 +368,25 @@ function CreateTaskButton({
     <div style={{ marginTop: '0.7rem' }}>
       <button
         type="button"
-        className="button"
+        className={`button secondary${isSuccess ? ' task-created' : ''}`}
         onClick={onCreate}
         disabled={isLoading || isSuccess}
+        aria-busy={isLoading}
         style={{
-          cursor: isLoading || isSuccess ? 'not-allowed' : 'pointer',
-          opacity: isLoading ? 0.78 : 1,
           fontSize: '0.9rem',
-          fontWeight: 800,
           padding: '0.65rem 0.9rem',
-          color: isSuccess ? '#f4fff5' : '#17120a',
-          background: isSuccess
-            ? 'linear-gradient(135deg, #287a45 0%, #1d5e35 100%)'
-            : isLoading
-              ? 'linear-gradient(135deg, #ad8234 0%, #7f5d22 100%)'
-              : 'linear-gradient(135deg, #ffe49a 0%, #dca52f 100%)',
-          border: isSuccess
-            ? '1px solid #68c987'
-            : '1px solid #ffe7a7',
-          boxShadow: isSuccess
-            ? '0 8px 22px rgba(35, 120, 67, 0.24)'
-            : '0 8px 22px rgba(220, 165, 47, 0.28)',
-          textShadow: isSuccess ? '0 1px 1px rgba(0,0,0,0.35)' : 'none',
         }}
       >
-        {isLoading
-          ? 'Creating Task…'
-          : isSuccess
-            ? '✓ Task Created'
-            : label || '+ Create Song Task'}
+        {isLoading ? (
+          <>
+            Creating task
+            <AnimatedDots label="Creating task" />
+          </>
+        ) : isSuccess ? (
+          '✓ Task Created'
+        ) : (
+          label || '+ Create Song Task'
+        )}
       </button>
 
       {state?.message ? (
@@ -730,20 +726,19 @@ function SongTasksManager({
 
         <button
           type="button"
-          className="button"
+          className="button secondary"
           onClick={onRefresh}
           disabled={state.status === 'loading'}
-          style={{
-            cursor: state.status === 'loading' ? 'wait' : 'pointer',
-            opacity: state.status === 'loading' ? 0.7 : 1,
-            color: '#17120a',
-            background: 'linear-gradient(135deg, #ffe49a 0%, #dca52f 100%)',
-            border: '1px solid #ffe7a7',
-            fontWeight: 800,
-            boxShadow: '0 6px 16px rgba(220, 165, 47, 0.2)',
-          }}
+          aria-busy={state.status === 'loading'}
         >
-          {state.status === 'loading' ? 'Loading Tasks…' : 'Refresh Tasks'}
+          {state.status === 'loading' ? (
+            <>
+              Loading tasks
+              <AnimatedDots label="Loading tasks" />
+            </>
+          ) : (
+            'Refresh Tasks'
+          )}
         </button>
       </div>
 
@@ -1119,29 +1114,25 @@ function IntelligenceResults({
         />
       </div>
 
-      <div
-        style={{
-          padding: '1rem',
-          border: '1px solid rgba(156, 137, 220, 0.55)',
-          borderRadius: 16,
-          background: 'linear-gradient(145deg, rgba(86, 67, 145, 0.16), rgba(255,255,255,0.025))',
-        }}
+      <RecommendedNextAction
+        eyebrow="Recommended creative partner"
+        title={`Explore this with ${leadMuse}`}
+        description={
+          <>
+            <p>{leadMuseReason}</p>
+            <p style={{ marginTop: '0.55rem' }}>
+              <strong>Recommended next move:</strong> {recommendedNextMove}
+            </p>
+          </>
+        }
       >
-        <div className="eyebrow">Recommended creative partner</div>
-        <h3 className="h3" style={{ marginTop: '0.35rem' }}>
-          {leadMuse}
-        </h3>
-        <p className="copy">{leadMuseReason}</p>
-        <p className="copy">
-          <strong>Recommended next move:</strong> {recommendedNextMove}
-        </p>
         <Link
           className="button primary"
           href={`/studio/songs/${slug}/edit?muse=${encodeURIComponent(leadMuseSlug)}&question=${encodeURIComponent(starterQuestion)}#muses`}
         >
           Explore this with {leadMuse}
         </Link>
-      </div>
+      </RecommendedNextAction>
 
       <div
         style={{
@@ -2006,22 +1997,44 @@ export function SongIntelligencePanel({
           </span>
         </div>
 
-        <button
-          type="button"
-          className="button primary"
-          onClick={() => void handleRunAnalytics()}
-          disabled={analyticsState.status === 'loading'}
-          style={{
-            marginTop: '1rem',
-            cursor: analyticsState.status === 'loading' ? 'wait' : 'pointer',
-          }}
+        <RecommendedNextAction
+          title="Run Song Intelligence"
+          description={
+            <p>
+              See provisional ratings, creative strengths, a recommended next move,
+              and the Muse best suited to help this Spark develop.
+            </p>
+          }
         >
-          {analyticsState.status === 'loading'
-            ? 'Understanding your song…'
-            : analyticsState.status === 'success'
-              ? 'Regenerate Song Intelligence'
-              : 'Run Song Intelligence'}
-        </button>
+          <button
+            type="button"
+            className="button primary"
+            onClick={() => void handleRunAnalytics()}
+            disabled={analyticsState.status === 'loading'}
+            aria-busy={analyticsState.status === 'loading'}
+          >
+            {analyticsState.status === 'loading'
+              ? 'Song Intelligence is working'
+              : analyticsState.status === 'success'
+                ? 'Regenerate Song Intelligence'
+                : 'Run Song Intelligence'}
+            {analyticsState.status === 'loading' ? (
+              <AnimatedDots label="Song Intelligence is working" />
+            ) : null}
+          </button>
+        </RecommendedNextAction>
+
+        {analyticsState.status === 'loading' ? (
+          <AnalysisLoadingState
+            title="Song Intelligence is working"
+            messages={[
+              'Reading the title, captured words, notes, lyrics, and document context.',
+              'Identifying creative strengths, hook possibilities, and development needs.',
+              'Considering the most useful Muse direction and next move.',
+              'Still working—your analysis will appear here when it is ready.',
+            ]}
+          />
+        ) : null}
 
         {analyticsState.message ? (
           <div
@@ -2104,6 +2117,7 @@ export function SongIntelligencePanel({
       </p>
 
       <section
+        className={!selectedTranscript?.is_reviewed ? 'recommended-action' : undefined}
         style={{
           marginTop: '1rem',
           padding: '1.1rem',
@@ -2112,7 +2126,10 @@ export function SongIntelligencePanel({
           background: 'rgba(0,0,0,0.12)',
         }}
       >
-        <div className="eyebrow">Step 1 · Transcribe and review</div>
+        <div className="eyebrow">
+          {!selectedTranscript?.is_reviewed ? 'Recommended next step · ' : ''}
+          Step 1 · Transcribe and review
+        </div>
         <h3 className="h3" style={{ marginTop: '0.35rem' }}>
           Make sure Song Intelligence hears the right words
         </h3>
@@ -2156,17 +2173,34 @@ export function SongIntelligencePanel({
           className={selectedTranscript ? 'button' : 'button primary'}
           onClick={handleGenerateTranscript}
           disabled={generateState.status === 'loading'}
+          aria-busy={generateState.status === 'loading'}
           style={{
             cursor: generateState.status === 'loading' ? 'wait' : 'pointer',
             opacity: generateState.status === 'loading' ? 0.7 : 1,
           }}
         >
-          {generateState.status === 'loading'
-            ? 'Transcribing your recording…'
-            : selectedTranscript
-              ? 'Regenerate Transcript'
-              : 'Transcribe My Recording'}
+          {generateState.status === 'loading' ? (
+            <>
+              Transcribing your recording
+              <AnimatedDots label="Transcribing your recording" />
+            </>
+          ) : selectedTranscript ? (
+            'Regenerate Transcript'
+          ) : (
+            'Transcribe My Recording'
+          )}
         </button>
+
+        {generateState.status === 'loading' ? (
+          <AnalysisLoadingState
+            title="Transcribing your recording"
+            messages={[
+              'Listening for the words, phrases, and repeated lines.',
+              'Preparing editable text for you to review against the recording.',
+              'Still working—longer recordings can take a little more time.',
+            ]}
+          />
+        ) : null}
 
         {generateState.message ? (
           <div
@@ -2274,6 +2308,7 @@ export function SongIntelligencePanel({
       </section>
 
       <section
+        className={selectedTranscript?.is_reviewed ? 'recommended-action' : undefined}
         style={{
           marginTop: '1rem',
           padding: '1.1rem',
@@ -2284,7 +2319,10 @@ export function SongIntelligencePanel({
             : 'rgba(255,255,255,0.025)',
         }}
       >
-        <div className="eyebrow">Step 2 · Understand the song</div>
+        <div className="eyebrow">
+          {selectedTranscript?.is_reviewed ? 'Recommended next step · ' : ''}
+          Step 2 · Understand the song
+        </div>
         <h3 className="h3" style={{ marginTop: '0.35rem' }}>
           Run Song Intelligence
         </h3>
@@ -2300,6 +2338,7 @@ export function SongIntelligencePanel({
           disabled={
             !selectedTranscript?.is_reviewed || analyticsState.status === 'loading'
           }
+          aria-busy={analyticsState.status === 'loading'}
           style={{
             cursor:
               !selectedTranscript?.is_reviewed || analyticsState.status === 'loading'
@@ -2311,12 +2350,29 @@ export function SongIntelligencePanel({
                 : 1,
           }}
         >
-          {analyticsState.status === 'loading'
-            ? 'Understanding your song…'
-            : analyticsState.status === 'success'
-              ? 'Regenerate Song Intelligence'
-              : 'Run Song Intelligence'}
+          {analyticsState.status === 'loading' ? (
+            <>
+              Song Intelligence is working
+              <AnimatedDots label="Song Intelligence is working" />
+            </>
+          ) : analyticsState.status === 'success' ? (
+            'Regenerate Song Intelligence'
+          ) : (
+            'Run Song Intelligence'
+          )}
         </button>
+
+        {analyticsState.status === 'loading' ? (
+          <AnalysisLoadingState
+            title="Song Intelligence is working"
+            messages={[
+              'Reading your reviewed transcript and the other material saved with this song.',
+              'Identifying strengths, hook possibilities, and development opportunities.',
+              'Considering the most useful Muse direction and recommended next move.',
+              'Still working—your results will replace this message when they are ready.',
+            ]}
+          />
+        ) : null}
       </section>
 
       {analyticsState.message ? (

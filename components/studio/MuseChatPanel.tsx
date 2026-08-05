@@ -23,6 +23,7 @@ import {
   MuseCouncilOverview,
   type MuseCouncilEntry,
 } from "@/components/studio/MuseCouncilOverview";
+import { AnalysisLoadingState, AnimatedDots } from "@/components/ui/AnalysisLoadingState";
 
 export type MuseChatOption = {
   slug: string;
@@ -1224,20 +1225,11 @@ export function MuseChatPanel({
       ) : null}
 
       {historyStatus === "loading" ? (
-        <div
-          className="copy"
-          style={{
-            marginTop: "1rem",
-            padding: "0.85rem 1rem",
-            border:
-              "1px solid rgba(220, 182, 92, 0.4)",
-            borderRadius: 16,
-            width: "fit-content",
-          }}
-        >
-          Restoring {selectedMuse.name}&apos;s
-          conversation…
-        </div>
+        <AnalysisLoadingState
+          compact
+          title={`Restoring ${selectedMuse.name}'s conversation`}
+          messages={["Bringing the saved questions, responses, and Muse guidance back into view."]}
+        />
       ) : messages.length === 0 ? (
         <div style={{ marginTop: "1rem" }}>
           <p
@@ -1712,20 +1704,25 @@ export function MuseChatPanel({
                                 "sending" ||
                               !collaboratorMuseSlug
                             }
+                            aria-busy={collaborationStatus === "sending"}
                             onClick={() =>
                               void requestCollaboration(
                                 message,
                               )
                             }
                           >
-                            {collaborationStatus ===
-                            "sending"
-                              ? "Inviting Muse…"
-                              : "Compare perspectives"}
+                            {collaborationStatus === "sending" ? (
+                              <>
+                                Inviting Muse
+                                <AnimatedDots label="Inviting Muse" />
+                              </>
+                            ) : (
+                              "Compare perspectives"
+                            )}
                           </button>
                           <button
                             type="button"
-                            className="button"
+                            className="button secondary"
                             disabled={
                               collaborationStatus ===
                               "sending"
@@ -1737,6 +1734,16 @@ export function MuseChatPanel({
                             Cancel
                           </button>
                         </div>
+
+                        {collaborationStatus === "sending" ? (
+                          <AnalysisLoadingState
+                            compact
+                            title="A second Muse is considering the song"
+                            messages={[
+                              "Comparing creative priorities and preparing a distinct perspective.",
+                            ]}
+                          />
+                        ) : null}
 
                         {collaborationError ? (
                           <div
@@ -1759,20 +1766,15 @@ export function MuseChatPanel({
           })}
 
           {status === "sending" ? (
-            <div
-              className="copy"
-              style={{
-                padding: "0.85rem 1rem",
-                border:
-                  "1px solid rgba(220, 182, 92, 0.4)",
-                borderRadius: 16,
-                width: "fit-content",
-              }}
-            >
-              {selectedMuse.name} is considering
-              your question through her complete
-              creative lenses…
-            </div>
+            <AnalysisLoadingState
+              title={`${selectedMuse.name} is considering your question`}
+              messages={[
+                `Reading your question alongside the saved material for ${songTitle || "this song"}.`,
+                `Considering the song through ${selectedMuse.name}'s complete creative lenses.`,
+                "Shaping practical guidance and a clear next creative move.",
+                "Still thinking—the response will appear here as soon as it is ready.",
+              ]}
+            />
           ) : null}
         </div>
       )}
@@ -1809,6 +1811,7 @@ export function MuseChatPanel({
             type="submit"
             className="button primary"
             disabled={!canSend}
+            aria-busy={status === "sending"}
             style={{
               opacity: canSend ? 1 : 0.6,
               cursor: canSend
@@ -1816,15 +1819,20 @@ export function MuseChatPanel({
                 : "not-allowed",
             }}
           >
-            {status === "sending"
-              ? `Asking ${selectedMuse.name}…`
-              : `Ask ${selectedMuse.name}`}
+            {status === "sending" ? (
+              <>
+                Asking {selectedMuse.name}
+                <AnimatedDots label={`Asking ${selectedMuse.name}`} />
+              </>
+            ) : (
+              `Ask ${selectedMuse.name}`
+            )}
           </button>
 
           {messages.length > 0 ? (
             <button
               type="button"
-              className="button"
+              className="button secondary"
               disabled={isBusy}
               onClick={() =>
                 void startNewConversation()

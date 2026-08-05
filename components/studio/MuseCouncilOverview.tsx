@@ -1,6 +1,7 @@
 "use client";
 
 import type { MuseIntelligenceResult } from "@/lib/muses/intelligence";
+import { AnalysisLoadingState } from "@/components/ui/AnalysisLoadingState";
 
 export type MuseCouncilEntry = {
   id: string;
@@ -339,6 +340,14 @@ export function MuseCouncilOverview({
           </span>
         </div>
       </div>
+
+      {status === "loading" ? (
+        <AnalysisLoadingState
+          compact
+          title="The Muse Council is refreshing"
+          messages={["Gathering the latest Muse perspectives and rebuilding the council summary."]}
+        />
+      ) : null}
 
       {status === "error" ? (
         <div className="statusMessage statusError" style={{ marginTop: "0.8rem" }}>

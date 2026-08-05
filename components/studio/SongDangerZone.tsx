@@ -78,7 +78,7 @@ export function SongDangerZone({
       <div className="button-row">
         <button
           type="button"
-          className="button"
+          className="button danger"
           onClick={() => void moveToTrash()}
           disabled={isMoving}
           style={{ borderColor: "rgba(211, 102, 102, 0.6)" }}

@@ -12,6 +12,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
+import { AnimatedDots } from "@/components/ui/AnalysisLoadingState";
 import {
   clearSparkCaptureDraft,
   loadSparkCaptureDraft,
@@ -1081,7 +1082,7 @@ export function SparkCaptureForm({
             {!isRecording ? (
               <button
                 type="button"
-                className="button primary"
+                className="button secondary"
                 onClick={() => void startRecording()}
                 disabled={status === "saving"}
               >
@@ -1243,7 +1244,7 @@ export function SparkCaptureForm({
                   <strong>Note {index + 1}</strong>
                   <button
                     type="button"
-                    className="button button-small"
+                    className="button danger button-small"
                     onClick={() => removeNote(note.id)}
                     disabled={status === "saving"}
                   >
@@ -1340,8 +1341,16 @@ export function SparkCaptureForm({
           type="submit"
           className="button primary"
           disabled={status === "saving" || isRecording || !isSignedIn}
+          aria-busy={status === "saving"}
         >
-          {status === "saving" ? "Saving your Spark…" : "Save My Spark"}
+          {status === "saving" ? (
+            <>
+              Saving your Spark
+              <AnimatedDots label="Saving your Spark" />
+            </>
+          ) : (
+            "Save My Spark"
+          )}
         </button>
 
         <button

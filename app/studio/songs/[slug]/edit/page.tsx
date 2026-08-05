@@ -271,6 +271,19 @@ export default async function EditSongPage({
               ? "Review Song Intelligence, choose one development task, and create the next version."
               : "Review Muse guidance and listener response before deciding whether the song needs another revision.";
 
+
+  const recommendedAction = !latestAnalysis && audioAttachments.length && !transcriptCount
+    ? { label: "Transcribe the recording", href: "#intelligence" }
+    : !latestAnalysis && audioAttachments.length && !reviewedTranscriptCount
+      ? { label: "Review the transcript", href: "#intelligence" }
+      : !latestAnalysis
+        ? { label: "Run Song Intelligence", href: "#intelligence" }
+        : !hasLyrics
+          ? { label: "Update the working lyric", href: "#song-details" }
+          : String(song.current_stage || "").toLowerCase() !== "final"
+            ? { label: "Choose the next development task", href: "#intelligence" }
+            : { label: "Review Muse guidance", href: "#muses" };
+
   if (showFreshCaptureHandoff) {
     return (
       <section className="section">
@@ -395,34 +408,26 @@ export default async function EditSongPage({
               ) : null}
             </div>
 
-            <div
-              style={{
-                padding: "1rem",
-                borderRadius: 16,
-                border: "1px solid rgba(220, 182, 92, 0.4)",
-                background: "rgba(0,0,0,0.14)",
-              }}
-            >
-              <div className="eyebrow">Recommended next move</div>
-              <p
-                className="copy"
-                style={{
-                  marginTop: "0.5rem",
-                  marginBottom: 0,
-                  fontWeight: 700,
-                }}
-              >
+            <div className="recommended-action" style={{ marginTop: 0 }}>
+              <div className="recommended-action__eyebrow">Recommended next step</div>
+              <h3 className="recommended-action__title">{recommendedAction.label}</h3>
+              <p className="recommended-action__description" style={{ marginBottom: 0 }}>
                 {recommendedNextMove}
               </p>
+              <div className="recommended-action__controls">
+                <a className="button primary" href={recommendedAction.href}>
+                  {recommendedAction.label}
+                </a>
+              </div>
             </div>
           </div>
 
           <div className="button-row" style={{ marginTop: "1rem" }}>
-            <Link href="/studio" className="button">
+            <Link href="/studio" className="button secondary">
               Back to Studio
             </Link>
 
-            <Link href={`/songs/${slug}`} className="button">
+            <Link href={`/songs/${slug}`} className="button secondary">
               View public song page
             </Link>
           </div>
@@ -456,7 +461,7 @@ export default async function EditSongPage({
               ["Share", "#share"],
               ["Credits", "#credits"],
             ].map(([label, href]) => (
-              <a key={href} href={href} className="button">
+              <a key={href} href={href} className="button tertiary">
                 {label}
               </a>
             ))}

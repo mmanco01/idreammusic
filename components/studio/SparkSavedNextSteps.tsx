@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AnalysisLoadingState } from "@/components/ui/AnalysisLoadingState";
+import { RecommendedNextAction } from "@/components/ui/RecommendedNextAction";
 
 type Props = {
   songId: string;
@@ -183,33 +185,40 @@ export function SparkSavedNextSteps({
         {hasAudio ? <span className="pill">Recording captured</span> : null}
       </div>
 
-      <div
-        style={{
-          marginTop: "1.25rem",
-          padding: "1.1rem",
-          borderRadius: 16,
-          border: "1px solid rgba(220, 182, 92, 0.42)",
-          background: "rgba(0,0,0,0.14)",
-        }}
+      <RecommendedNextAction
+        title={heading}
+        description={<p>{description}</p>}
       >
-        <div className="eyebrow">Recommended next move</div>
-        <h2 className="h3" style={{ marginTop: "0.45rem" }}>
-          {heading}
-        </h2>
-        <p className="copy" style={{ maxWidth: 780 }}>
-          {description}
-        </p>
-
         <button
           type="button"
           className="button primary"
           onClick={handlePrimaryAction}
           disabled={isBusy}
-          style={{ cursor: isBusy ? "wait" : "pointer" }}
+          aria-busy={isBusy}
         >
           {buttonLabel}
         </button>
-      </div>
+      </RecommendedNextAction>
+
+      {state === "transcribing" ? (
+        <AnalysisLoadingState
+          title="Transcribing your recording"
+          messages={[
+            "Listening for the words, phrases, and repeated lines in your Spark.",
+            "Preparing a transcript you can review and correct.",
+            "Still working—longer recordings can take a little more time.",
+          ]}
+        />
+      ) : state === "analyzing" ? (
+        <AnalysisLoadingState
+          title="Song Intelligence is working"
+          messages={[
+            "Reading the material you captured.",
+            "Identifying strengths, possibilities, and the most useful Muse direction.",
+            "Saving your provisional ratings and recommended next move.",
+          ]}
+        />
+      ) : null}
 
       {message ? (
         <div
@@ -224,16 +233,16 @@ export function SparkSavedNextSteps({
       <div className="button-row" style={{ marginTop: "1rem" }}>
         <Link
           href={`/studio/songs/${slug}/edit?workspace=open#song-details`}
-          className="button"
+          className="button secondary"
         >
           Add more to this Spark
         </Link>
-        <Link href="/studio" className="button">
+        <Link href="/studio" className="button secondary">
           Save and return to Studio
         </Link>
         <Link
           href={`/studio/songs/${slug}/edit?workspace=open#overview`}
-          className="textLink"
+          className="button tertiary"
           style={{ alignSelf: "center" }}
         >
           Open the full Song Workbench
