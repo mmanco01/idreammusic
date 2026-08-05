@@ -376,3 +376,236 @@ button.button.tertiary {
   border-color: rgba(104, 201, 135, .62);
   opacity: .92 !important;
 }
+
+/* Muse Council: summary-first collaboration */
+.council-section-intro {
+  max-width: 900px;
+  margin-bottom: 1rem;
+}
+
+.council-section-intro .h2,
+.council-overview .h3 {
+  margin-bottom: .45rem;
+}
+
+.council-section-intro .copy,
+.council-overview__headline .copy {
+  margin: 0;
+}
+
+.muse-council-panel__intro,
+.council-overview__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.muse-council-panel__intro > div,
+.council-overview__headline {
+  flex: 1 1 560px;
+}
+
+.council-overview {
+  margin-top: 1rem;
+  padding: clamp(1rem, 3vw, 1.25rem);
+  border-radius: 20px;
+  border: 1px solid rgba(156, 137, 220, .48);
+  background: linear-gradient(145deg, rgba(86, 67, 145, .16), rgba(0, 0, 0, .12));
+}
+
+.council-lead-muse {
+  min-width: 230px;
+  padding: .85rem .95rem;
+  border-radius: 15px;
+  border: 1px solid rgba(220, 182, 92, .42);
+  background: rgba(137, 96, 31, .12);
+}
+
+.council-lead-muse strong {
+  display: block;
+  color: #fff8e8;
+  line-height: 1.45;
+}
+
+.council-lead-muse .info-badge {
+  margin-top: .55rem;
+}
+
+.council-recommended-action {
+  margin-top: 1rem;
+}
+
+.council-insights {
+  margin-top: 1.1rem;
+}
+
+.council-insights ol {
+  display: grid;
+  gap: .65rem;
+  margin: .55rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: council-insight;
+}
+
+.council-insights li {
+  position: relative;
+  padding: .85rem .9rem .85rem 3rem;
+  border-radius: 14px;
+  border: 1px solid rgba(183, 195, 214, .22);
+  background: rgba(255, 255, 255, .035);
+  color: var(--muted);
+  line-height: 1.6;
+  counter-increment: council-insight;
+}
+
+.council-insights li::before {
+  content: counter(council-insight);
+  position: absolute;
+  left: .85rem;
+  top: .8rem;
+  display: grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  color: #1a1207;
+  background: #e3c47c;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.council-disclosure {
+  margin-top: .85rem;
+  padding: .8rem .9rem;
+  border-radius: 15px;
+  border: 1px solid rgba(183, 195, 214, .22);
+  background: rgba(0, 0, 0, .1);
+}
+
+.council-disclosure > summary {
+  color: #f4ead0;
+  cursor: pointer;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.council-disclosure[open] > summary {
+  color: #fff6df;
+}
+
+.council-alignment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .75rem;
+  margin-top: .8rem;
+}
+
+.council-alignment-grid > div {
+  padding: .85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(183, 195, 214, .18);
+  background: rgba(255, 255, 255, .025);
+}
+
+.council-alignment-grid .copy {
+  margin: .35rem 0 0;
+}
+
+.council-full-responses {
+  display: grid;
+  gap: .65rem;
+  margin-top: .75rem;
+}
+
+.council-response {
+  padding: .75rem .85rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, .12);
+}
+
+.council-response > summary {
+  display: grid;
+  gap: .25rem;
+  cursor: pointer;
+}
+
+.council-response > summary span:first-child {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.council-response > summary span:last-child {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.council-response__content {
+  margin-top: .75rem;
+  white-space: pre-wrap;
+}
+
+.council-response__moves {
+  margin-top: .85rem;
+}
+
+.council-response__moves ul {
+  margin: .4rem 0 .85rem 1.1rem;
+}
+
+.council-tool-disclosure {
+  margin-top: .75rem;
+}
+
+.council-selector-panel {
+  margin-top: .75rem;
+  padding: .85rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, .12);
+}
+
+.muse-first-question {
+  margin-top: 1rem;
+}
+
+.council-question-options {
+  margin-top: .75rem;
+}
+
+.council-message-next-move,
+.council-message-expand-hint {
+  display: block;
+  margin-top: .45rem;
+  line-height: 1.45;
+}
+
+.council-message-next-move {
+  color: #f2d99d;
+  font-size: .9rem;
+  font-weight: 700;
+}
+
+.council-message-expand-hint {
+  color: rgba(216, 224, 236, .72);
+  font-size: .82rem;
+  font-weight: 400;
+}
+
+@media (max-width: 760px) {
+  .muse-council-panel__intro,
+  .council-overview__header {
+    display: grid;
+  }
+
+  .council-lead-muse {
+    min-width: 0;
+  }
+
+  .council-alignment-grid {
+    grid-template-columns: 1fr;
+  }
+}
