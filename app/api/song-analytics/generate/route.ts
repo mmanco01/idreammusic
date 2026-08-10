@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const MODEL_NAME = process.env.OPENAI_ANALYTICS_MODEL || 'gpt-5.6-terra';
-const ANALYSIS_VERSION = '2.1';
+const ANALYSIS_VERSION = '2.2';
 
 const MUSE_NAMES = [
   'Calliope',
@@ -597,7 +597,10 @@ Important analytical rules:
 12. lead_muse must match muse_analysis.primary.name. lead_muse_reason should briefly explain the fit.
 13. starter_question must be a useful first question the songwriter can ask the lead Muse about this exact material.
 14. Never invent missing lyrics, events, characters, melody, harmony, or production evidence.
-15. When material is limited, use conditional language, lower confidence appropriately, and make the limitations explicit.`;
+15. When material is limited, use conditional language, lower confidence appropriately, and make the limitations explicit.
+16. The CURRENT SAVED LYRICS from the canonical song version are authoritative for lyric wording, story details, hook language, rhyme, repetition, and line-level critique.
+17. A recording transcript is secondary audio evidence. If it differs from the current saved lyrics, do not replace, correct, score, quote, or downgrade the current lyrics based on the transcript.
+18. If the transcript comes from a different song version, treat audio-specific conclusions as potentially stale and state that limitation where relevant.`;
 
 function extractOutputText(payload: OpenAIResponse): string {
   if (typeof payload.output_text === 'string' && payload.output_text.trim()) {
@@ -709,6 +712,7 @@ type ResolvedSongMaterial = {
   analysisBasis: SongIntelligenceResult['analysis_basis'];
   analysisStage: SongIntelligenceResult['analysis_stage'];
   materialCompleteness: SongIntelligenceResult['material_completeness'];
+  transcriptVersionRelation: 'current_version' | 'different_version' | 'unlinked';
 };
 
 function normalizeAnalysisStage(value: unknown): SongIntelligenceResult['analysis_stage'] {
@@ -765,39 +769,25 @@ async function resolveSongMaterial(
     transcript = data || null;
   }
 
-  let version: ResolvedSongMaterial['version'] = null;
+  // Always analyze the song's current canonical version. A transcript is audio
+  // evidence and may be linked to an earlier recording/version; it must never
+  // override newer saved lyrics simply because it has a song_version_id.
+  const { data: currentVersion, error: versionError } = await supabase
+    .from('song_versions')
+    .select(
+      'id, title, lyrics, arrangement_notes, story_behind_song, stage, version_number, is_stage_primary'
+    )
+    .eq('song_id', songId)
+    .order('is_stage_primary', { ascending: false })
+    .order('version_number', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (transcript?.song_version_id) {
-    const { data, error } = await supabase
-      .from('song_versions')
-      .select('id, title, lyrics, arrangement_notes, story_behind_song, stage')
-      .eq('id', transcript.song_version_id)
-      .eq('song_id', songId)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Song version lookup failed: ${error.message}`);
-    }
-
-    version = data || null;
+  if (versionError) {
+    throw new Error(`Song version lookup failed: ${versionError.message}`);
   }
 
-  if (!version) {
-    const { data, error } = await supabase
-      .from('song_versions')
-      .select('id, title, lyrics, arrangement_notes, story_behind_song, stage, version_number')
-      .eq('song_id', songId)
-      .order('is_stage_primary', { ascending: false })
-      .order('version_number', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`Song version lookup failed: ${error.message}`);
-    }
-
-    version = data || null;
-  }
+  const version = (currentVersion || null) as ResolvedSongMaterial['version'];
 
   const [{ data: notesData, error: notesError }, { data: attachmentData, error: attachmentError }] =
     await Promise.all([
@@ -829,13 +819,22 @@ async function resolveSongMaterial(
   );
   const savedLyrics = String(version?.lyrics || '').trim();
   const transcriptText = String(transcript?.transcript_text || '').trim();
+  const transcriptVersionRelation: ResolvedSongMaterial['transcriptVersionRelation'] =
+    !transcript?.song_version_id
+      ? 'unlinked'
+      : transcript.song_version_id === version?.id
+        ? 'current_version'
+        : 'different_version';
   const sourceTypes = new Set<string>();
 
   if (hasMeaningfulTitle) sourceTypes.add('title');
   if (song.summary?.trim()) sourceTypes.add('summary');
   if (song.hook_line?.trim()) sourceTypes.add('hook');
-  if (savedLyrics) sourceTypes.add('captured_text');
+  if (savedLyrics) sourceTypes.add('saved_lyrics');
   if (transcriptText) sourceTypes.add('transcript');
+  if (transcriptText && transcriptVersionRelation === 'different_version') {
+    sourceTypes.add('earlier_version_transcript');
+  }
   if (version?.story_behind_song?.trim()) sourceTypes.add('story');
   const arrangementNotes = String(version?.arrangement_notes || '').trim();
   const meaningfulArrangementNotes =
@@ -922,6 +921,7 @@ async function resolveSongMaterial(
     analysisBasis,
     analysisStage,
     materialCompleteness,
+    transcriptVersionRelation,
   };
 }
 
@@ -1131,12 +1131,13 @@ Origin: ${material.song.song_origin || 'unknown'}
 Existing hook field: ${material.song.hook_line || 'not supplied'}
 Existing summary: ${material.song.summary || 'not supplied'}
 Transcript reviewed by songwriter: ${material.transcript?.is_reviewed ? 'yes' : 'no'}
+Transcript/version relationship: ${material.transcriptVersionRelation}
 Available basis: ${material.analysisBasis}
 Source types: ${material.sourceTypes.join(', ') || 'title'}
 Material completeness: ${material.materialCompleteness}
 
-${material.savedLyrics ? `CAPTURED WORDS OR SAVED LYRICS\n${material.savedLyrics.slice(0, 50000)}\n` : ''}
-${material.transcriptText ? `RECORDING TRANSCRIPT\n${material.transcriptText.slice(0, 50000)}\n` : ''}
+${material.savedLyrics ? `CURRENT SAVED LYRICS — AUTHORITATIVE\n${material.savedLyrics.slice(0, 50000)}\n` : ''}
+${material.transcriptText ? `RECORDING TRANSCRIPT — SECONDARY AUDIO EVIDENCE\n${material.transcriptText.slice(0, 50000)}\n` : ''}
 ${material.version?.story_behind_song ? `STORY BEHIND THE SONG\n${material.version.story_behind_song.slice(0, 10000)}\n` : ''}
 ${material.version?.arrangement_notes && material.version.arrangement_notes !== 'Captured in expanded Spark Capture.' ? `ARRANGEMENT OR CAPTURE NOTES\n${material.version.arrangement_notes.slice(0, 10000)}\n` : ''}
 ${noteText ? `WRITER NOTES\n${noteText.slice(0, 30000)}\n` : ''}
@@ -1151,6 +1152,8 @@ For Spark-stage material, describe ratings as provisional and developmental.
 Treat BPM, vocal range, melody, arrangement, performance, and production as recommendations unless directly supported by supplied notes.
 Use short excerpts only when citing strongest lines, weakest lines, or Muse evidence.
 Choose one practical recommended_next_move.
+If current saved lyrics are present, base all lyric-specific scoring, strongest/weakest lines, rhyme observations, repetition, hook wording, and story wording on those saved lyrics rather than the transcript.
+If Transcript/version relationship is different_version, use the transcript only as secondary evidence from an earlier/different recording and include an appropriate limitation for audio-dependent observations.
 Set lead_muse to the same Muse as muse_analysis.primary and generate one specific starter_question for that Muse.`;
 
     const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
