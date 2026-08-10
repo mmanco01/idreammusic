@@ -1,0 +1,42 @@
+﻿{
+  "release": {
+    "name": "iDreamMusic Song Journey",
+    "version": "1.0.0",
+    "tag": "song-journey-v1.0.0",
+    "accepted_date": "2026-08-05",
+    "production_url": "https://idreammusic.com",
+    "status": "deployed-live-tested-accepted",
+    "production_commit": "217d6dd"
+  },
+  "journey": [
+    "Studio",
+    "Catch",
+    "Transcribe when needed",
+    "Understand",
+    "Collaborate",
+    "Shape"
+  ],
+  "features": [
+    "simplified-studio-home",
+    "unified-spark-capture",
+    "text-first-song-intelligence",
+    "transcript-first-audio-analysis",
+    "mixed-material-analysis",
+    "action-hierarchy",
+    "recommended-next-action",
+    "animated-processing-feedback",
+    "song-intelligence-muse-handoff",
+    "summary-first-muse-council"
+  ],
+  "required_checks": [
+    "npm run typecheck",
+    "npm run build",
+    "production text-only spark",
+    "production uploaded-audio spark",
+    "production direct-recording spark",
+    "production muse council",
+    "desktop",
+    "mobile"
+  ]
+}
+
