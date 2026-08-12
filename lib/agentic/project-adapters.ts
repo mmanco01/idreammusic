@@ -1,4 +1,12 @@
 import {
+  getAgentAdminClient,
+} from "@/lib/agentic/admin-client";
+
+export {
+  getAgentAdminClient,
+};
+
+import {
   createServerSupabaseClient,
 } from "@/lib/supabase/server";
 
