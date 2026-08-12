@@ -526,3 +526,4 @@ export function hydrateStoredCitation(
       Number(row.relevance_score ?? 0),
   };
 }
+
