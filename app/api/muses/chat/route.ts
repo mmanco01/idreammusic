@@ -29,6 +29,10 @@ import type {
 } from "@/lib/muses/knowledge-types";
 import { getMusePlatformConfig } from "@/lib/muses/platform";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  getAgentAdminClient,
+  requireAgentAdmin,
+} from "@/lib/agentic/project-adapters";
 
 export const runtime = "nodejs";
 
@@ -40,6 +44,7 @@ type MuseChatRequest = {
   message?: unknown;
   songId?: unknown;
   conversationId?: unknown;
+  agentJobId?: unknown;
   originalQuestion?: unknown;
   primaryMuseSlug?: unknown;
   collaboratorMuseSlug?: unknown;
@@ -1067,7 +1072,7 @@ Guidance for the structured fields:
 - primaryObservation: the single most important grounded observation.
   Its category should normally match one of your named diagnostic keys.
 - diagnostics: assess each named diagnostic area that can be grounded in
-  the supplied material, up to five areas. Give a 0–100 working score,
+  the supplied material, up to five areas. Give a 0ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ100 working score,
   evidence, confidence, and changeFromPrevious. Use unknown when there is
   no trustworthy earlier diagnostic comparison.
 - lensAssessments: separately assess lyric, form, melody, performance, and
@@ -1977,6 +1982,35 @@ export async function POST(request: Request) {
     const body =
       (await request.json()) as MuseChatRequest;
 
+    const agentJobId =
+      cleanString(
+        body.agentJobId,
+        100,
+      );
+
+    let candidateKnowledgeSupabase:
+      any = null;
+
+    if (agentJobId) {
+      try {
+        await requireAgentAdmin(
+          request,
+        );
+      } catch {
+        return NextResponse.json(
+          {
+            status: "error",
+            message:
+              "Candidate Muse validation requires Agent admin access.",
+          },
+          { status: 403 },
+        );
+      }
+
+      candidateKnowledgeSupabase =
+        getAgentAdminClient();
+    }
+
     const mode: MuseChatMode =
       body.mode === "collaborate"
         ? "collaborate"
@@ -2164,17 +2198,34 @@ export async function POST(request: Request) {
       if (musePlatform.knowledgeEnabled) {
         knowledgeSearch =
           await retrieveMuseKnowledge({
-            supabase,
+            supabase:
+              candidateKnowledgeSupabase ??
+              supabase,
+
             openai,
+
             query: question,
+
             museSlug: muse.slug,
+
+            agentJobId:
+              agentJobId || null,
+
             ownerUserId:
               user?.id ?? null,
+
             queryContext:
-              "General Muse conversation",
-            matchCount: musePlatform.generalRetrievalCount,
+              agentJobId
+                ? `Agent candidate validation ${agentJobId}`
+                : "General Muse conversation",
+
+            matchCount:
+              musePlatform.generalRetrievalCount,
+
             logSearch:
-              Boolean(user?.id),
+              agentJobId
+                ? false
+                : Boolean(user?.id),
           });
 
         context.knowledge =
@@ -2348,24 +2399,45 @@ export async function POST(request: Request) {
     if (musePlatform.knowledgeEnabled) {
       knowledgeSearch =
         await retrieveMuseKnowledge({
-          supabase,
+          supabase:
+            candidateKnowledgeSupabase ??
+            supabase,
+
           openai,
+
           query:
             buildSongKnowledgeQuery({
               question,
               context,
             }),
-          museSlug: muse.slug,
-          ownerUserId: user.id,
+
+          museSlug:
+            muse.slug,
+
+          agentJobId:
+            agentJobId || null,
+
+          ownerUserId:
+            user.id,
+
           songId,
+
           conversationId:
             conversation.id,
+
           queryContext:
-            `Song-aware retrieval for ${
-              context.song?.title ??
-              "saved song"
-            }`,
-          matchCount: musePlatform.songRetrievalCount,
+            agentJobId
+              ? `Agent candidate validation ${agentJobId}`
+              : `Song-aware retrieval for ${
+                  context.song?.title ??
+                  "saved song"
+                }`,
+
+          matchCount:
+            musePlatform.songRetrievalCount,
+
+          logSearch:
+            !agentJobId,
         });
 
       context.knowledge =

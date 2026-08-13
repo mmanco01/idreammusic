@@ -151,6 +151,7 @@ export async function retrieveMuseKnowledge({
   minimumSimilarity = 0.20,
   sourceTypes,
   traditions,
+  agentJobId,
   logSearch = true,
 }: {
   supabase: any;
@@ -165,6 +166,7 @@ export async function retrieveMuseKnowledge({
   minimumSimilarity?: number;
   sourceTypes?: string[] | null;
   traditions?: string[] | null;
+  agentJobId?: string | null;
   logSearch?: boolean;
 }) {
   const cleanQuery = cleanText(
@@ -186,29 +188,54 @@ export async function retrieveMuseKnowledge({
       text: cleanQuery,
     });
 
+  const rpcName =
+    agentJobId
+      ? "search_muse_knowledge_candidate"
+      : "search_muse_knowledge";
+
+  const rpcArgs: Record<
+    string,
+    unknown
+  > = {
+    p_query_text:
+      cleanQuery,
+
+    p_query_embedding:
+      embedding,
+
+    p_muse_slug:
+      museSlug,
+
+    p_match_count:
+      clamp(
+        matchCount,
+        1,
+        20,
+      ),
+
+    p_min_similarity:
+      clamp(
+        minimumSimilarity,
+        0,
+        1,
+      ),
+
+    p_source_types:
+      sourceTypes ?? null,
+
+    p_traditions:
+      traditions ?? null,
+  };
+
+  if (agentJobId) {
+    rpcArgs.p_agent_job_id =
+      agentJobId;
+  }
+
   const { data, error } =
     await (supabase as any).rpc(
-      "search_muse_knowledge",
-      {
-        p_query_text: cleanQuery,
-        p_query_embedding: embedding,
-        p_muse_slug: museSlug,
-        p_match_count: clamp(
-          matchCount,
-          1,
-          20,
-        ),
-        p_min_similarity:
-          clamp(
-            minimumSimilarity,
-            0,
-            1,
-          ),
-        p_source_types:
-          sourceTypes ?? null,
-        p_traditions:
-          traditions ?? null,
-      },
+      rpcName,
+      rpcArgs,
     );
 
   if (error) {
