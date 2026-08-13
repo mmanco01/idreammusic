@@ -371,11 +371,38 @@ export async function stageCandidateKnowledge({
       "scholarly_reference",
 
     rights_status:
-      cleanText(
-        sourceCandidate.rights_status,
-        80,
-      ) ||
-      "UNKNOWN",
+      (() => {
+        const rawRights = cleanText(
+          sourceCandidate.rights_status,
+          80,
+        ).toUpperCase();
+
+        switch (rawRights) {
+          case "PUBLIC_DOMAIN":
+            return "public_domain";
+
+          case "LICENSED":
+            return "licensed";
+
+          case "USER_PROVIDED":
+            return "user_owned";
+
+          case "CLEARED":
+            return "citation_only";
+
+          case "UNKNOWN":
+          case "":
+            return "unknown";
+
+          case "RESTRICTED":
+            throw new Error(
+              "Restricted source cannot be staged.",
+            );
+
+          default:
+            return "unknown";
+        }
+      })(),
 
     rights_note:
       cleanText(
