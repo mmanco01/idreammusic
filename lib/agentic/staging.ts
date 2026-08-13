@@ -368,7 +368,7 @@ export async function stageCandidateKnowledge({
           .evidence_classification,
         80,
       ) ||
-      "agent_curated_evidence",
+      "scholarly_reference",
 
     rights_status:
       cleanText(
