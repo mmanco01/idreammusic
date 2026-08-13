@@ -329,11 +329,70 @@ export async function stageCandidateKnowledge({
       "global",
 
     source_type:
-      cleanText(
-        sourceCandidate.source_type,
-        80,
-      ) ||
-      "agent_research",
+      (() => {
+        const rawType = cleanText(
+          sourceCandidate.source_type,
+          80,
+        )
+          .toLowerCase()
+          .replace(/[\s-]+/g, "_");
+
+        const allowedTypes = new Set([
+          "ancient_primary",
+          "ancient_source_index",
+          "material_artifact",
+          "scripture",
+          "sacred_poetry",
+          "historical_hymnody",
+          "spirituals",
+          "gospel_form",
+          "congregational_form",
+          "comparative_tradition",
+          "theology_reference",
+          "song_analysis",
+          "editorial_framework",
+          "personal_archive",
+          "institutional_reference",
+          "archival_collection",
+          "scholarly_reference",
+        ]);
+
+        if (allowedTypes.has(rawType)) {
+          return rawType;
+        }
+
+        switch (rawType) {
+          case "book":
+          case "academic_book":
+          case "scholarly_book":
+          case "journal":
+          case "journal_article":
+          case "academic_article":
+          case "scholarly_article":
+          case "research_article":
+          case "paper":
+          case "research_paper":
+          case "monograph":
+            return "scholarly_reference";
+
+          case "song":
+          case "song_study":
+          case "music_analysis":
+            return "song_analysis";
+
+          case "archive":
+          case "archival_source":
+            return "archival_collection";
+
+          case "institution":
+          case "institutional":
+          case "university":
+            return "institutional_reference";
+
+          default:
+            return "scholarly_reference";
+        }
+      })(),
 
     title,
 
