@@ -1,4 +1,7 @@
 import {
+  requireAgentAdmin,
+} from "@/lib/agentic/project-adapters";
+import {
   NextResponse,
 } from "next/server";
 import {
@@ -21,6 +24,7 @@ type RunRequest = {
   offset?: unknown;
   benchmarkKey?: unknown;
   deploymentLabel?: unknown;
+  agentJobId?: unknown;
 };
 
 function cleanString(
@@ -262,6 +266,29 @@ export async function POST(
         150,
       );
 
+    const agentJobId =
+      cleanString(
+        body.agentJobId,
+        100,
+      );
+
+    if (agentJobId) {
+      try {
+        await requireAgentAdmin(
+          request,
+        );
+      } catch {
+        return NextResponse.json(
+          {
+            status: "error",
+            message:
+              "Candidate Muse IQ requires Agent admin access.",
+          },
+          { status: 403 },
+        );
+      }
+    }
+
     const limit =
       benchmarkKey
         ? 1
@@ -408,6 +435,9 @@ export async function POST(
                   benchmark.muse_slug,
                 message:
                   benchmark.question,
+                agentJobId:
+                  agentJobId ||
+                  undefined,
               }),
               cache: "no-store",
             },
