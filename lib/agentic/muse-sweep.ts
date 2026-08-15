@@ -405,6 +405,8 @@ export async function ensureMuseSweepJobs({
           "agent_jobs",
         )
         .insert({
+          job_type:
+            "MUSE_KNOWLEDGE_EXPANSION",
           muse_key:
             target.museKey,
           title:
@@ -417,6 +419,10 @@ export async function ensureMuseSweepJobs({
             target.candidateVersion,
           status:
             "NEW",
+          priority:
+            60,
+          risk_level:
+            "LOW",
           requested_source_count:
             10,
           input: {
