@@ -1646,29 +1646,68 @@ export async function runMuseSweepStep({
 
   const resultProblems =
     results.filter(
-      (result: any) =>
-        Boolean(
-          result?.error,
-        ),
+      (result: any) => {
+        if (
+          !result?.error
+        ) {
+          return false;
+        }
+
+        const message =
+          String(
+            result.error,
+          );
+
+        return (
+          !isRecoverableCurationShortfall(
+            message,
+          ) &&
+          !isTimingLikeError(
+            message,
+          )
+        );
+      },
     );
 
   const needsAttention =
     [
       ...status.filter(
-        (job: any) =>
-          [
-            "DIAGNOSING",
-            "HUMAN_REVIEW",
-            "BLOCKED",
-            "FAILED",
-          ].includes(
+        (job: any) => {
+          if (
+            [
+              "DIAGNOSING",
+              "HUMAN_REVIEW",
+              "BLOCKED",
+              "FAILED",
+            ].includes(
+              String(
+                job.status,
+              ),
+            )
+          ) {
+            return true;
+          }
+
+          if (
+            !job.lastError
+          ) {
+            return false;
+          }
+
+          const message =
             String(
-              job.status,
-            ),
-          ) ||
-          Boolean(
-            job.lastError,
-          ),
+              job.lastError,
+            );
+
+          return (
+            !isRecoverableCurationShortfall(
+              message,
+            ) &&
+            !isTimingLikeError(
+              message,
+            )
+          );
+        },
       ),
       ...resultProblems.map(
         (result: any) => ({
