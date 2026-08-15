@@ -209,11 +209,11 @@ export async function runResearchAgent({
     targetCapabilities.length
       ? targetCapabilities
       : [
-          "narrative perspective",
-          "character",
-          "scene",
-          "dramatic tension",
-          "story-song structure",
+          "core concepts implied by the Muse mission",
+          "songwriting application",
+          "diagnostic reasoning",
+          "creative guidance",
+          "limitations and cautions",
         ];
 
   const configuredPool =
@@ -445,7 +445,7 @@ Research requirements:
 - This stage identifies evidence; it does not ingest source text.
 - Use multiple source families rather than sixteen near-duplicates.
 - Score authority, novelty, and overlap from 0 through 100.
-- overlap_score means overlap with existing Calliope knowledge; LOWER is better.
+- overlap_score means overlap with existing ${job.muse_key} knowledge; LOWER is better.
 - If a complete publication date cannot be verified, return null rather than guessing.
 - rights_status should normally be UNKNOWN unless there is clear evidence for another allowed value.
 - Every source must materially support at least one target capability.

@@ -516,15 +516,15 @@ TASK:
 
 Research this exact approved source and determine what evidence is actually available.
 
-If the available evidence is strong enough, create one focused original knowledge synthesis for Calliope.
+If the available evidence is strong enough, create one focused original knowledge synthesis for ${job.muse_key}.
 
 The synthesis should teach practical reasoning rather than summarize the source as a book report.
 
 It should explain:
-1. the useful narrative concept,
+1. the useful concept,
 2. why it matters in songwriting,
-3. how Calliope should recognize it in a song,
-4. how Calliope might use it when advising a songwriter,
+3. how ${job.muse_key} should recognize it in a song,
+4. how ${job.muse_key} might use it when advising a songwriter,
 5. important limits or cautions.
 
 Do not make claims that the available evidence does not support.
@@ -807,7 +807,7 @@ Return only URLs that were actually consulted as evidence.
 
           `${candidate.title}${
             candidate.author
-              ? ` — ${candidate.author}`
+              ? ` â€” ${candidate.author}`
               : ""
           }`,
 
@@ -862,7 +862,7 @@ Return only URLs that were actually consulted as evidence.
             limitations.length
               ? limitations
               : [
-                  "Use as one evidence source among the broader Calliope knowledge base.",
+                  `Use as one evidence source among the broader ${job.muse_key} knowledge base.`,
                 ]
           ).map(
             (
