@@ -75,6 +75,7 @@ export async function runCurationAgent({
         candidate_version,
         status,
         requested_source_count,
+        input,
         result_summary,
         retry_count,
         max_retries
@@ -154,6 +155,43 @@ export async function runCurationAgent({
       job.requested_source_count ??
       10,
     );
+
+  const jobInput =
+    job.input &&
+    typeof job.input ===
+      "object"
+      ? job.input as any
+      : {};
+
+  const targetCapabilities =
+    Array.isArray(
+      jobInput.target_capabilities,
+    )
+      ? jobInput
+          .target_capabilities
+          .filter(
+            (
+              value: unknown,
+            ): value is string =>
+              typeof value ===
+                "string",
+          )
+          .map(
+            (value: string) =>
+              value.trim(),
+          )
+          .filter(Boolean)
+      : [];
+
+  const capabilityLines =
+    targetCapabilities.length
+      ? targetCapabilities
+          .map(
+            (value: string) =>
+              `  - ${value}`,
+          )
+          .join("\n")
+      : "  - capabilities implied by the Muse mission";
 
   if (
     sourceCandidates.length <
@@ -337,14 +375,10 @@ IMPORTANT GOVERNANCE:
 - UNKNOWN rights status does not automatically disqualify a source because this stage selects evidence sources; later ingestion must use lawful original synthesis rather than copied copyrighted text.
 - Favor sources that contribute real new capability rather than repeating existing ideas.
 - Prefer direct songwriting/popular-song relevance when authority is comparable.
-- A highly authoritative narrative-theory source is useful only if its concepts transfer meaningfully to Calliope.
+- A highly authoritative source is useful only if its concepts transfer meaningfully to ${job.muse_key} and this Muse's mission.
 - Do not reward prestige alone.
-- Look for balanced coverage across:
-  narrative perspective,
-  character,
-  scene,
-  dramatic tension,
-  story-song structure.
+- Look for balanced coverage across this Muse's target capabilities:
+${capabilityLines}
 - Use HUMAN_REVIEW only for a genuine editorial conflict that should be surfaced to Mike.
 
 Research candidates:
