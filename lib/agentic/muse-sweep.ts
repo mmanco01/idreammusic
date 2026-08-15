@@ -405,8 +405,6 @@ export async function ensureMuseSweepJobs({
           "agent_jobs",
         )
         .insert({
-          job_type:
-            "MUSE_KNOWLEDGE_EXPANSION",
           muse_key:
             target.museKey,
           title:
@@ -419,10 +417,6 @@ export async function ensureMuseSweepJobs({
             target.candidateVersion,
           status:
             "NEW",
-          priority:
-            60,
-          risk_level:
-            "LOW",
           requested_source_count:
             10,
           input: {
@@ -718,6 +712,541 @@ async function markRepairAttempted({
   }
 }
 
+
+function sleep(
+  ms: number,
+) {
+  return new Promise<void>(
+    (resolve) => {
+      setTimeout(
+        resolve,
+        ms,
+      );
+    },
+  );
+}
+
+function isRecoverableCurationShortfall(
+  message: string,
+) {
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    /curation produced only \d+ acceptable sources; \d+ are required\./i.test(
+      message,
+    ) ||
+    /only \d+ candidates have complete provenance; \d+ are required\./i.test(
+      message,
+    ) ||
+    /only \d+ research candidates exist; \d+ are required\./i.test(
+      message,
+    ) ||
+    normalized.includes(
+      "acceptable sources",
+    )
+  );
+}
+
+function isExplicitSubstantiveError(
+  message: string,
+) {
+  const text =
+    message.toLowerCase();
+
+  return [
+    "no credits remaining",
+    "insufficient_quota",
+    "billing",
+    "unauthorized",
+    "forbidden",
+    "human_review",
+    "validation regression",
+    "persistent regression",
+    "restricted material",
+  ].some(
+    (token) =>
+      text.includes(
+        token,
+      ),
+  );
+}
+
+function isTimingLikeError(
+  message: string,
+) {
+  if (
+    isExplicitSubstantiveError(
+      message,
+    ) ||
+    isRecoverableCurationShortfall(
+      message,
+    )
+  ) {
+    return false;
+  }
+
+  const text =
+    message.toLowerCase();
+
+  return [
+    "fetch failed",
+    "timeout",
+    "timed out",
+    "econnreset",
+    "socket",
+    "network",
+    "und_err",
+    "rate limit",
+    "429",
+    "502",
+    "503",
+    "504",
+  ].some(
+    (token) =>
+      text.includes(
+        token,
+      ),
+  );
+}
+
+async function loadJobState({
+  supabase,
+  jobId,
+}: {
+  supabase: any;
+  jobId: string;
+}) {
+  const {
+    data,
+    error,
+  } =
+    await supabase
+      .from(
+        "agent_jobs",
+      )
+      .select(
+        `
+          id,
+          muse_key,
+          status,
+          current_agent,
+          last_error,
+          input,
+          result_summary,
+          retry_count,
+          updated_at
+        `,
+      )
+      .eq(
+        "id",
+        jobId,
+      )
+      .single();
+
+  if (
+    error ||
+    !data
+  ) {
+    throw new Error(
+      error?.message ||
+        `Could not reload Agent job ${jobId}.`,
+    );
+  }
+
+  return data;
+}
+
+async function scheduleSupplementalResearch({
+  supabase,
+  job,
+  reason,
+}: {
+  supabase: any;
+  job: any;
+  reason: string;
+}) {
+  const input =
+    isRecord(
+      job.input,
+    )
+      ? job.input
+      : {};
+
+  const researchBehavior =
+    isRecord(
+      input.research_behavior,
+    )
+      ? input.research_behavior
+      : {};
+
+  const priorAttempts =
+    Number(
+      researchBehavior
+        .supplemental_attempts ??
+      0,
+    );
+
+  const nextAttempt =
+    priorAttempts + 1;
+
+  const maxAttempts =
+    3;
+
+  if (
+    nextAttempt >
+    maxAttempts
+  ) {
+    return null;
+  }
+
+  const configuredPool =
+    Number(
+      researchBehavior
+        .target_candidate_pool ??
+      16,
+    );
+
+  const nextPool =
+    Math.min(
+      40,
+      Math.max(
+        24,
+        Number.isFinite(
+          configuredPool,
+        )
+          ? configuredPool + 8
+          : 24,
+      ),
+    );
+
+  const {
+    error: updateError,
+  } =
+    await supabase
+      .from(
+        "agent_jobs",
+      )
+      .update({
+        status:
+          "NEW",
+        current_agent:
+          null,
+        last_error:
+          null,
+        retry_count:
+          0,
+        requires_human_review:
+          false,
+        input: {
+          ...input,
+          research_behavior: {
+            ...researchBehavior,
+            target_candidate_pool:
+              nextPool,
+            supplemental_attempts:
+              nextAttempt,
+            supplemental_reason:
+              reason,
+            supplemental_requested_at:
+              new Date().toISOString(),
+          },
+        },
+      })
+      .eq(
+        "id",
+        job.id,
+      );
+
+  if (updateError) {
+    throw new Error(
+      `Could not schedule supplemental research: ${updateError.message}`,
+    );
+  }
+
+  await writeAudit({
+    supabase,
+    jobId:
+      String(
+        job.id,
+      ),
+    eventType:
+      "SUPPLEMENTAL_RESEARCH_SCHEDULED",
+    fromStatus:
+      String(
+        job.status,
+      ),
+    toStatus:
+      "NEW",
+    payload: {
+      sweepKey:
+        SWEEP_KEY,
+      reason,
+      supplementalAttempt:
+        nextAttempt,
+      maxSupplementalAttempts:
+        maxAttempts,
+      targetCandidatePool:
+        nextPool,
+    },
+  });
+
+  return {
+    jobId:
+      job.id,
+    museKey:
+      job.muse_key,
+    action:
+      "supplemental-research-scheduled",
+    recovered:
+      true,
+    supplementalAttempt:
+      nextAttempt,
+    targetCandidatePool:
+      nextPool,
+    reason,
+  };
+}
+
+async function advanceWithRecovery({
+  supabase,
+  job,
+  origin,
+  cookie,
+}: {
+  supabase: any;
+  job: any;
+  origin: string;
+  cookie: string;
+}) {
+  const originalStatus =
+    String(
+      job.status,
+    );
+
+  const originalUpdatedAt =
+    job.updated_at
+      ? String(
+          job.updated_at,
+        )
+      : "";
+
+  try {
+    return await advanceOneJob({
+      supabase,
+      job,
+      origin,
+      cookie,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown Muse Sweep step error.";
+
+    if (
+      isRecoverableCurationShortfall(
+        message,
+      )
+    ) {
+      const current =
+        await loadJobState({
+          supabase,
+          jobId:
+            String(
+              job.id,
+            ),
+        });
+
+      const scheduled =
+        await scheduleSupplementalResearch({
+          supabase,
+          job: {
+            ...job,
+            ...current,
+          },
+          reason:
+            message,
+        });
+
+      if (scheduled) {
+        return scheduled;
+      }
+
+      return {
+        jobId:
+          job.id,
+        museKey:
+          job.muse_key,
+        action:
+          nextActionForStatus(
+            originalStatus,
+          ),
+        error:
+          `${message} Supplemental research retry limit reached.`,
+        substantive:
+          true,
+      };
+    }
+
+    /*
+     * A disappearing HTTP response is not authoritative. The database is.
+     * Reconcile first, then wait and poll before deciding that a timing-like
+     * failure actually needs human attention.
+     */
+    const delays =
+      [15000, 30000, 60000];
+
+    for (
+      let attempt = 0;
+      attempt <
+      delays.length;
+      attempt++
+    ) {
+      const current =
+        await loadJobState({
+          supabase,
+          jobId:
+            String(
+              job.id,
+            ),
+        });
+
+      const currentStatus =
+        String(
+          current.status,
+        );
+
+      const currentUpdatedAt =
+        current.updated_at
+          ? String(
+              current.updated_at,
+            )
+          : "";
+
+      const stateAdvanced =
+        currentStatus !==
+          originalStatus ||
+        (
+          currentUpdatedAt &&
+          currentUpdatedAt !==
+            originalUpdatedAt
+        );
+
+      if (
+        stateAdvanced &&
+        ![
+          "FAILED",
+          "BLOCKED",
+          "HUMAN_REVIEW",
+          "DIAGNOSING",
+        ].includes(
+          currentStatus,
+        )
+      ) {
+        return {
+          jobId:
+            job.id,
+          museKey:
+            job.muse_key,
+          action:
+            nextActionForStatus(
+              originalStatus,
+            ),
+          recovered:
+            true,
+          recovery:
+            "database-state-reconciliation",
+          originalError:
+            message,
+          observedStatus:
+            currentStatus,
+        };
+      }
+
+      if (
+        isExplicitSubstantiveError(
+          message,
+        )
+      ) {
+        break;
+      }
+
+      await sleep(
+        delays[
+          attempt
+        ],
+      );
+    }
+
+    const finalState =
+      await loadJobState({
+        supabase,
+        jobId:
+          String(
+            job.id,
+          ),
+      });
+
+    if (
+      String(
+        finalState.status,
+      ) !==
+        originalStatus &&
+      ![
+        "FAILED",
+        "BLOCKED",
+        "HUMAN_REVIEW",
+        "DIAGNOSING",
+      ].includes(
+        String(
+          finalState.status,
+        ),
+      )
+    ) {
+      return {
+        jobId:
+          job.id,
+        museKey:
+          job.muse_key,
+        action:
+          nextActionForStatus(
+            originalStatus,
+          ),
+        recovered:
+          true,
+        recovery:
+          "delayed-database-reconciliation",
+        originalError:
+          message,
+        observedStatus:
+          finalState.status,
+      };
+    }
+
+    return {
+      jobId:
+        job.id,
+      museKey:
+        job.muse_key,
+      action:
+        nextActionForStatus(
+          originalStatus,
+        ),
+      error:
+        message,
+      timingLike:
+        isTimingLikeError(
+          message,
+        ),
+      substantive:
+        isExplicitSubstantiveError(
+          message,
+        ),
+    };
+  }
+}
+
 async function advanceOneJob({
   supabase,
   job,
@@ -763,6 +1292,28 @@ async function advanceOneJob({
         "research",
       result,
     };
+  }
+
+  if (
+    status ===
+      "RESEARCHED" &&
+    typeof job.last_error ===
+      "string" &&
+    isRecoverableCurationShortfall(
+      job.last_error,
+    )
+  ) {
+    const scheduled =
+      await scheduleSupplementalResearch({
+        supabase,
+        job,
+        reason:
+          job.last_error,
+      });
+
+    if (scheduled) {
+      return scheduled;
+    }
   }
 
   if (
@@ -1010,59 +1561,74 @@ export async function runMuseSweepStep({
         ),
     );
 
-  // Validation is intentionally serialized. Other agent stages may advance
-  // two Muses at a time to keep cost and latency controlled.
+  const stagingJobs =
+    actionable.filter(
+      (job: any) =>
+        [
+          "CURATED",
+          "STAGING",
+        ].includes(
+          String(
+            job.status,
+          ),
+        ),
+    );
+
+  const releasePreparationJobs =
+    actionable.filter(
+      (job: any) =>
+        String(
+          job.status,
+        ) ===
+        "RELEASE_CANDIDATE",
+    );
+
+  /*
+   * Reliability over speed:
+   * - validation: one Muse at a time
+   * - knowledge staging: one Muse at a time
+   * - release preparation: one Muse at a time
+   * - research/curation: up to two at a time
+   */
   const selected =
     validationJobs.length
       ? validationJobs.slice(
           0,
           1,
         )
-      : actionable.slice(
-          0,
-          Math.max(
+      : stagingJobs.length
+        ? stagingJobs.slice(
+            0,
             1,
-            Math.min(
-              parallelism,
-              2,
-            ),
-          ),
-        );
+          )
+        : releasePreparationJobs.length
+          ? releasePreparationJobs.slice(
+              0,
+              1,
+            )
+          : actionable.slice(
+              0,
+              Math.max(
+                1,
+                Math.min(
+                  parallelism,
+                  2,
+                ),
+              ),
+            );
 
   const results =
     await Promise.all(
       selected.map(
         async (
           job: any,
-        ) => {
-          try {
-            return await advanceOneJob({
-              supabase,
-              job,
-              origin,
-              cookie,
-            });
-          } catch (
-            error
-          ) {
-            return {
-              jobId:
-                job.id,
-              museKey:
-                job.muse_key,
-              action:
-                nextActionForStatus(
-                  String(
-                    job.status,
-                  ),
-                ),
-              error:
-                error instanceof Error
-                  ? error.message
-                  : "Unknown Muse Sweep step error.",
-            };
-          }
-        },
+        ) =>
+          advanceWithRecovery({
+            supabase,
+            job,
+            origin,
+            cookie,
+          }),
       ),
     );
 
@@ -1078,23 +1644,51 @@ export async function runMuseSweepStep({
           "AWAITING_APPROVAL",
     );
 
-  const needsAttention =
-    status.filter(
-      (job: any) =>
-        [
-          "DIAGNOSING",
-          "HUMAN_REVIEW",
-          "BLOCKED",
-          "FAILED",
-        ].includes(
-          String(
-            job.status,
-          ),
-        ) ||
+  const resultProblems =
+    results.filter(
+      (result: any) =>
         Boolean(
-          job.lastError,
+          result?.error,
         ),
     );
+
+  const needsAttention =
+    [
+      ...status.filter(
+        (job: any) =>
+          [
+            "DIAGNOSING",
+            "HUMAN_REVIEW",
+            "BLOCKED",
+            "FAILED",
+          ].includes(
+            String(
+              job.status,
+            ),
+          ) ||
+          Boolean(
+            job.lastError,
+          ),
+      ),
+      ...resultProblems.map(
+        (result: any) => ({
+          jobId:
+            result.jobId,
+          museKey:
+            result.museKey,
+          status:
+            "STEP_ERROR",
+          currentAgent:
+            null,
+          lastError:
+            result.error,
+          nextAction:
+            result.action,
+          updatedAt:
+            null,
+        }),
+      ),
+    ];
 
   const remaining =
     status.filter(

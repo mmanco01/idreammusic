@@ -231,7 +231,7 @@ export async function runResearchAgent({
       ? Math.max(
           10,
           Math.min(
-            20,
+            40,
             Math.floor(
               configuredPool,
             ),
