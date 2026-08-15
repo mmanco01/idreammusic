@@ -98,6 +98,108 @@ export async function stageCandidateKnowledge({
     );
   }
 
+  /*
+   * A completed staging job is immutable, but a late duplicate
+   * request for material already staged is an idempotent success.
+   */
+  if (
+    job.status ===
+    "STAGED"
+  ) {
+    const {
+      data:
+        existingDocument,
+      error:
+        existingDocumentError,
+    } = await supabase
+      .from(
+        "muse_knowledge_documents",
+      )
+      .select(
+        "id,source_id",
+      )
+      .eq(
+        "agent_job_id",
+        agentJobId,
+      )
+      .eq(
+        "document_key",
+        `agent-${sourceCandidateId}`,
+      )
+      .maybeSingle();
+
+    if (
+      existingDocumentError
+    ) {
+      throw new Error(
+        existingDocumentError.message,
+      );
+    }
+
+    if (
+      !existingDocument
+    ) {
+      throw new Error(
+        `Agent job ${agentJobId} is STAGED, but source candidate ${sourceCandidateId} has no staged document; refusing to modify a completed candidate set.`,
+      );
+    }
+
+    const {
+      count,
+      error:
+        chunkCountError,
+    } = await supabase
+      .from(
+        "muse_knowledge_chunks",
+      )
+      .select(
+        "id",
+        {
+          count:
+            "exact",
+          head:
+            true,
+        },
+      )
+      .eq(
+        "document_id",
+        existingDocument.id,
+      );
+
+    if (
+      chunkCountError
+    ) {
+      throw new Error(
+        chunkCountError.message,
+      );
+    }
+
+    return {
+      sourceId:
+        String(
+          existingDocument.source_id,
+        ),
+      documentId:
+        String(
+          existingDocument.id,
+        ),
+      sourceCandidateId,
+      agentJobId,
+      museSlug:
+        String(
+          job.muse_key,
+        ),
+      candidateVersion:
+        String(
+          job.candidate_version,
+        ),
+      chunkCount:
+        count ?? 0,
+      alreadyStaged:
+        true,
+    };
+  }
+
   if (
     ![
       "CURATED",

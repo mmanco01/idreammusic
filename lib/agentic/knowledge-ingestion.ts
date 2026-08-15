@@ -150,6 +150,28 @@ export async function runKnowledgeIngestionAgent({
     );
   }
 
+  /*
+   * Idempotency:
+   * A late/repeated request after successful staging is success,
+   * not an error and never a reason to move the job backward.
+   */
+  if (
+    job.status ===
+    "STAGED"
+  ) {
+    return {
+      status:
+        "success",
+      jobId,
+      alreadyStaged:
+        true,
+      recovered:
+        true,
+      recovery:
+        "job-already-staged",
+    };
+  }
+
   if (
     ![
       "CURATED",
@@ -807,7 +829,7 @@ Return only URLs that were actually consulted as evidence.
 
           `${candidate.title}${
             candidate.author
-              ? ` â€” ${candidate.author}`
+              ? ` Ã¢â‚¬â€ ${candidate.author}`
               : ""
           }`,
 
@@ -1140,6 +1162,41 @@ Return only URLs that were actually consulted as evidence.
       error instanceof Error
         ? error.message
         : "Unknown Knowledge Ingestion Agent error.";
+
+    /*
+     * Another invocation may have completed while this one was
+     * still running. Re-read authoritative state before rollback.
+     */
+    const {
+      data:
+        currentJobState,
+    } = await supabase
+      .from("agent_jobs")
+      .select("status")
+      .eq(
+        "id",
+        jobId,
+      )
+      .single();
+
+    if (
+      currentJobState?.status ===
+      "STAGED"
+    ) {
+      return {
+        status:
+          "success",
+        jobId,
+        alreadyStaged:
+          true,
+        recovered:
+          true,
+        recovery:
+          "concurrent-staging-completed",
+        originalError:
+          message,
+      };
+    }
 
     await supabase
       .from("agent_jobs")
