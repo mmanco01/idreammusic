@@ -520,23 +520,39 @@ async function materializeValidationRun({
       final,
     );
 
-  const failureCategories =
-    Array.from(
-      new Set(
-        (
-          Array.isArray(
-            validation.candidateResults,
-          )
-            ? validation.candidateResults
-            : []
-        ).flatMap(
-          (row: any) =>
-            stringArray(
-              row?.failureCategories,
-            ),
-        ),
+const rawFailureCategories =
+  Array.from(
+    new Set(
+      (
+        Array.isArray(
+          validation.candidateResults,
+        )
+          ? validation.candidateResults
+          : []
+      ).flatMap(
+        (row: any) =>
+          stringArray(
+            row?.failureCategories,
+          ),
       ),
-    );
+    ),
+  );
+
+const candidateSummary =
+  isRecord(final.candidate)
+    ? final.candidate
+    : {};
+
+const candidateFullyPassed =
+  Number(candidateSummary.total ?? 0) > 0 &&
+  Number(candidateSummary.total ?? 0) ===
+    Number(candidateSummary.passed ?? -1);
+
+const failureCategories =
+  candidateFullyPassed
+    ? []
+    : rawFailureCategories;
+
 
   const targetStatus =
     String(
