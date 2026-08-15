@@ -91,6 +91,127 @@ function collectUrls(
   }
 }
 
+function normalizePublicationDate(
+  value: unknown,
+): string | null {
+  if (
+    typeof value !==
+      "string"
+  ) {
+    return null;
+  }
+
+  const raw =
+    value.trim();
+
+  if (!raw) {
+    return null;
+  }
+
+  // Exact ISO date.
+  const isoDate =
+    raw.match(
+      /^(\d{4})-(\d{2})-(\d{2})$/,
+    );
+
+  if (isoDate) {
+    const year =
+      Number(
+        isoDate[1],
+      );
+
+    const month =
+      Number(
+        isoDate[2],
+      );
+
+    const day =
+      Number(
+        isoDate[3],
+      );
+
+    const parsed =
+      new Date(
+        Date.UTC(
+          year,
+          month - 1,
+          day,
+        ),
+      );
+
+    if (
+      parsed.getUTCFullYear() ===
+        year &&
+      parsed.getUTCMonth() ===
+        month - 1 &&
+      parsed.getUTCDate() ===
+        day
+    ) {
+      return raw;
+    }
+
+    return null;
+  }
+
+  // ISO timestamp containing an exact date.
+  const isoTimestamp =
+    raw.match(
+      /^(\d{4}-\d{2}-\d{2})T/,
+    );
+
+  if (isoTimestamp) {
+    return normalizePublicationDate(
+      isoTimestamp[1],
+    );
+  }
+
+  // Month/year or year-only is partial information.
+  // Do not invent a day just to satisfy the SQL date type.
+  if (
+    /^[A-Za-z]+\s+\d{4}$/.test(
+      raw,
+    ) ||
+    /^\d{4}$/.test(
+      raw,
+    ) ||
+    /^\d{4}-\d{1,2}$/.test(
+      raw,
+    )
+  ) {
+    return null;
+  }
+
+  // Accept an unambiguous textual date such as
+  // "September 15, 2020".
+  if (
+    /^[A-Za-z]+\s+\d{1,2},\s+\d{4}$/.test(
+      raw,
+    )
+  ) {
+    const timestamp =
+      Date.parse(
+        raw,
+      );
+
+    if (
+      Number.isFinite(
+        timestamp,
+      )
+    ) {
+      return new Date(
+        timestamp,
+      )
+        .toISOString()
+        .slice(
+          0,
+          10,
+        );
+    }
+  }
+
+  return null;
+}
+
 type ResearchCandidate = {
   title: string;
   author: string | null;
@@ -753,8 +874,9 @@ Research requirements:
               ) || null,
 
             publication_date:
-              candidate.publication_date ||
-              null,
+              normalizePublicationDate(
+                candidate.publication_date,
+              ),
 
             source_url:
               sourceUrl,
