@@ -37,6 +37,51 @@ const CONCEPT_ALIASES: Record<
 
 
 
+  variation: [
+    "mutate the repetition",
+    "mutate the repeat",
+    "change one element",
+    "change one thing",
+    "alter one thing",
+    "new detail each time",
+    "unexpected viewpoint",
+    "different each time",
+  ],
+
+  "self-awareness": [
+    "self knowledge",
+    "self-knowledge",
+    "aware of the contradiction",
+    "aware of their contradiction",
+    "recognize the blind spot",
+    "recognizes the blind spot",
+  ],
+
+  desire: [
+    "what they want",
+    "what the narrator wants",
+    "what the character wants",
+    "what the speaker wants",
+  ],
+
+  "emotional truth": [
+    "emotional stake",
+    "emotional stakes",
+    "underlying feeling",
+    "feeling underneath",
+    "song's feeling",
+    "cost stays visible",
+    "hurt stays visible",
+  ],
+
+  contrast: [
+    "juxtaposition",
+    "funny and sad",
+    "humor and sadness",
+    "comic and sad",
+    "sad setup",
+    "comic payoff",
+  ],
   context: [
     "human moment",
     "concrete scene",
