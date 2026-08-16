@@ -35,6 +35,7 @@ type ValidationRecheck = {
     | null
     | "variance_pass"
     | "execution_recovered"
+    | "execution_exhausted"
     | "unstable"
     | "confirmed_failure";
 };
@@ -71,6 +72,7 @@ const AGENT_NAME =
   "validation-agent-v1" as const;
 
 const BATCH_SIZE = 3;
+const MAX_RECHECK_EXECUTION_ERRORS = 3;
 const AVERAGE_OVERALL_REGRESSION_LIMIT = -0.5;
 const INDIVIDUAL_OVERALL_REGRESSION_LIMIT = -3.0;
 
@@ -889,6 +891,19 @@ function buildFinalComparison({
     );
   }
 
+  const executionRecheckExhausted =
+    rechecks.some(
+      (item) =>
+        item.resolution ===
+        "execution_exhausted",
+    );
+
+  if (executionRecheckExhausted) {
+    watchItems.push(
+      "Validation execution retries were exhausted for one or more benchmarks.",
+    );
+  }
+
   let classification: string;
   let targetStatus:
     | "RELEASE_CANDIDATE"
@@ -936,7 +951,12 @@ function buildFinalComparison({
       baselineConfirmedFailures.length &&
     !largeIndividualRegression;
 
-  if (
+  if (executionRecheckExhausted) {
+    classification =
+      "VALIDATION_EXECUTION_UNSTABLE";
+    targetStatus =
+      "HUMAN_REVIEW";
+  } else if (
     unstableBaseline ||
     baselineExecutionFailures.length >
       0
