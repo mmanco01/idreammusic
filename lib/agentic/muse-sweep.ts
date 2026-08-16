@@ -1676,7 +1676,6 @@ export async function runMuseSweepStep({
           if (
             [
               "DIAGNOSING",
-              "HUMAN_REVIEW",
               "BLOCKED",
               "FAILED",
             ].includes(
