@@ -895,8 +895,73 @@ function buildFinalComparison({
     | "DIAGNOSING"
     | "HUMAN_REVIEW";
 
+  const baselineConfirmedFailures =
+    rechecks.filter(
+      (item) =>
+        item.target === "baseline" &&
+        item.resolution ===
+          "confirmed_failure",
+    );
+
+  const baselineExecutionFailures =
+    baselineConfirmedFailures.filter(
+      (item) =>
+        item.reason ===
+          "execution_failure",
+    );
+
+  const repairedBaselineFailures =
+    baselineConfirmedFailures.filter(
+      (item) => {
+        const candidateRow =
+          candidateEffective.find(
+            (row) =>
+              row.benchmarkKey ===
+              item.benchmarkKey,
+          );
+
+        return candidateRow?.passed ===
+          true;
+      },
+    );
+
+  const candidateRepairsBaseline =
+    !baselineCompletePass &&
+    candidateCompletePass &&
+    baselineConfirmedFailures.length >
+      0 &&
+    baselineExecutionFailures.length ===
+      0 &&
+    repairedBaselineFailures.length ===
+      baselineConfirmedFailures.length &&
+    !largeIndividualRegression;
+
   if (
     unstableBaseline ||
+    baselineExecutionFailures.length >
+      0
+  ) {
+    classification =
+      "BASELINE_NOT_STABLE";
+    targetStatus =
+      "HUMAN_REVIEW";
+  } else if (
+    candidateRepairsBaseline
+  ) {
+    classification =
+      "BASELINE_DRIFT_REPAIRED";
+    targetStatus =
+      "RELEASE_CANDIDATE";
+
+    watchItems.push(
+      `Candidate repaired ${repairedBaselineFailures.length} confirmed baseline failure(s): ${repairedBaselineFailures
+        .map(
+          (item) =>
+            item.benchmarkKey,
+        )
+        .join(", ")}`,
+    );
+  } else if (
     !baselineCompletePass
   ) {
     classification =
