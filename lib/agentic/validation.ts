@@ -26,11 +26,15 @@ type ValidationBenchmarkResult = {
 type ValidationRecheck = {
   target: ValidationTarget;
   benchmarkKey: string;
+  reason:
+    | "response_variance"
+    | "execution_failure";
   attempts: number;
   results: ValidationBenchmarkResult[];
   resolution:
     | null
     | "variance_pass"
+    | "execution_recovered"
     | "unstable"
     | "confirmed_failure";
 };
@@ -220,6 +224,21 @@ function isResponseVarianceCandidate(
   );
 }
 
+function isExecutionRetryCandidate(
+  result: ValidationBenchmarkResult,
+) {
+  if (result.passed) {
+    return false;
+  }
+
+  return (
+    result.status === "error" ||
+    result.failureCategories.includes(
+      "execution",
+    )
+  );
+}
+
 function averageRechecks(
   original: ValidationBenchmarkResult,
   rows: ValidationBenchmarkResult[],
@@ -290,6 +309,24 @@ function adjudicatedResults({
           (row) => row.passed,
         ),
       );
+    }
+
+    if (
+      recheck?.resolution ===
+      "execution_recovered"
+    ) {
+      const recovered =
+        recheck.results.find(
+          (row) => row.passed,
+        );
+
+      if (recovered) {
+        return {
+          ...recovered,
+          evaluatorNotes:
+            "Recovered after transient benchmark execution failure.",
+        };
+      }
     }
 
     return result;
@@ -515,6 +552,25 @@ function makeRecheckQueue(
           target,
           benchmarkKey:
             row.benchmarkKey,
+          reason:
+            "response_variance",
+          attempts: 0,
+          results: [],
+          resolution: null,
+        });
+
+        continue;
+      }
+
+      if (
+        isExecutionRetryCandidate(row)
+      ) {
+        queue.push({
+          target,
+          benchmarkKey:
+            row.benchmarkKey,
+          reason:
+            "execution_failure",
           attempts: 0,
           results: [],
           resolution: null,
@@ -691,13 +747,32 @@ function buildFinalComparison({
     rechecks.some(
       (item) =>
         item.target === "baseline" &&
-        item.resolution === "unstable",
+        (
+          item.resolution ===
+            "unstable" ||
+          (
+            item.reason ===
+              "execution_failure" &&
+            item.resolution ===
+              "confirmed_failure"
+          )
+        ),
     );
+
   const unstableCandidate =
     rechecks.some(
       (item) =>
         item.target === "candidate" &&
-        item.resolution === "unstable",
+        (
+          item.resolution ===
+            "unstable" ||
+          (
+            item.reason ===
+              "execution_failure" &&
+            item.resolution ===
+              "confirmed_failure"
+          )
+        ),
     );
 
   const baselineCompletePass =
@@ -1268,14 +1343,34 @@ export async function runValidationAgentStep({
 
     if (results.length !== 1) {
       throw new Error(
-        `Response-variance recheck expected one result but stored ${results.length}.`,
+        `Validation recheck expected one result but stored ${results.length}.`,
       );
     }
 
     item.results.push(results[0]);
     item.attempts += 1;
 
-    if (item.attempts >= 2) {
+    if (
+      item.reason ===
+      "execution_failure"
+    ) {
+      const recovered =
+        item.results.some(
+          (row) => row.passed,
+        );
+
+      if (recovered) {
+        item.resolution =
+          "execution_recovered";
+      } else if (
+        item.attempts >= 2
+      ) {
+        item.resolution =
+          "confirmed_failure";
+      }
+    } else if (
+      item.attempts >= 2
+    ) {
       const passCount =
         item.results.filter(
           (row) => row.passed,

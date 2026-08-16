@@ -156,8 +156,17 @@ export async function runKnowledgeIngestionAgent({
    * not an error and never a reason to move the job backward.
    */
   if (
-    job.status ===
-    "STAGED"
+    [
+      "STAGED",
+      "VALIDATING",
+      "DIAGNOSING",
+      "CODE_FIX",
+      "REVALIDATING",
+      "RELEASE_CANDIDATE",
+      "AWAITING_APPROVAL",
+      "HUMAN_REVIEW",
+      "RELEASED",
+    ].includes(job.status)
   ) {
     return {
       status:
@@ -829,7 +838,7 @@ Return only URLs that were actually consulted as evidence.
 
           `${candidate.title}${
             candidate.author
-              ? ` Ã¢â‚¬â€ ${candidate.author}`
+              ? ` ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â ${candidate.author}`
               : ""
           }`,
 
@@ -1112,6 +1121,13 @@ Return only URLs that were actually consulted as evidence.
       .eq(
         "id",
         jobId,
+      )
+      .in(
+        "status",
+        [
+          "CURATED",
+          "STAGING",
+        ],
       );
 
     if (
@@ -1180,8 +1196,22 @@ Return only URLs that were actually consulted as evidence.
       .single();
 
     if (
-      currentJobState?.status ===
-      "STAGED"
+      [
+        "STAGED",
+        "VALIDATING",
+        "DIAGNOSING",
+        "CODE_FIX",
+        "REVALIDATING",
+        "RELEASE_CANDIDATE",
+        "AWAITING_APPROVAL",
+        "HUMAN_REVIEW",
+        "RELEASED",
+      ].includes(
+        String(
+          currentJobState?.status ??
+            "",
+        ),
+      )
     ) {
       return {
         status:
@@ -1213,6 +1243,10 @@ Return only URLs that were actually consulted as evidence.
       .eq(
         "id",
         jobId,
+      )
+      .eq(
+        "status",
+        "STAGING",
       );
 
     await supabase

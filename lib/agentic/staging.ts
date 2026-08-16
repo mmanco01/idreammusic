@@ -103,8 +103,17 @@ export async function stageCandidateKnowledge({
    * request for material already staged is an idempotent success.
    */
   if (
-    job.status ===
-    "STAGED"
+    [
+      "STAGED",
+      "VALIDATING",
+      "DIAGNOSING",
+      "CODE_FIX",
+      "REVALIDATING",
+      "RELEASE_CANDIDATE",
+      "AWAITING_APPROVAL",
+      "HUMAN_REVIEW",
+      "RELEASED",
+    ].includes(job.status)
   ) {
     const {
       data:
@@ -140,7 +149,7 @@ export async function stageCandidateKnowledge({
       !existingDocument
     ) {
       throw new Error(
-        `Agent job ${agentJobId} is STAGED, but source candidate ${sourceCandidateId} has no staged document; refusing to modify a completed candidate set.`,
+        `Agent job ${agentJobId} has advanced beyond staging, but source candidate ${sourceCandidateId} has no staged document; refusing to modify a completed candidate set.`,
       );
     }
 
