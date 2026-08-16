@@ -874,6 +874,26 @@ const CONCEPT_ALIASES: Record<
     "new obstacle",
     "force a decision",
     "reversal",
+    "deadpan accumulation",
+    "build expectation",
+    "expectations build",
+    "build anticipation",
+  ],
+
+  callback: [
+    "echo the new meaning",
+    "second chorus echo",
+    "echo the earlier meaning",
+    "return to the setup",
+    "revisit the setup",
+  ],
+
+  resolution: [
+    "satisfying click",
+    "oh of course",
+    "snaps into place",
+    "reparse the whole thing",
+    "reframe what came before",
   ],
 
   setup: [
