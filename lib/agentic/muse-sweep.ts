@@ -58,15 +58,6 @@ function isRecord(
   );
 }
 
-function targetForMuse(
-  museKey: string,
-) {
-  return TARGETS.find(
-    (target) =>
-      target.museKey ===
-      museKey,
-  );
-}
 
 function nextActionForStatus(
   status: string,
@@ -119,8 +110,11 @@ function nextActionForStatus(
 
 async function loadSweepJobs({
   supabase,
+  sweepKey =
+    DEFAULT_MUSE_SWEEP_KEY,
 }: {
   supabase: any;
+  sweepKey?: string;
 }) {
   const {
     data,
@@ -150,7 +144,7 @@ async function loadSweepJobs({
         "input",
         {
           sweep_key:
-            SWEEP_KEY,
+            sweepKey,
         },
       )
       .order(
@@ -222,12 +216,26 @@ async function writeAudit({
 export async function ensureMuseSweepJobs({
   supabase,
   initiatedByUserId,
+  sweepKey =
+    DEFAULT_MUSE_SWEEP_KEY,
 }: {
   supabase: any;
   initiatedByUserId: string;
+  sweepKey?: string;
 }) {
+  const definition =
+    getMuseSweepDefinition(
+      sweepKey,
+    );
+
+  const resolvedSweepKey =
+    definition.sweepKey;
+
+  const targets =
+    definition.targets;
+
   const candidateVersions =
-    TARGETS.map(
+    targets.map(
       (target) =>
         target.candidateVersion,
     );
@@ -252,6 +260,13 @@ export async function ensureMuseSweepJobs({
       .in(
         "candidate_version",
         candidateVersions,
+      )
+      .contains(
+        "input",
+        {
+          sweep_key:
+            resolvedSweepKey,
+        },
       );
 
   if (existingError) {
@@ -283,9 +298,17 @@ export async function ensureMuseSweepJobs({
     Array<Record<string, unknown>> =
     [];
 
+  const depthLabel =
+    String(
+      definition.depth,
+    ).padStart(
+      2,
+      "0",
+    );
+
   for (
     const target
-    of TARGETS
+    of targets
   ) {
     const existing =
       existingByVersion.get(
@@ -325,22 +348,22 @@ export async function ensureMuseSweepJobs({
           muse_key:
             target.museKey,
           title:
-            `${target.displayName} Autonomous Depth Experiment 01`,
+            `${target.displayName} Autonomous Depth Experiment ${depthLabel}`,
           mission:
             target.mission,
           baseline_version:
-            "muse-iq-v1.2",
+            definition.baselineVersion,
           candidate_version:
             target.candidateVersion,
           status:
             "NEW",
           requested_source_count:
-            10,
+            definition.requestedSourceCount,
           input: {
             sweep_key:
-              SWEEP_KEY,
+              resolvedSweepKey,
             sweep_version:
-              1,
+              definition.sweepVersion,
             initiated_by:
               initiatedByUserId,
             target_capabilities:
@@ -383,13 +406,15 @@ export async function ensureMuseSweepJobs({
         "NEW",
       payload: {
         sweepKey:
-          SWEEP_KEY,
+          resolvedSweepKey,
+        sweepVersion:
+          definition.sweepVersion,
         museKey:
           target.museKey,
         candidateVersion:
           target.candidateVersion,
         requestedSourceCount:
-          10,
+          definition.requestedSourceCount,
         targetCapabilities:
           target.targetCapabilities,
         initiatedBy:
@@ -415,14 +440,18 @@ export async function ensureMuseSweepJobs({
     orchestrator:
       ORCHESTRATOR_NAME,
     sweepKey:
-      SWEEP_KEY,
+      resolvedSweepKey,
+    sweepVersion:
+      definition.sweepVersion,
     targetCount:
-      TARGETS.length,
+      targets.length,
     created,
     reused,
     jobs:
       await getMuseSweepStatus({
         supabase,
+        sweepKey:
+          resolvedSweepKey,
       }),
   };
 }
@@ -564,7 +593,7 @@ async function markRepairAttempted({
         "agent_jobs",
       )
       .select(
-        "result_summary",
+        "result_summary,input",
       )
       .eq(
         "id",
@@ -589,6 +618,20 @@ async function markRepairAttempted({
       ? row.result_summary
       : {};
 
+  const input =
+    isRecord(
+      row.input,
+    )
+      ? row.input
+      : {};
+
+  const resolvedSweepKey =
+    typeof input.sweep_key ===
+      "string" &&
+    input.sweep_key.trim()
+      ? input.sweep_key.trim()
+      : DEFAULT_MUSE_SWEEP_KEY;
+
   const orchestrator =
     isRecord(
       summary.orchestrator,
@@ -609,7 +652,7 @@ async function markRepairAttempted({
           orchestrator: {
             ...orchestrator,
             sweep_key:
-              SWEEP_KEY,
+              resolvedSweepKey,
             provenance_repair_attempted:
               true,
             provenance_repair_attempted_at:
@@ -790,6 +833,13 @@ async function scheduleSupplementalResearch({
       ? job.input
       : {};
 
+  const resolvedSweepKey =
+    typeof input.sweep_key ===
+      "string" &&
+    input.sweep_key.trim()
+      ? input.sweep_key.trim()
+      : DEFAULT_MUSE_SWEEP_KEY;
+
   const researchBehavior =
     isRecord(
       input.research_behavior,
@@ -897,7 +947,7 @@ async function scheduleSupplementalResearch({
       "NEW",
     payload: {
       sweepKey:
-        SWEEP_KEY,
+        resolvedSweepKey,
       reason,
       supplementalAttempt:
         nextAttempt,
@@ -1396,12 +1446,16 @@ async function advanceOneJob({
 
 export async function getMuseSweepStatus({
   supabase,
+  sweepKey =
+    DEFAULT_MUSE_SWEEP_KEY,
 }: {
   supabase: any;
+  sweepKey?: string;
 }) {
   const jobs =
     await loadSweepJobs({
       supabase,
+      sweepKey,
     });
 
   return jobs.map(
@@ -1435,23 +1489,39 @@ export async function runMuseSweepStep({
   origin,
   cookie,
   parallelism = 2,
+  sweepKey =
+    DEFAULT_MUSE_SWEEP_KEY,
 }: {
   supabase: any;
   origin: string;
   cookie: string;
   parallelism?: number;
+  sweepKey?: string;
 }) {
+  const definition =
+    getMuseSweepDefinition(
+      sweepKey,
+    );
+
+  const resolvedSweepKey =
+    definition.sweepKey;
+
+  const targets =
+    definition.targets;
+
   const jobs =
     await loadSweepJobs({
       supabase,
+      sweepKey:
+        resolvedSweepKey,
     });
 
   if (
     jobs.length !==
-      TARGETS.length
+      targets.length
   ) {
     throw new Error(
-      `Muse Sweep expected ${TARGETS.length} jobs but found ${jobs.length}. Run the start action first.`,
+      `Muse Sweep expected ${targets.length} jobs but found ${jobs.length}. Run the start action first.`,
     );
   }
 
@@ -1552,6 +1622,8 @@ export async function runMuseSweepStep({
   const status =
     await getMuseSweepStatus({
       supabase,
+      sweepKey:
+        resolvedSweepKey,
     });
 
   const waitingForApproval =
@@ -1661,7 +1733,7 @@ export async function runMuseSweepStep({
     orchestrator:
       ORCHESTRATOR_NAME,
     sweepKey:
-      SWEEP_KEY,
+      resolvedSweepKey,
     advancedCount:
       selected.length,
     results,
@@ -2014,30 +2086,38 @@ export async function runMuseSweepWorkerStep({
   supabase,
   origin,
   authorization,
+  sweepKey =
+    DEFAULT_MUSE_SWEEP_KEY,
 }: {
   supabase: any;
   origin: string;
   authorization: string;
+  sweepKey?: string;
 }) {
-  if (
-    !process.env.OPENAI_API_KEY
-  ) {
-    throw new Error(
-      "OPENAI_API_KEY is not configured.",
+  const definition =
+    getMuseSweepDefinition(
+      sweepKey,
     );
-  }
+
+  const resolvedSweepKey =
+    definition.sweepKey;
+
+  const targets =
+    definition.targets;
 
   const jobs =
     await loadSweepJobs({
       supabase,
+      sweepKey:
+        resolvedSweepKey,
     });
 
   if (
     jobs.length !==
-      TARGETS.length
+      targets.length
   ) {
     throw new Error(
-      `Muse Sweep worker expected ${TARGETS.length} jobs but found ${jobs.length}.`,
+      `Muse Sweep worker expected ${targets.length} jobs but found ${jobs.length}.`,
     );
   }
 
@@ -2055,18 +2135,28 @@ export async function runMuseSweepWorkerStep({
       orchestrator:
         ORCHESTRATOR_NAME,
       sweepKey:
-        SWEEP_KEY,
+        resolvedSweepKey,
       advancedCount: 0,
       result: null,
       jobs:
         await getMuseSweepStatus({
           supabase,
+          sweepKey:
+            resolvedSweepKey,
         }),
       continueRequired:
         false,
       message:
         "No actionable Muse Sweep jobs remain.",
     };
+  }
+
+  if (
+    !process.env.OPENAI_API_KEY
+  ) {
+    throw new Error(
+      "OPENAI_API_KEY is not configured.",
+    );
   }
 
   /*
@@ -2117,6 +2207,8 @@ export async function runMuseSweepWorkerStep({
   const status =
     await getMuseSweepStatus({
       supabase,
+      sweepKey:
+        resolvedSweepKey,
     });
 
   const remaining =
@@ -2132,7 +2224,7 @@ export async function runMuseSweepWorkerStep({
     orchestrator:
       ORCHESTRATOR_NAME,
     sweepKey:
-      SWEEP_KEY,
+      resolvedSweepKey,
     advancedCount: 1,
     result,
     jobs: status,
