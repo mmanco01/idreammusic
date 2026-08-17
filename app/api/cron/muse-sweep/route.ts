@@ -1,4 +1,8 @@
-﻿import {
+import {
+  randomUUID,
+} from "node:crypto";
+
+import {
   NextResponse,
 } from "next/server";
 
@@ -20,6 +24,9 @@ export const runtime =
 
 export const maxDuration =
   300;
+
+const WORKER_LEASE_SECONDS =
+  600;
 
 export async function GET(
   request: Request,
@@ -67,17 +74,95 @@ export async function GET(
     const supabase =
       getAgentAdminClient();
 
-    const result =
-      await runMuseSweepWorkerStep({
-        supabase,
-        origin,
-        authorization,
-        sweepKey,
-      });
+    const ownerToken =
+      randomUUID();
 
-    return NextResponse.json(
-      result,
-    );
+    const leaseKey =
+      `muse-sweep:${sweepKey}`;
+
+    const {
+      data: leaseData,
+      error: leaseError,
+    } =
+      await (supabase.rpc as any)(
+        "acquire_agent_worker_lease",
+        {
+          p_lease_key:
+            leaseKey,
+          p_owner_token:
+            ownerToken,
+          p_lease_seconds:
+            WORKER_LEASE_SECONDS,
+        },
+      );
+
+    if (leaseError) {
+      throw new Error(
+        `Could not acquire Muse Sweep worker lease: ${leaseError.message}`,
+      );
+    }
+
+    const lease =
+      Array.isArray(
+        leaseData,
+      )
+        ? leaseData[0]
+        : leaseData;
+
+    if (!lease?.acquired) {
+      return NextResponse.json({
+        status: "success",
+        orchestrator:
+          "muse-sweep-orchestrator-v1",
+        sweepKey,
+        advancedCount: 0,
+        leaseAcquired:
+          false,
+        leaseExpiresAt:
+          lease?.lease_expires_at ??
+          null,
+        continueRequired:
+          true,
+        message:
+          "Muse Sweep worker is already active for this sweep.",
+      });
+    }
+
+    try {
+      const result =
+        await runMuseSweepWorkerStep({
+          supabase,
+          origin,
+          authorization,
+          sweepKey,
+        });
+
+      return NextResponse.json({
+        ...result,
+        leaseAcquired:
+          true,
+      });
+    } finally {
+      const {
+        error: releaseError,
+      } =
+        await (supabase.rpc as any)(
+          "release_agent_worker_lease",
+          {
+            p_lease_key:
+              leaseKey,
+            p_owner_token:
+              ownerToken,
+          },
+        );
+
+      if (releaseError) {
+        console.error(
+          "Could not release Muse Sweep worker lease:",
+          releaseError,
+        );
+      }
+    }
   } catch (error) {
     console.error(
       "Muse Sweep worker error:",
