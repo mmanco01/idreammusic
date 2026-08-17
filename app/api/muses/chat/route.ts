@@ -31,6 +31,7 @@ import { getMusePlatformConfig } from "@/lib/muses/platform";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   getAgentAdminClient,
+  isAgentWorkerRequest,
   requireAgentAdmin,
 } from "@/lib/agentic/project-adapters";
 
@@ -1072,7 +1073,7 @@ Guidance for the structured fields:
 - primaryObservation: the single most important grounded observation.
   Its category should normally match one of your named diagnostic keys.
 - diagnostics: assess each named diagnostic area that can be grounded in
-  the supplied material, up to five areas. Give a 0ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ100 working score,
+  the supplied material, up to five areas. Give a 0ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“100 working score,
   evidence, confidence, and changeFromPrevious. Use unknown when there is
   no trustworthy earlier diagnostic comparison.
 - lensAssessments: separately assess lyric, form, melody, performance, and
@@ -1991,25 +1992,31 @@ export async function POST(request: Request) {
     let candidateKnowledgeSupabase:
       any = null;
 
-    if (agentJobId) {
-      try {
-        await requireAgentAdmin(
-          request,
-        );
-      } catch {
-        return NextResponse.json(
-          {
-            status: "error",
-            message:
-              "Candidate Muse validation requires Agent admin access.",
-          },
-          { status: 403 },
-        );
-      }
-
-      candidateKnowledgeSupabase =
-        getAgentAdminClient();
+if (agentJobId) {
+  if (
+    !isAgentWorkerRequest(
+      request,
+    )
+  ) {
+    try {
+      await requireAgentAdmin(
+        request,
+      );
+    } catch {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "Candidate Muse validation requires Agent admin access.",
+        },
+        { status: 403 },
+      );
     }
+  }
+
+  candidateKnowledgeSupabase =
+    getAgentAdminClient();
+}
 
     const mode: MuseChatMode =
       body.mode === "collaborate"
