@@ -8,6 +8,10 @@ import {
 } from "@/lib/agentic/project-adapters";
 
 import {
+  DEFAULT_MUSE_SWEEP_KEY,
+} from "@/lib/agentic/muse-sweep-definitions";
+
+import {
   runMuseSweepWorkerStep,
 } from "@/lib/agentic/muse-sweep";
 
@@ -48,6 +52,18 @@ export async function GET(
         request.url,
       ).origin;
 
+    /*
+     * Safety default:
+     * unattended execution stays on the completed
+     * historical v1 sweep unless this environment
+     * setting is deliberately changed.
+     */
+    const sweepKey =
+      process.env
+        .MUSE_SWEEP_CRON_KEY
+        ?.trim() ||
+      DEFAULT_MUSE_SWEEP_KEY;
+
     const supabase =
       getAgentAdminClient();
 
@@ -56,6 +72,7 @@ export async function GET(
         supabase,
         origin,
         authorization,
+        sweepKey,
       });
 
     return NextResponse.json(

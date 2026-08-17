@@ -1,4 +1,4 @@
-import {
+﻿import {
   NextResponse,
 } from "next/server";
 
@@ -7,6 +7,10 @@ import {
   getAgentAdminClient,
   requireAgentAdmin,
 } from "@/lib/agentic/project-adapters";
+
+import {
+  DEFAULT_MUSE_SWEEP_KEY,
+} from "@/lib/agentic/muse-sweep-definitions";
 
 import {
   ensureMuseSweepJobs,
@@ -23,6 +27,7 @@ export const maxDuration =
 type SweepRequest = {
   action?: unknown;
   parallelism?: unknown;
+  sweepKey?: unknown;
 };
 
 function cleanAction(
@@ -61,6 +66,20 @@ function cleanParallelism(
   );
 }
 
+function cleanSweepKey(
+  value: unknown,
+) {
+  if (
+    typeof value !==
+      "string" ||
+    !value.trim()
+  ) {
+    return DEFAULT_MUSE_SWEEP_KEY;
+  }
+
+  return value.trim();
+}
+
 export async function POST(
   request: Request,
 ) {
@@ -84,6 +103,11 @@ export async function POST(
         body.action,
       );
 
+    const sweepKey =
+      cleanSweepKey(
+        body.sweepKey,
+      );
+
     const supabase =
       getAgentAdminClient();
 
@@ -95,6 +119,7 @@ export async function POST(
           supabase,
           initiatedByUserId:
             user.id,
+          sweepKey,
         });
 
       return NextResponse.json(
@@ -124,6 +149,7 @@ export async function POST(
             cleanParallelism(
               body.parallelism,
             ),
+          sweepKey,
         });
 
       return NextResponse.json(
@@ -137,11 +163,13 @@ export async function POST(
       const jobs =
         await getMuseSweepStatus({
           supabase,
+          sweepKey,
         });
 
       return NextResponse.json({
         status:
           "success",
+        sweepKey,
         jobs,
       });
     }
