@@ -1,3 +1,24 @@
+import OpenAI from "openai";
+
+import {
+  runResearchAgent,
+} from "@/lib/agentic/research";
+import {
+  runCurationAgent,
+} from "@/lib/agentic/curation";
+import {
+  runProvenanceRepair,
+} from "@/lib/agentic/provenance-repair";
+import {
+  runKnowledgeIngestionAgent,
+} from "@/lib/agentic/knowledge-ingestion";
+import {
+  runValidationAgentStep,
+} from "@/lib/agentic/validation";
+import {
+  prepareReleaseCandidate,
+} from "@/lib/agentic/release-manager";
+
 const SWEEP_KEY =
   "nine-muses-first-pass-v1";
 
@@ -1761,6 +1782,478 @@ export async function runMuseSweepStep({
     continueRequired:
       remaining.length >
       0,
+  };
+}
+
+
+function sweepInitiator(
+  job: any,
+) {
+  const input =
+    isRecord(job.input)
+      ? job.input
+      : {};
+
+  const userId =
+    typeof input.initiated_by === "string"
+      ? input.initiated_by.trim()
+      : "";
+
+  if (!userId) {
+    throw new Error(
+      `Muse Sweep job ${job.id} does not contain its initiating user.`,
+    );
+  }
+
+  return userId;
+}
+
+async function advanceWorkerJob({
+  supabase,
+  openai,
+  job,
+  origin,
+  authorization,
+}: {
+  supabase: any;
+  openai: OpenAI;
+  job: any;
+  origin: string;
+  authorization: string;
+}) {
+  const jobId =
+    String(job.id);
+
+  const status =
+    String(job.status);
+
+  const initiatedByUserId =
+    sweepInitiator(job);
+
+  if (
+    status === "NEW" ||
+    status === "RESEARCHING"
+  ) {
+    return {
+      jobId,
+      museKey: job.muse_key,
+      action: "research",
+      result:
+        await runResearchAgent({
+          supabase,
+          openai,
+          jobId,
+          initiatedByUserId,
+        }),
+    };
+  }
+
+  if (
+    status === "RESEARCHED" &&
+    typeof job.last_error === "string" &&
+    isRecoverableCurationShortfall(
+      job.last_error,
+    )
+  ) {
+    const scheduled =
+      await scheduleSupplementalResearch({
+        supabase,
+        job,
+        reason: job.last_error,
+      });
+
+    if (scheduled) {
+      return scheduled;
+    }
+  }
+
+  if (
+    status === "RESEARCHED" ||
+    status === "CURATING"
+  ) {
+    return {
+      jobId,
+      museKey: job.muse_key,
+      action: "curate",
+      result:
+        await runCurationAgent({
+          supabase,
+          openai,
+          jobId,
+          initiatedByUserId,
+        }),
+    };
+  }
+
+  if (status === "CURATED") {
+    const shouldRepair =
+      !repairAlreadyAttempted(
+        job.result_summary,
+      ) &&
+      await provenanceRepairNeeded({
+        supabase,
+        jobId,
+      });
+
+    if (shouldRepair) {
+      const result =
+        await runProvenanceRepair({
+          supabase,
+          openai,
+          jobId,
+          initiatedByUserId,
+        });
+
+      await markRepairAttempted({
+        supabase,
+        jobId,
+      });
+
+      return {
+        jobId,
+        museKey: job.muse_key,
+        action: "repair-provenance",
+        result,
+      };
+    }
+
+    return {
+      jobId,
+      museKey: job.muse_key,
+      action: "stage",
+      result:
+        await runKnowledgeIngestionAgent({
+          supabase,
+          openai,
+          jobId,
+          initiatedByUserId,
+        }),
+    };
+  }
+
+  if (status === "STAGING") {
+    return {
+      jobId,
+      museKey: job.muse_key,
+      action: "stage",
+      result:
+        await runKnowledgeIngestionAgent({
+          supabase,
+          openai,
+          jobId,
+          initiatedByUserId,
+        }),
+    };
+  }
+
+  if (
+    status === "STAGED" ||
+    status === "VALIDATING"
+  ) {
+    return {
+      jobId,
+      museKey: job.muse_key,
+      action: "validate",
+      result:
+        await runValidationAgentStep({
+          supabase,
+          jobId,
+          initiatedByUserId,
+          origin,
+          cookie: "",
+          authorization,
+        }),
+    };
+  }
+
+  if (
+    status === "RELEASE_CANDIDATE"
+  ) {
+    return {
+      jobId,
+      museKey: job.muse_key,
+      action: "prepare-release",
+      result:
+        await prepareReleaseCandidate({
+          supabase,
+          jobId,
+          initiatedByUserId,
+        }),
+    };
+  }
+
+  return {
+    jobId,
+    museKey: job.muse_key,
+    action: "none",
+    result: {
+      status,
+      nextAction:
+        nextActionForStatus(
+          status,
+        ),
+    },
+  };
+}
+
+async function advanceWorkerJobWithRecovery({
+  supabase,
+  openai,
+  job,
+  origin,
+  authorization,
+}: {
+  supabase: any;
+  openai: OpenAI;
+  job: any;
+  origin: string;
+  authorization: string;
+}) {
+  const originalStatus =
+    String(job.status);
+
+  try {
+    return await advanceWorkerJob({
+      supabase,
+      openai,
+      job,
+      origin,
+      authorization,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown durable Muse Sweep worker error.";
+
+    if (
+      isRecoverableCurationShortfall(
+        message,
+      )
+    ) {
+      const current =
+        await loadJobState({
+          supabase,
+          jobId:
+            String(job.id),
+        });
+
+      const scheduled =
+        await scheduleSupplementalResearch({
+          supabase,
+          job: {
+            ...job,
+            ...current,
+          },
+          reason: message,
+        });
+
+      if (scheduled) {
+        return scheduled;
+      }
+    }
+
+    /*
+     * Durable-worker rule:
+     * do not sleep inside this invocation.
+     * Reconcile once against the database and exit.
+     * A later worker tick resumes whatever remains.
+     */
+    const current =
+      await loadJobState({
+        supabase,
+        jobId:
+          String(job.id),
+      });
+
+    const currentStatus =
+      String(current.status);
+
+    if (
+      currentStatus !==
+        originalStatus &&
+      ![
+        "FAILED",
+        "BLOCKED",
+        "HUMAN_REVIEW",
+        "DIAGNOSING",
+      ].includes(
+        currentStatus,
+      )
+    ) {
+      return {
+        jobId: job.id,
+        museKey:
+          job.muse_key,
+        action:
+          nextActionForStatus(
+            originalStatus,
+          ),
+        recovered: true,
+        recovery:
+          "database-state-reconciliation",
+        originalError:
+          message,
+        observedStatus:
+          currentStatus,
+      };
+    }
+
+    return {
+      jobId: job.id,
+      museKey:
+        job.muse_key,
+      action:
+        nextActionForStatus(
+          originalStatus,
+        ),
+      error: message,
+      timingLike:
+        isTimingLikeError(
+          message,
+        ),
+      substantive:
+        isExplicitSubstantiveError(
+          message,
+        ),
+    };
+  }
+}
+
+export async function runMuseSweepWorkerStep({
+  supabase,
+  origin,
+  authorization,
+}: {
+  supabase: any;
+  origin: string;
+  authorization: string;
+}) {
+  if (
+    !process.env.OPENAI_API_KEY
+  ) {
+    throw new Error(
+      "OPENAI_API_KEY is not configured.",
+    );
+  }
+
+  const jobs =
+    await loadSweepJobs({
+      supabase,
+    });
+
+  if (
+    jobs.length !==
+      TARGETS.length
+  ) {
+    throw new Error(
+      `Muse Sweep worker expected ${TARGETS.length} jobs but found ${jobs.length}.`,
+    );
+  }
+
+  const actionable =
+    jobs.filter(
+      (job: any) =>
+        !TERMINAL_STATUSES.has(
+          String(job.status),
+        ),
+    );
+
+  if (!actionable.length) {
+    return {
+      status: "success",
+      orchestrator:
+        ORCHESTRATOR_NAME,
+      sweepKey:
+        SWEEP_KEY,
+      advancedCount: 0,
+      result: null,
+      jobs:
+        await getMuseSweepStatus({
+          supabase,
+        }),
+      continueRequired:
+        false,
+      message:
+        "No actionable Muse Sweep jobs remain.",
+    };
+  }
+
+  /*
+   * One durable unit of work per invocation.
+   * Validation/staging/release preparation retain priority.
+   */
+  const selected =
+    actionable.find(
+      (job: any) =>
+        [
+          "STAGED",
+          "VALIDATING",
+        ].includes(
+          String(job.status),
+        ),
+    ) ??
+    actionable.find(
+      (job: any) =>
+        [
+          "CURATED",
+          "STAGING",
+        ].includes(
+          String(job.status),
+        ),
+    ) ??
+    actionable.find(
+      (job: any) =>
+        String(job.status) ===
+          "RELEASE_CANDIDATE",
+    ) ??
+    actionable[0];
+
+  const openai =
+    new OpenAI({
+      apiKey:
+        process.env.OPENAI_API_KEY,
+    });
+
+  const result =
+    await advanceWorkerJobWithRecovery({
+      supabase,
+      openai,
+      job: selected,
+      origin,
+      authorization,
+    });
+
+  const status =
+    await getMuseSweepStatus({
+      supabase,
+    });
+
+  const remaining =
+    status.filter(
+      (job: any) =>
+        !TERMINAL_STATUSES.has(
+          String(job.status),
+        ),
+    );
+
+  return {
+    status: "success",
+    orchestrator:
+      ORCHESTRATOR_NAME,
+    sweepKey:
+      SWEEP_KEY,
+    advancedCount: 1,
+    result,
+    jobs: status,
+    waitingForApproval:
+      status.filter(
+        (job: any) =>
+          job.status ===
+            "AWAITING_APPROVAL",
+      ),
+    continueRequired:
+      remaining.length > 0,
   };
 }
 
