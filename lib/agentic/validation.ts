@@ -461,6 +461,8 @@ async function loadRunResults({
 async function callMuseIq({
   origin,
   cookie,
+  authorization,
+  workerJobId,
   museSlug,
   deploymentLabel,
   agentJobId,
@@ -470,6 +472,8 @@ async function callMuseIq({
 }: {
   origin: string;
   cookie: string;
+  authorization?: string;
+  workerJobId?: string | null;
   museSlug: string;
   deploymentLabel: string;
   agentJobId?: string | null;
@@ -497,6 +501,11 @@ async function callMuseIq({
     body.agentJobId = agentJobId;
   }
 
+  if (workerJobId) {
+    body.workerJobId =
+      workerJobId;
+  }
+
   const response =
     await fetch(
       `${origin}/api/admin/muse-iq/run`,
@@ -505,9 +514,13 @@ async function callMuseIq({
         headers: {
           "content-type":
             "application/json",
-          ...(cookie
-            ? { cookie }
-            : {}),
+          ...(authorization
+            ? {
+                authorization,
+              }
+            : cookie
+              ? { cookie }
+              : {}),
         },
         body: JSON.stringify(body),
         cache: "no-store",
@@ -1102,12 +1115,14 @@ export async function runValidationAgentStep({
   initiatedByUserId,
   origin,
   cookie,
+  authorization,
 }: {
   supabase: any;
   jobId: string;
   initiatedByUserId: string;
   origin: string;
   cookie: string;
+  authorization?: string;
 }) {
   const {
     data: job,
@@ -1279,6 +1294,9 @@ export async function runValidationAgentStep({
       await callMuseIq({
         origin,
         cookie,
+        authorization,
+        workerJobId:
+          jobId,
         museSlug: job.muse_key,
         deploymentLabel: label,
         agentJobId:
@@ -1409,6 +1427,9 @@ export async function runValidationAgentStep({
       await callMuseIq({
         origin,
         cookie,
+        authorization,
+        workerJobId:
+          jobId,
         museSlug: job.muse_key,
         deploymentLabel:
           `${job.candidate_version || jobId}-${item.target}-recheck-${item.benchmarkKey}-${item.attempts + 1}`,

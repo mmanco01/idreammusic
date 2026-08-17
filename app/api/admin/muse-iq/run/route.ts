@@ -1,4 +1,6 @@
 import {
+  getAgentAdminClient,
+  isAgentWorkerRequest,
   requireAgentAdmin,
 } from "@/lib/agentic/project-adapters";
 import {
@@ -25,6 +27,7 @@ type RunRequest = {
   benchmarkKey?: unknown;
   deploymentLabel?: unknown;
   agentJobId?: unknown;
+  workerJobId?: unknown;
 };
 
 function cleanString(
@@ -211,8 +214,15 @@ async function updateRunSummary({
 export async function POST(
   request: Request,
 ) {
+  const workerRequest =
+    isAgentWorkerRequest(
+      request,
+    );
+
   const supabase =
-    await createServerSupabaseClient();
+    workerRequest
+      ? getAgentAdminClient()
+      : await createServerSupabaseClient();
 
   if (!supabase) {
     return NextResponse.json(
@@ -225,20 +235,27 @@ export async function POST(
     );
   }
 
-  const {
-    data: { user },
-  } =
-    await supabase.auth.getUser();
+  let actorUserId = "";
 
-  if (!user) {
-    return NextResponse.json(
-      {
-        status: "error",
-        message:
-          "Please sign in to run Muse IQ.",
-      },
-      { status: 401 },
-    );
+  if (!workerRequest) {
+    const {
+      data: { user },
+    } =
+      await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message:
+            "Please sign in to run Muse IQ.",
+        },
+        { status: 401 },
+      );
+    }
+
+    actorUserId =
+      user.id;
   }
 
   // Temporary Muse IQ access rule:
@@ -272,7 +289,16 @@ export async function POST(
         100,
       );
 
-    if (agentJobId) {
+    const workerJobId =
+      cleanString(
+        body.workerJobId,
+        100,
+      );
+
+    if (
+      agentJobId &&
+      !workerRequest
+    ) {
       try {
         await requireAgentAdmin(
           request,
@@ -287,6 +313,82 @@ export async function POST(
           { status: 403 },
         );
       }
+    }
+
+    if (workerRequest) {
+      if (!workerJobId) {
+        return NextResponse.json(
+          {
+            status: "error",
+            message:
+              "Agent worker Muse IQ requires a worker job ID.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const {
+        data: workerJob,
+        error: workerJobError,
+      } =
+        await supabase
+          .from("agent_jobs")
+          .select(
+            "id, muse_key, input",
+          )
+          .eq(
+            "id",
+            workerJobId,
+          )
+          .maybeSingle();
+
+      if (
+        workerJobError ||
+        !workerJob
+      ) {
+        throw new Error(
+          workerJobError?.message ||
+            "Agent worker job could not be loaded.",
+        );
+      }
+
+      if (
+        String(
+          workerJob.muse_key,
+        ) !== museSlug
+      ) {
+        throw new Error(
+          "Agent worker Muse IQ job does not match the requested Muse.",
+        );
+      }
+
+      if (
+        agentJobId &&
+        agentJobId !==
+          workerJobId
+      ) {
+        throw new Error(
+          "Candidate Muse IQ job does not match the worker job.",
+        );
+      }
+
+      const initiatedBy =
+        typeof workerJob.input
+          ?.initiated_by ===
+          "string"
+          ? workerJob.input
+              .initiated_by
+              .trim()
+          : "";
+
+      if (!initiatedBy) {
+        throw new Error(
+          "Agent worker job does not contain its initiating user.",
+        );
+      }
+
+      actorUserId =
+        initiatedBy;
     }
 
     const limit =
@@ -383,7 +485,8 @@ export async function POST(
           new Date().toISOString(),
         total_benchmarks:
           benchmarks.length,
-        created_by: user.id,
+        created_by:
+          actorUserId,
       })
       .select("*")
       .single();
@@ -401,6 +504,13 @@ export async function POST(
       request.headers.get(
         "cookie",
       ) ?? "";
+
+    const workerAuthorization =
+      workerRequest
+        ? request.headers.get(
+            "authorization",
+          ) ?? ""
+        : "";
 
     const results: Array<
       Record<string, unknown>
@@ -423,11 +533,16 @@ export async function POST(
               headers: {
                 "content-type":
                   "application/json",
-                ...(cookie
+                ...(workerAuthorization
                   ? {
-                      cookie,
+                      authorization:
+                        workerAuthorization,
                     }
-                  : {}),
+                  : cookie
+                    ? {
+                        cookie,
+                      }
+                    : {}),
               },
               body: JSON.stringify({
                 mode: "chat",
