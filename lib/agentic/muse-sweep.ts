@@ -1,3 +1,8 @@
+import {
+  DEFAULT_MUSE_SWEEP_KEY,
+  getMuseSweepDefinition,
+} from "@/lib/agentic/muse-sweep-definitions";
+
 import OpenAI from "openai";
 
 import {
@@ -19,134 +24,19 @@ import {
   prepareReleaseCandidate,
 } from "@/lib/agentic/release-manager";
 
+const SWEEP_DEFINITION =
+  getMuseSweepDefinition(
+    DEFAULT_MUSE_SWEEP_KEY,
+  );
+
 const SWEEP_KEY =
-  "nine-muses-first-pass-v1";
+  SWEEP_DEFINITION.sweepKey;
 
 const ORCHESTRATOR_NAME =
   "muse-sweep-orchestrator-v1";
 
-type MuseSweepTarget = {
-  museKey: string;
-  displayName: string;
-  candidateVersion: string;
-  mission: string;
-  targetCapabilities: string[];
-};
-
-const TARGETS: MuseSweepTarget[] = [
-  {
-    museKey: "clio",
-    displayName: "Clio",
-    candidateVersion: "clio-depth-agent-01",
-    mission:
-      "Strengthen Clio's ability to help songwriters work with roots, lineage, place, history, tradition, cultural memory, and historical context without turning songs into lectures.",
-    targetCapabilities: [
-      "historical context",
-      "place and cultural memory",
-      "lineage and tradition",
-      "chronology and time",
-      "roots-based songwriting",
-    ],
-  },
-  {
-    museKey: "erato",
-    displayName: "Erato",
-    candidateVersion: "erato-depth-agent-01",
-    mission:
-      "Strengthen Erato's ability to guide songs about intimacy, desire, vulnerability, attachment, relational tension, and emotionally specific romantic perspective.",
-    targetCapabilities: [
-      "intimacy and desire",
-      "vulnerability",
-      "relationship dynamics",
-      "romantic point of view",
-      "emotional specificity",
-    ],
-  },
-  {
-    museKey: "euterpe",
-    displayName: "Euterpe",
-    candidateVersion: "euterpe-depth-agent-01",
-    mission:
-      "Strengthen Euterpe's musical-craft guidance around melody, prosody, phrasing, harmony, hooks, song form, and the relationship between lyric and musical motion.",
-    targetCapabilities: [
-      "melody",
-      "prosody and phrasing",
-      "harmony",
-      "hooks",
-      "song form",
-    ],
-  },
-  {
-    museKey: "melpomene",
-    displayName: "Melpomene",
-    candidateVersion: "melpomene-depth-agent-01",
-    mission:
-      "Strengthen Melpomene's guidance for grief, lament, blues, suffering, catharsis, emotional restraint, tragic perspective, and earned emotional release.",
-    targetCapabilities: [
-      "grief and lament",
-      "blues expression",
-      "catharsis",
-      "tragic perspective",
-      "emotional restraint",
-    ],
-  },
-  {
-    museKey: "polyhymnia",
-    displayName: "Polyhymnia",
-    candidateVersion: "polyhymnia-depth-agent-01",
-    mission:
-      "Strengthen Polyhymnia's guidance for sacred song, devotion, prayer, hymnody, reverence, spiritual metaphor, communal singing, and language that serves faith without becoming generic.",
-    targetCapabilities: [
-      "sacred lyric",
-      "devotion and prayer",
-      "hymnody",
-      "spiritual metaphor",
-      "reverence and communal song",
-    ],
-  },
-  {
-    museKey: "terpsichore",
-    displayName: "Terpsichore",
-    candidateVersion: "terpsichore-depth-agent-01",
-    mission:
-      "Strengthen Terpsichore's rhythmic guidance around groove, meter, syncopation, repetition, feel, movement, rhythmic tension, and lyric-rhythm relationships.",
-    targetCapabilities: [
-      "groove",
-      "meter",
-      "syncopation",
-      "repetition and feel",
-      "lyric-rhythm relationship",
-    ],
-  },
-  {
-    museKey: "thalia",
-    displayName: "Thalia",
-    candidateVersion: "thalia-depth-agent-01",
-    mission:
-      "Strengthen Thalia's guidance for humor, irony, satire, comic timing, wordplay, incongruity, playful perspective, and balancing wit with emotional truth.",
-    targetCapabilities: [
-      "humor",
-      "irony and satire",
-      "comic timing",
-      "wordplay",
-      "playful point of view",
-    ],
-  },
-  {
-    museKey: "urania",
-    displayName: "Urania",
-    candidateVersion: "urania-depth-agent-01",
-    mission:
-      "Strengthen Urania's guidance for wonder, dreams, cosmic imagery, transcendence, mystery, scale, imagination, and the use of science or the heavens as metaphor.",
-    targetCapabilities: [
-      "wonder",
-      "dream imagery",
-      "cosmic perspective",
-      "transcendence and mystery",
-      "science and scale as metaphor",
-    ],
-  },
-];
+const TARGETS =
+  SWEEP_DEFINITION.targets;
 
 const TERMINAL_STATUSES =
   new Set([
