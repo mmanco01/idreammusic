@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { recordAIUsage } from '@/lib/ai/usage';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -181,6 +182,10 @@ type SongIntelligenceResult = {
 };
 
 type OpenAIResponse = {
+  id?: string;
+  model?: string;
+  status?: string;
+  usage?: unknown;
   output_text?: string;
   output?: Array<{
     type?: string;
@@ -568,15 +573,15 @@ Do not rewrite the entire song. Identify focused opportunities the songwriter ca
 reject, or turn into development tasks.
 
 The iDreamMusic Nine Muses are:
-- Calliope — Story: narrative, character, journey, point of view.
-- Clio — Roots: history, memory, heritage, place, lived experience.
-- Erato — Love: intimacy, relationship, desire, vulnerability.
-- Euterpe — Craft: musicality, lyric craft, structure, melody potential.
-- Melpomene — Blues: sorrow, tragedy, tension, struggle, catharsis.
-- Polyhymnia — Faith: sacred meaning, devotion, gratitude, spiritual searching.
-- Terpsichore — Rhythm: movement, groove, dance, physical energy.
-- Thalia — Play: humor, wit, joy, satire, lightness.
-- Urania — Dream: wonder, imagination, future, mystery, transcendence.
+- Calliope ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Story: narrative, character, journey, point of view.
+- Clio ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Roots: history, memory, heritage, place, lived experience.
+- Erato ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Love: intimacy, relationship, desire, vulnerability.
+- Euterpe ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Craft: musicality, lyric craft, structure, melody potential.
+- Melpomene ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Blues: sorrow, tragedy, tension, struggle, catharsis.
+- Polyhymnia ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Faith: sacred meaning, devotion, gratitude, spiritual searching.
+- Terpsichore ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Rhythm: movement, groove, dance, physical energy.
+- Thalia ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Play: humor, wit, joy, satire, lightness.
+- Urania ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â Dream: wonder, imagination, future, mystery, transcendence.
 
 Muse classifications are recommendations only. Select one primary and one different secondary Muse.
 Supporting lines must be short excerpts from the supplied song text.
@@ -588,7 +593,7 @@ Important analytical rules:
 3. Similar artists are high-level stylistic comparisons only. Never recommend copying an artist.
 4. Rights cautions are warnings for human review, not legal conclusions.
 5. Scores must be internally consistent with the written rationale.
-6. Use the full 0–100 scale honestly. A promising draft need not score like a release-ready master.
+6. Use the full 0ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ100 scale honestly. A promising draft need not score like a release-ready master.
 7. The Muse guidance should sound specific to each Muse's domain, not like generic advice.
 8. When a transcript appears to repeat choruses, account for repetition rather than treating it as accidental.
 9. Preserve the songwriter's voice. Recommend direction and strategy more often than replacement lines.
@@ -815,7 +820,7 @@ async function resolveSongMaterial(
   const attachments = (attachmentData || []) as ResolvedSongMaterial['attachments'];
   const title = song.title_final || song.title_working || version?.title || 'Untitled song';
   const hasMeaningfulTitle = Boolean(
-    title.trim() && !/^Untitled Spark\s*[—-]/i.test(title.trim())
+    title.trim() && !/^Untitled Spark\s*[ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â-]/i.test(title.trim())
   );
   const savedLyrics = String(version?.lyrics || '').trim();
   const transcriptText = String(transcript?.transcript_text || '').trim();
@@ -1136,8 +1141,8 @@ Available basis: ${material.analysisBasis}
 Source types: ${material.sourceTypes.join(', ') || 'title'}
 Material completeness: ${material.materialCompleteness}
 
-${material.savedLyrics ? `CURRENT SAVED LYRICS — AUTHORITATIVE\n${material.savedLyrics.slice(0, 50000)}\n` : ''}
-${material.transcriptText ? `RECORDING TRANSCRIPT — SECONDARY AUDIO EVIDENCE\n${material.transcriptText.slice(0, 50000)}\n` : ''}
+${material.savedLyrics ? `CURRENT SAVED LYRICS ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â AUTHORITATIVE\n${material.savedLyrics.slice(0, 50000)}\n` : ''}
+${material.transcriptText ? `RECORDING TRANSCRIPT ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â SECONDARY AUDIO EVIDENCE\n${material.transcriptText.slice(0, 50000)}\n` : ''}
 ${material.version?.story_behind_song ? `STORY BEHIND THE SONG\n${material.version.story_behind_song.slice(0, 10000)}\n` : ''}
 ${material.version?.arrangement_notes && material.version.arrangement_notes !== 'Captured in expanded Spark Capture.' ? `ARRANGEMENT OR CAPTURE NOTES\n${material.version.arrangement_notes.slice(0, 10000)}\n` : ''}
 ${noteText ? `WRITER NOTES\n${noteText.slice(0, 30000)}\n` : ''}
@@ -1155,6 +1160,8 @@ Choose one practical recommended_next_move.
 If current saved lyrics are present, base all lyric-specific scoring, strongest/weakest lines, rhyme observations, repetition, hook wording, and story wording on those saved lyrics rather than the transcript.
 If Transcript/version relationship is different_version, use the transcript only as secondary evidence from an earlier/different recording and include an appropriate limitation for audio-dependent observations.
 Set lead_muse to the same Muse as muse_analysis.primary and generate one specific starter_question for that Muse.`;
+
+    const openAIStartedAt = Date.now();
 
     const openAIResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -1208,6 +1215,28 @@ Set lead_muse to the same Muse as muse_analysis.primary and generate one specifi
     } catch {
       // The raw response is included in the error below.
     }
+
+    await recordAIUsage({
+      supabase,
+      activityType: 'song_intelligence',
+      operation: 'analysis',
+      model: openAIPayload.model || MODEL_NAME,
+      responseId: openAIPayload.id || null,
+      usage: openAIPayload.usage,
+      userId: user.id,
+      songId,
+      analysisRunId: runId,
+      durationMs: Date.now() - openAIStartedAt,
+      status: openAIResponse.ok
+        ? openAIPayload.status || 'completed'
+        : 'error',
+      metadata: {
+        http_status: openAIResponse.status,
+        analysis_version: ANALYSIS_VERSION,
+        analysis_stage: material.analysisStage,
+        analysis_basis: material.analysisBasis,
+      },
+    });
 
     if (!openAIResponse.ok) {
       const message =
