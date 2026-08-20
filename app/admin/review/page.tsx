@@ -489,9 +489,9 @@ function AgentCard({
     } else if (job.status === "RESEARCHED") {
       action = "curate";
       label = "Run Curation";
-    } else if (job.status === "CURATED") {
+    } else if (["CURATED", "STAGING"].includes(job.status)) {
       action = "stage-knowledge";
-      label = "Stage Knowledge";
+      label = job.status === "STAGING" ? "Resume Knowledge" : "Stage Knowledge";
     } else if (["STAGED", "VALIDATING"].includes(job.status)) {
       action = "validate";
       label = job.status === "STAGED" ? "Start Validation" : "Continue Validation";

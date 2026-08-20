@@ -374,6 +374,108 @@ export async function runKnowledgeIngestionAgent({
       const candidate
       of acceptedCandidates
     ) {
+      /*
+       * Resume before spending:
+       * a platform timeout can terminate this Agent after some
+       * candidate documents have already been staged. Detect those
+       * completed documents before starting another OpenAI/web
+       * synthesis so retries only work on unfinished sources.
+       */
+      const {
+        data: existingDocument,
+        error: existingDocumentError,
+      } = await supabase
+        .from(
+          "muse_knowledge_documents",
+        )
+        .select(
+          "id,source_id",
+        )
+        .eq(
+          "agent_job_id",
+          jobId,
+        )
+        .eq(
+          "document_key",
+          `agent-${candidate.id}`,
+        )
+        .maybeSingle();
+
+      if (
+        existingDocumentError
+      ) {
+        throw new Error(
+          `Could not check resumable candidate knowledge: ${existingDocumentError.message}`,
+        );
+      }
+
+      if (existingDocument) {
+        const {
+          count:
+            existingChunkCount,
+          error:
+            existingChunkError,
+        } = await supabase
+          .from(
+            "muse_knowledge_chunks",
+          )
+          .select(
+            "id",
+            {
+              count:
+                "exact",
+              head:
+                true,
+            },
+          )
+          .eq(
+            "document_id",
+            existingDocument.id,
+          );
+
+        if (existingChunkError) {
+          throw new Error(
+            existingChunkError.message,
+          );
+        }
+
+        if (
+          !existingChunkCount
+        ) {
+          throw new Error(
+            `Existing candidate document ${existingDocument.id} for source ${candidate.id} has no chunks; refusing to treat incomplete staging as resumable success.`,
+          );
+        }
+
+        results.push({
+          source_candidate_id:
+            candidate.id,
+
+          title:
+            candidate.title,
+
+          staged:
+            true,
+
+          source_id:
+            existingDocument.source_id,
+
+          document_id:
+            existingDocument.id,
+
+          chunk_count:
+            existingChunkCount,
+
+          already_staged:
+            true,
+
+          resumed:
+            true,
+        });
+
+        continue;
+      }
+
       const decision =
         decisionBySourceId.get(
           String(
