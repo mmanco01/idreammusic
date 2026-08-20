@@ -61,7 +61,7 @@ const lifecycleSteps: readonly LifecycleStep[] = [
 
 export default async function HomePage() {
   const theme = await getMyMuseRepresentationTheme();
-  const configuredBookUrl = process.env.NEXT_PUBLIC_BOOK_PURCHASE_URL?.trim();
+  const configuredBookUrl = process.env.NEXT_PUBLIC_BOOK_PURCHASE_URL?.trim() || "https://www.amazon.com/dp/B0HF1Q4QZC";
   const bookPurchaseUrl =
     configuredBookUrl && /^https?:\/\//i.test(configuredBookUrl)
       ? configuredBookUrl
@@ -247,7 +247,7 @@ export default async function HomePage() {
             <div>
               <div className="eyebrow">
                 {bookPurchaseUrl
-                  ? "Now available in paperback"
+                  ? "Now available on Amazon"
                   : "Coming soon in paperback"}
               </div>
               <h2 className="h2">The iDreamMusic Book</h2>
@@ -270,7 +270,7 @@ export default async function HomePage() {
                     rel="noreferrer"
                     className="button"
                   >
-                    Buy the Paperback
+                    Buy on Amazon
                   </a>
                 ) : (
                   <Link href="/book#release-updates" className="button">

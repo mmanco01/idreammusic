@@ -42,7 +42,7 @@ type BookPageProps = {
 
 export default async function BookPage({ searchParams }: BookPageProps) {
   const { signup } = await searchParams;
-  const configuredPurchaseUrl = process.env.NEXT_PUBLIC_BOOK_PURCHASE_URL?.trim();
+  const configuredPurchaseUrl = process.env.NEXT_PUBLIC_BOOK_PURCHASE_URL?.trim() || 'https://www.amazon.com/dp/B0HF1Q4QZC';
   const purchaseUrl =
     configuredPurchaseUrl && /^https?:\/\//i.test(configuredPurchaseUrl)
       ? configuredPurchaseUrl
@@ -108,7 +108,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   </div>
                   <strong>
                     {purchaseUrl
-                      ? 'Now available in paperback'
+                      ? 'Now available on Amazon'
                       : 'Coming soon in paperback'}
                   </strong>
                   <p className="copy">
@@ -126,7 +126,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                       rel="noreferrer"
                       className="button primary"
                     >
-                      Buy the Paperback
+                      Buy on Amazon
                     </a>
                   ) : (
                     <a href="#release-updates" className="button primary">
@@ -260,7 +260,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
                   : 'Be the first to know when the book is released'}
               </h2>
               <p className="copy">
-                Join the release list for paperback availability and future updates
+                Join the iDreamMusic publishing list for future updates
                 about the audiobook, companion workbook, and other iDreamMusic
                 publishing projects.
               </p>
