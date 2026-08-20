@@ -308,7 +308,7 @@ export async function POST(
         ingestion_version:
           "agent-v1.1",
         chunking_version:
-          "semantic-v2",
+          "semantic-v2.1",
         rechunked_at:
           embeddedAt,
         rechunked_by:
@@ -506,7 +506,7 @@ export async function POST(
             total_chunk_count:
               totalChunkCount,
             chunking_version:
-              "semantic-v2",
+              "semantic-v2.1",
             rechunked_at:
               repairedAt,
             rechunked_by:
@@ -548,7 +548,7 @@ export async function POST(
           candidate_version:
             job.candidate_version,
           chunking_version:
-            "semantic-v2",
+            "semantic-v2.1",
           document_count:
             documents.length,
           total_chunk_count:
@@ -573,7 +573,7 @@ export async function POST(
       candidateVersion:
         job.candidate_version,
       chunkingVersion:
-        "semantic-v2",
+        "semantic-v2.1",
       documentCount:
         documents.length,
       totalChunkCount,

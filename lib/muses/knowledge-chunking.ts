@@ -229,6 +229,28 @@ function markdownUnits(
 
     if (!block) return;
 
+    /*
+     * Candidate documents begin with administrative preamble
+     * such as "Muse:" and "Candidate version:". Those values
+     * already live in structured metadata and should not
+     * consume vector-retrieval slots as standalone knowledge.
+     */
+    const blockLinesForMetadataCheck =
+      block
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+    const isAdministrativePreamble =
+      blockLinesForMetadataCheck.length > 0 &&
+      blockLinesForMetadataCheck.every((line) =>
+        /^(?:Muse|Candidate version):\s*/i.test(line),
+      );
+
+    if (isAdministrativePreamble) {
+      return;
+    }
+
     const pieces =
       splitLongBlock(
         block,
