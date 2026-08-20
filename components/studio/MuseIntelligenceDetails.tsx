@@ -72,6 +72,33 @@ function sourceLabel(source: string) {
   return labels[source] ?? source;
 }
 
+function hasMeaningfulText(
+  value: unknown,
+): value is string {
+  return (
+    typeof value === "string" &&
+    /[\p{L}\p{N}]/u.test(value.trim())
+  );
+}
+
+function hasMeaningfulLens(
+  assessment:
+    | MuseLensAssessment
+    | null
+    | undefined,
+) {
+  if (!assessment) {
+    return false;
+  }
+
+  return [
+    assessment.summary,
+    assessment.nextMove,
+    ...assessment.strengths,
+    ...assessment.risks,
+  ].some(hasMeaningfulText);
+}
+
 function LensCard({
   title,
   assessment,
@@ -148,13 +175,55 @@ export function MuseIntelligenceDetails({
       )
     : null;
 
+  const meaningfulSuggestedLines =
+    intelligence.lyricWork?.suggestedLines.filter(
+      (line) => hasMeaningfulText(line.text),
+    ) ?? [];
+  const hasLyricWork = Boolean(
+    intelligence.lyricWork &&
+      (hasMeaningfulText(
+        intelligence.lyricWork.likelyLyric,
+      ) ||
+        meaningfulSuggestedLines.length),
+  );
+
+  const meaningfulFormAlternatives =
+    intelligence.formWork?.alternatives.filter(
+      hasMeaningfulText,
+    ) ?? [];
+  const hasFormWork = Boolean(
+    intelligence.formWork &&
+      (hasMeaningfulText(
+        intelligence.formWork.recommendedForm,
+      ) ||
+        hasMeaningfulText(
+          intelligence.formWork.reasoning,
+        ) ||
+        meaningfulFormAlternatives.length),
+  );
+
+  const meaningfulUnresolvedQuestions =
+    intelligence.unresolvedQuestions.filter(
+      hasMeaningfulText,
+    );
+
   const availableLenses = [
     ["Lyric lens", intelligence.lensAssessments.lyric],
     ["Form lens", intelligence.lensAssessments.form],
     ["Melody lens", intelligence.lensAssessments.melody],
     ["Performance lens", intelligence.lensAssessments.performance],
     ["Audience lens", intelligence.lensAssessments.audience],
-  ].filter((entry): entry is [string, MuseLensAssessment] => Boolean(entry[1]));
+  ].filter(
+    (
+      entry,
+    ): entry is [string, MuseLensAssessment] =>
+      hasMeaningfulLens(
+        entry[1] as
+          | MuseLensAssessment
+          | null
+          | undefined,
+      ),
+  );
 
   const lensConfidence = availableLenses.length
     ? availableLenses.reduce(
@@ -702,7 +771,7 @@ export function MuseIntelligenceDetails({
         </details>
       ) : null}
 
-      {intelligence.lyricWork ? (
+      {hasLyricWork && intelligence.lyricWork ? (
         <details style={{ marginTop: "0.85rem" }}>
           <summary className="copy" style={{ cursor: "pointer", fontWeight: 700 }}>
             Lyric work
@@ -724,11 +793,11 @@ export function MuseIntelligenceDetails({
               </div>
             ) : null}
 
-            {intelligence.lyricWork.suggestedLines.length ? (
+            {meaningfulSuggestedLines.length ? (
               <div style={{ marginTop: "0.65rem" }}>
                 <div className="eyebrow">Candidate lines</div>
                 <div style={{ display: "grid", gap: "0.5rem", marginTop: "0.45rem" }}>
-                  {intelligence.lyricWork.suggestedLines.map((line, index) => (
+                  {meaningfulSuggestedLines.map((line, index) => (
                     <div
                       key={`${line.text}-${index}`}
                       style={{
@@ -756,7 +825,7 @@ export function MuseIntelligenceDetails({
         </details>
       ) : null}
 
-      {intelligence.formWork ? (
+      {hasFormWork && intelligence.formWork ? (
         <details style={{ marginTop: "0.85rem" }}>
           <summary className="copy" style={{ cursor: "pointer", fontWeight: 700 }}>
             Song-form work
@@ -776,23 +845,23 @@ export function MuseIntelligenceDetails({
             <p className="copy" style={{ margin: "0.35rem 0 0" }}>
               {intelligence.formWork.reasoning}
             </p>
-            {intelligence.formWork.alternatives.length ? (
+            {meaningfulFormAlternatives.length ? (
               <p className="copy" style={{ margin: "0.45rem 0 0" }}>
                 <strong>Alternatives:</strong>{" "}
-                {intelligence.formWork.alternatives.join(", ")}
+                {meaningfulFormAlternatives.join(", ")}
               </p>
             ) : null}
           </div>
         </details>
       ) : null}
 
-      {intelligence.unresolvedQuestions.length ? (
+      {meaningfulUnresolvedQuestions.length ? (
         <details style={{ marginTop: "0.85rem" }}>
           <summary className="copy" style={{ cursor: "pointer", fontWeight: 700 }}>
             Questions still open
           </summary>
           <ul className="copy" style={{ margin: "0.55rem 0 0 1.1rem" }}>
-            {intelligence.unresolvedQuestions.map((question) => (
+            {meaningfulUnresolvedQuestions.map((question) => (
               <li key={question}>{question}</li>
             ))}
           </ul>

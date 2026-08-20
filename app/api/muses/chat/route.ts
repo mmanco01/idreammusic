@@ -93,6 +93,49 @@ function citationKeysFromReply(
   );
 }
 
+function collectCitationText(
+  value: unknown,
+  output: string[],
+) {
+  if (typeof value === "string") {
+    output.push(value);
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectCitationText(item, output);
+    }
+    return;
+  }
+
+  if (
+    value &&
+    typeof value === "object"
+  ) {
+    for (
+      const nested of Object.values(
+        value as Record<string, unknown>,
+      )
+    ) {
+      collectCitationText(
+        nested,
+        output,
+      );
+    }
+  }
+}
+
+function citationTextFromResult(
+  result: MuseIntelligenceResult,
+): string {
+  const output: string[] = [];
+
+  collectCitationText(result, output);
+
+  return output.join("\n");
+}
+
 function fallbackSupportedClaim({
   reply,
   citationKey,
@@ -165,6 +208,8 @@ function reconcileKnowledgeCitationRequests({
       string,
       MuseKnowledgeCitationRequest
     >();
+  const citationText =
+    citationTextFromResult(result);
 
   for (
     const request of
@@ -195,7 +240,7 @@ function reconcileKnowledgeCitationRequests({
             500,
           ) ||
           fallbackSupportedClaim({
-            reply: result.reply,
+            reply: citationText,
             citationKey,
             sourceTitle:
               source.title,
@@ -204,14 +249,14 @@ function reconcileKnowledgeCitationRequests({
     );
   }
 
-  // The model occasionally cites a valid retrieved key in the prose
-  // but omits it from the structured knowledgeCitations array.
-  // Reconcile those keys on the server so every visible citation
-  // resolves to its exact retrieved source.
+  // The model can cite a valid retrieved key in the prose or in
+  // structured intelligence such as diagnostics and creative lenses.
+  // Reconcile those keys so every displayed citation can resolve
+  // to its exact retrieved source.
   for (
     const citationKey of
       citationKeysFromReply(
-        result.reply,
+        citationText,
       )
   ) {
     if (
@@ -237,7 +282,7 @@ function reconcileKnowledgeCitationRequests({
         citationKey,
         supportedClaim:
           fallbackSupportedClaim({
-            reply: result.reply,
+            reply: citationText,
             citationKey,
             sourceTitle:
               source.title,
