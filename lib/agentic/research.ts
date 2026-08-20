@@ -346,7 +346,7 @@ export async function runResearchAgent({
       jobInput
         ?.research_behavior
         ?.target_candidate_pool ??
-        16,
+        10,
     );
 
   const targetPool =
@@ -362,7 +362,7 @@ export async function runResearchAgent({
             ),
           ),
         )
-      : 16;
+      : 10;
 
   const startedAt =
     new Date().toISOString();
@@ -568,7 +568,7 @@ Research requirements:
 - Do not invent a URL.
 - Do not copy large copyrighted passages.
 - This stage identifies evidence; it does not ingest source text.
-- Use multiple source families rather than sixteen near-duplicates.
+- Use multiple source families rather than a pool of near-duplicates.
 - Score authority, novelty, and overlap from 0 through 100.
 - overlap_score means overlap with existing ${job.muse_key} knowledge; LOWER is better.
 - If a complete publication date cannot be verified, return null rather than guessing.
