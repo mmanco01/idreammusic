@@ -29,6 +29,7 @@ import type {
 } from "@/lib/muses/knowledge-types";
 import { getMusePlatformConfig } from "@/lib/muses/platform";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { recordAIUsage } from "@/lib/ai/usage";
 
 export const runtime = "nodejs";
 
@@ -1067,7 +1068,7 @@ Guidance for the structured fields:
 - primaryObservation: the single most important grounded observation.
   Its category should normally match one of your named diagnostic keys.
 - diagnostics: assess each named diagnostic area that can be grounded in
-  the supplied material, up to five areas. Give a 0–100 working score,
+  the supplied material, up to five areas. Give a 0ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ100 working score,
   evidence, confidence, and changeFromPrevious. Use unknown when there is
   no trustworthy earlier diagnostic comparison.
 - lensAssessments: separately assess lyric, form, melody, performance, and
@@ -1255,6 +1256,7 @@ async function createMuseResponse({
   model,
   muse,
   prompt,
+  telemetry,
 }: {
   openai: OpenAI;
   model: string;
@@ -1262,6 +1264,14 @@ async function createMuseResponse({
     ReturnType<typeof getMuseBySlug>
   >;
   prompt: string;
+  telemetry?: {
+    supabase: any;
+    userId?: string | null;
+    songId?: string | null;
+    conversationId?: string | null;
+    mode: MuseChatMode;
+    role: string;
+  };
 }) {
   const attempts = [
     {
@@ -1290,6 +1300,7 @@ Every required property must be present, and the JSON must close cleanly.
     const attempt =
       attempts[attemptIndex];
 
+    const openAIStartedAt = Date.now();
     try {
       const response =
         await openai.responses.create({
@@ -1307,10 +1318,32 @@ Every required property must be present, and the JSON must close cleanly.
             attempt.maxOutputTokens,
           store: false,
         });
-
       const metadata =
         response as OpenAIResponseMetadata;
 
+      if (telemetry) {
+        await recordAIUsage({
+          supabase: telemetry.supabase,
+          activityType: "talk_to_muse",
+          operation: "structured_response",
+          model: response.model ?? model,
+          responseId: response.id,
+          usage: response.usage,
+          userId: telemetry.userId ?? null,
+          songId: telemetry.songId ?? null,
+          conversationId: telemetry.conversationId ?? null,
+          durationMs: Date.now() - openAIStartedAt,
+          status: metadata.status ?? "completed",
+          metadata: {
+            muse_slug: muse.slug,
+            muse_name: muse.name,
+            mode: telemetry.mode,
+            role: telemetry.role,
+            attempt: attemptIndex + 1,
+            max_output_tokens: attempt.maxOutputTokens,
+          },
+        });
+      }
       if (
         metadata.status === "incomplete"
       ) {
@@ -2200,8 +2233,18 @@ export async function POST(request: Request) {
           model,
           muse,
           prompt,
+          telemetry: {
+            supabase,
+            userId: user?.id ?? null,
+            songId: null,
+            conversationId: null,
+            mode,
+            role:
+              mode === "collaborate"
+                ? "collaborator"
+                : "primary",
+          },
         });
-
       result.memoryCandidates =
         normalizeMemoryCandidates({
           result,
@@ -2405,8 +2448,15 @@ export async function POST(request: Request) {
         model,
         muse,
         prompt,
+        telemetry: {
+          supabase,
+          userId: user.id,
+          songId,
+          conversationId: conversation.id,
+          mode,
+          role,
+        },
       });
-
     result.memoryCandidates =
       normalizeMemoryCandidates({
         result,
