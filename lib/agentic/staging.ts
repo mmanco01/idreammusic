@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import {
   chunkKnowledgeDocument,
   contentHash,
+  normalizeKnowledgeText,
 } from "@/lib/muses/knowledge-chunking";
 
 import {
@@ -64,9 +65,11 @@ export async function stageCandidateKnowledge({
   createdByUserId,
 }: StageCandidateKnowledgeInput): Promise<StageCandidateKnowledgeResult> {
   const text =
-    cleanText(
-      curatedText,
-      120000,
+    normalizeKnowledgeText(
+      cleanText(
+        curatedText,
+        120000,
+      ),
     );
 
   if (!text) {
@@ -745,6 +748,7 @@ export async function stageCandidateKnowledge({
           citation,
         sourceLocator:
           sourceRow.source_locator,
+        documentTitle: title,
       });
 
     if (!drafts.length) {
