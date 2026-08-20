@@ -6,6 +6,10 @@ import {
 import {
   RESEARCH_AGENT_PROMPT,
 } from "@/lib/agentic/prompts";
+import {
+  countOpenAIWebSearchCalls,
+  recordAIUsage,
+} from "@/lib/ai/usage";
 
 function clean(
   value: unknown,
@@ -572,6 +576,8 @@ Research requirements:
 - Every source must materially support at least one target capability.
 `.trim();
 
+    const openAIStartedAt =
+      Date.now();
     const response =
       await openai.responses.create({
         model,
@@ -789,6 +795,47 @@ Research requirements:
           },
         },
       });
+
+    const webSearchCalls =
+      countOpenAIWebSearchCalls(
+        response.output,
+      );
+
+    await recordAIUsage({
+      supabase,
+      activityType:
+        "agent_research",
+      operation:
+        "source_discovery",
+      model:
+        response.model ??
+        model,
+      responseId:
+        response.id,
+      usage:
+        response.usage,
+      userId:
+        initiatedByUserId,
+      agentJobId:
+        jobId,
+      webSearchCalls,
+      durationMs:
+        Date.now() -
+        openAIStartedAt,
+      status:
+        response.status ??
+        "completed",
+      metadata: {
+        muse_key:
+          job.muse_key,
+        baseline_version:
+          job.baseline_version,
+        candidate_version:
+          job.candidate_version,
+        target_pool:
+          targetPool,
+      },
+    });
 
     if (
       !response.output_text
