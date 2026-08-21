@@ -154,6 +154,16 @@ const MUSE_PROFILES: Record<
   },
 };
 
+export function getMuseProfile(
+  museKey: string,
+) {
+  const profile = MUSE_PROFILES[museKey];
+  if (!profile) {
+    throw new Error(`Unsupported Muse: ${museKey}`);
+  }
+  return profile;
+}
+
 const ALL_MUSE_KEYS = [
   "calliope",
   "clio",
@@ -259,6 +269,31 @@ const DEPTH_AGENT_02: MuseSweepDefinition = {
     }),
 };
 
+const REMAINING_DEPTH_AGENT_02: MuseSweepDefinition = {
+  sweepKey:
+    "seven-muses-depth-agent-02",
+  sweepVersion: 1,
+  depth: 2,
+  displayName:
+    "Remaining Seven Muses Depth-02",
+  baselineVersion:
+    "muse-iq-v1.2",
+  requestedSourceCount: 10,
+  targets:
+    buildTargets({
+      museKeys: [
+        "clio",
+        "erato",
+        "euterpe",
+        "melpomene",
+        "polyhymnia",
+        "terpsichore",
+        "thalia",
+      ],
+      depth: 2,
+    }),
+};
+
 export const MUSE_SWEEP_DEFINITIONS:
   Record<
     string,
@@ -269,6 +304,9 @@ export const MUSE_SWEEP_DEFINITIONS:
 
     [DEPTH_AGENT_02.sweepKey]:
       DEPTH_AGENT_02,
+
+    [REMAINING_DEPTH_AGENT_02.sweepKey]:
+      REMAINING_DEPTH_AGENT_02,
   };
 
 export const DEFAULT_MUSE_SWEEP_KEY =

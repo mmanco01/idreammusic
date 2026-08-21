@@ -10,6 +10,7 @@ import {
 
 import {
   DEFAULT_MUSE_SWEEP_KEY,
+  getMuseSweepDefinition,
 } from "@/lib/agentic/muse-sweep-definitions";
 
 import {
@@ -166,10 +167,27 @@ export async function POST(
           sweepKey,
         });
 
+      const definition =
+        getMuseSweepDefinition(
+          sweepKey,
+        );
+      const schedulerSweepKey =
+        process.env
+          .MUSE_SWEEP_CRON_KEY
+          ?.trim() ||
+        DEFAULT_MUSE_SWEEP_KEY;
+
       return NextResponse.json({
         status:
           "success",
         sweepKey,
+        displayName:
+          definition.displayName,
+        targetCount:
+          definition.targets.length,
+        schedulerSweepKey,
+        schedulerMatchesSweep:
+          schedulerSweepKey === sweepKey,
         jobs,
       });
     }
