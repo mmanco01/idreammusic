@@ -14,6 +14,14 @@ const managerTools = [
     action: "Open Review Center",
   },
   {
+    title: "Muse Sweeps",
+    eyebrow: "Agent automation",
+    description:
+      "Start controlled Muse-wide or one-off knowledge runs and watch automation progress toward the human release gate.",
+    href: "/admin/sweeps",
+    action: "Open Muse Sweeps",
+  },
+  {
     title: "AI Metrics",
     eyebrow: "Cost & usage",
     description:
