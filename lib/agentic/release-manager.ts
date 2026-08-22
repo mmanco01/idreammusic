@@ -884,7 +884,9 @@ export async function prepareReleaseCandidate({
     final.classification !==
       "VALIDATED_NO_REGRESSION" &&
     final.classification !==
-      "IMPROVED"
+      "IMPROVED" &&
+    final.classification !==
+      "BASELINE_DRIFT_REPAIRED"
   ) {
     throw new Error(
       `Release Manager cannot prepare validation classification ${String(
