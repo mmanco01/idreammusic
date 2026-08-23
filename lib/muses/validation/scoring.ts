@@ -64,6 +64,38 @@ const CONCEPT_ALIASES: Record<
     "what the speaker wants",
   ],
 
+  layers: [
+    "layered meaning",
+    "layered meanings",
+    "multiple levels",
+    "two distinct levels",
+    "multiple hearings",
+    "second hearing",
+    "new meaning on repeat",
+    "new meanings on repeat",
+  ],
+
+  "musical strength": [
+    "musical hook",
+    "musical hooks",
+    "melodic hook",
+    "melodic hooks",
+    "musical substance",
+    "strong melody",
+    "melodic strength",
+    "chorus hook",
+  ],
+
+  "emotional stake": [
+    "emotional stakes",
+    "emotional truth",
+    "emotional kernel",
+    "emotional substance",
+    "underlying feeling",
+    "feeling underneath",
+    "what is at stake",
+  ],
+
   "emotional truth": [
     "emotional stake",
     "emotional stakes",
