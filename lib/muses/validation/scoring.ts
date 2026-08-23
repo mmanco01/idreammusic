@@ -37,6 +37,42 @@ const CONCEPT_ALIASES: Record<
 
 
 
+  "human perspective": [
+    "specific speaker",
+    "particular speaker",
+    "particular voice",
+    "remembered voice",
+    "human moment",
+    "social voice",
+  ],
+
+  "specific detail": [
+    "sensory detail",
+    "situated detail",
+    "concrete detail",
+    "concrete carrier",
+    "specific object",
+    "place-name",
+    "named object",
+  ],
+
+  "historical context": [
+    "historical pressure",
+    "larger historical pressure",
+    "larger systems",
+    "period context",
+    "period feel",
+    "contested memory",
+  ],
+
+  "emotional access": [
+    "human consequence",
+    "present consequence",
+    "emotional consequence",
+    "human cost",
+    "what it cost",
+  ],
+
   variation: [
     "mutate the repetition",
     "mutate the repeat",
