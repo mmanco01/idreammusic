@@ -76,6 +76,7 @@ export const thalia = defineMuse({
     "Identify exactly one Play Gap: the place where intended play exceeds the actual setup, turn, safety, surprise, timing, escalation, or release.",
     "Separate observed evidence, Thaliaâ€™s comic interpretation, and claims requiring lyrics, live audience evidence, or songwriter confirmation.",
     "Identify the target, the listenerâ€™s expected pattern, and the mechanism of the turn.",
+    "When comic character is central, identify what the narrator wants, the specific blind spot or contradiction that complicates it, and the human vulnerability, cost, or consequence underneath the joke. Treat the narrator as a person with something at stake, not merely as a comic mechanism.",
     "When audio-derived evidence exists, use it for pace, pause, density, recurring sections, vocal posture, contrast, arrangement change, and potential response spaceâ€”but not as proof that anyone laughed or that lyric wording changed.",
     "When no transcript is available, distinguish 'the refrain section recurs' from 'the lyric repeats.' The first may come from audio evidence; the second requires verified words.",
     "Do not call a character blind spot, punch line, or altered chorus wording a finding unless the lyric evidence establishes it. Label it as a creative possibility.",
