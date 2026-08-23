@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getServerAuthContext } from "@/lib/auth";
 import { getMySongs } from "@/lib/data";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import StudioLifecycleV1 from "@/components/studio/StudioLifecycleV1";
+import { getStudioLifecycleSongs } from "@/lib/studio/lifecycle";
 import StudioPortfolio, {
   type StudioPortfolioSong,
 } from "@/components/studio/StudioPortfolio";
@@ -882,6 +884,46 @@ export default async function StudioPage({
 }) {
   const { trashed, view } = await searchParams;
   const { user, profile } = await getServerAuthContext();
+
+  // Studio v1 promotion:
+  // - authenticated users get the new lifecycle Studio at /studio
+  // - ?view=portfolio preserves the existing detailed portfolio
+  // - unauthenticated visitors keep the existing public Studio experience
+  if (user && view !== "portfolio") {
+    const lifecycleSongs = await getStudioLifecycleSongs(user.id);
+
+    return (
+      <section className="section">
+        <div className="container pageStack">
+          {trashed === "1" ? (
+            <div className="statusMessage statusSuccess">
+              The item was moved to Trash. You can begin a new Spark whenever you are ready.
+            </div>
+          ) : null}
+
+          <div className="page-intro">
+            <div>
+              <div className="eyebrow">Studio</div>
+              <h1 className="h2">Songcatcher Studio</h1>
+              <p className="copy" style={{ maxWidth: 820 }}>
+                Catch what arrives. Craft what matters. Release it when it is ready.
+                Listen to what comes back.
+              </p>
+              <div className="copy" style={{ marginTop: "0.45rem", fontWeight: 750 }}>
+                {lifecycleSongs.length} {lifecycleSongs.length === 1 ? "Song" : "Songs"}
+              </div>
+            </div>
+
+            <Link className="button primary" href="/studio/capture">
+              + Catch a Spark
+            </Link>
+          </div>
+
+          <StudioLifecycleV1 initialSongs={lifecycleSongs} />
+        </div>
+      </section>
+    );
+  }
   const rawMySongs = user ? await getMySongs(user.id) : [];
   const mySongs = Array.from(
     new Map(rawMySongs.map((song) => [song.id, song])).values(),
@@ -1109,7 +1151,7 @@ export default async function StudioPage({
         ) : (
           <section className="card">
             <div className="eyebrow">A simple creative path</div>
-            <h2 className="h2">Catch. Understand. Collaborate. Shape.</h2>
+            <h2 className="h2">Capture. Craft. Release.</h2>
             <p className="copy" style={{ maxWidth: 820 }}>
               A private account lets you capture words or recordings, run
               Song Intelligence, work with the Muses, and keep every version

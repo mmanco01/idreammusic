@@ -1,0 +1,199 @@
+.lifecycleHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 1rem;
+}
+
+.lifecycleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.7rem;
+}
+
+.lifecycleButton {
+  text-align: left;
+  padding: 0.9rem;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  cursor: pointer;
+}
+
+.lifecycleButton[data-active="true"] {
+  border-color: rgba(255, 211, 106, 0.9);
+  background: rgba(255, 211, 106, 0.08);
+}
+
+.lifecycleHelper {
+  margin-top: 0.2rem;
+  font-size: 0.86rem;
+}
+
+.focusScroller {
+  display: flex;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  scrollbar-width: thin;
+}
+
+.controls {
+  display: flex;
+  gap: 0.65rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.songList {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.songCard {
+  padding: 0.8rem !important;
+  border-radius: 16px !important;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.songHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.songIdentity {
+  min-width: 0;
+}
+
+.songTitle {
+  margin: 0.12rem 0 0;
+}
+
+.museLine {
+  margin-top: 0.12rem;
+  opacity: 0.78;
+  font-size: 0.9rem;
+}
+
+.songPills {
+  justify-content: flex-end;
+}
+
+.nextBlock {
+  padding: 0.12rem 0.1rem 0.02rem;
+}
+
+.nextCopy {
+  margin-top: 0.15rem;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.receptionStrip {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  padding: 0.45rem 0.1rem 0.05rem;
+}
+
+.craftControls {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.focusControl {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.focusControl select {
+  width: auto;
+  min-width: 135px;
+}
+
+.releaseGate {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  padding: 0.62rem 0.72rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 211, 106, 0.035);
+}
+
+.saveMessage {
+  font-size: 0.82rem;
+  opacity: 0.82;
+}
+
+.atAGlance summary {
+  cursor: pointer;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+}
+
+.metricCard {
+  padding: 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.metricCard .copy {
+  margin-top: 0.1rem;
+  font-weight: 750;
+}
+
+.cardActions {
+  margin-top: 0.05rem;
+}
+
+@media (max-width: 700px) {
+  .lifecycleGrid {
+    gap: 0.4rem;
+  }
+
+  .lifecycleHelper {
+    display: none;
+  }
+
+  .controls {
+    align-items: stretch;
+  }
+
+  .controls > * {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .songCard {
+    padding: 0.72rem !important;
+  }
+
+  .songPills {
+    justify-content: flex-start;
+  }
+
+  .releaseGate {
+    align-items: flex-start;
+  }
+}
