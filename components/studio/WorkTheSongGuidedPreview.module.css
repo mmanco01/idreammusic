@@ -1,0 +1,267 @@
+.stack {
+  display: grid;
+  gap: 1rem;
+}
+
+.hero,
+.compass,
+.nowCard,
+.glance {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.hero {
+  padding: 1.15rem;
+  border-color: rgba(220, 182, 92, 0.45);
+  background:
+    radial-gradient(circle at top right, rgba(151, 106, 40, 0.16), transparent 34%),
+    linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08));
+}
+
+.heroTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 1rem;
+}
+
+.title {
+  margin: 0.35rem 0 0.45rem;
+  font-size: clamp(2rem, 4vw, 3.45rem);
+  line-height: 1;
+}
+
+.orientation {
+  margin: 0;
+  max-width: 720px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.lifecycle {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+
+.phase {
+  min-height: 64px;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+}
+
+.phaseActive {
+  border-color: rgba(220, 182, 92, 0.9);
+  background: rgba(151, 106, 40, 0.12);
+}
+
+.viewSwitch {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+}
+
+.viewChoice {
+  padding: 0.55rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  text-decoration: none;
+}
+
+.viewChoiceActive {
+  border-color: rgba(220, 182, 92, 0.8);
+  background: rgba(151, 106, 40, 0.12);
+}
+
+.compass {
+  overflow: hidden;
+}
+
+.compassHeader {
+  padding: 0.85rem 1rem 0.7rem;
+}
+
+.sectionTitle {
+  margin: 0.22rem 0 0;
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+}
+
+.compassGrid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.25fr 1.25fr;
+}
+
+.compassCell {
+  min-height: 105px;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.compassCell:not(:last-child) {
+  border-right: 1px solid var(--line);
+}
+
+.compassCell p {
+  margin: 0.4rem 0 0;
+  line-height: 1.45;
+}
+
+.nowCard {
+  padding: 1rem;
+  border-color: rgba(220, 182, 92, 0.42);
+}
+
+.nextLabel {
+  margin-top: 0.75rem;
+  color: var(--gold);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.nextText {
+  margin: 0.25rem 0 0;
+  max-width: 880px;
+  font-size: clamp(1.2rem, 2.25vw, 1.55rem);
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.partner {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+.partner strong {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.partnerContext {
+  margin: 0.35rem 0 0;
+  max-width: 760px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.readyGate {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(220, 182, 92, 0.35);
+  border-radius: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.readyGate p {
+  margin: 0.35rem 0 0;
+}
+
+.glance {
+  padding: 0;
+  overflow: hidden;
+}
+
+.glance summary {
+  cursor: pointer;
+  padding: 1rem;
+  font-weight: 750;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 0.65rem;
+  padding: 0 1rem 1rem;
+}
+
+.metric {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.metric strong {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 820px) {
+  .compassGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .compassCell:not(:last-child) {
+    border-right: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .heroTop,
+  .readyGate {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lifecycle {
+    gap: 0.4rem;
+  }
+
+  .phase {
+    padding: 0.65rem;
+    min-height: 58px;
+    font-size: 0.7rem;
+  }
+
+  .viewSwitch {
+    justify-content: flex-start;
+  }
+}
+
+
+.actionMessage {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+
+.focusChooser {
+  margin-top: 1rem;
+  max-width: 460px;
+  padding: 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.focusChooser label {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.focusChooser select {
+  width: 100%;
+}
+
+.focusHint {
+  margin: 0.45rem 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}

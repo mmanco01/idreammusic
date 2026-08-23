@@ -11,6 +11,8 @@ import { SparkSavedNextSteps } from "@/components/studio/SparkSavedNextSteps";
 import { SongUnavailable } from "@/components/songs/SongUnavailable";
 import { buildPublicAssetUrl } from "@/lib/storage";
 import type { ProductionCreditRow } from "@/lib/production-credits";
+import WorkTheSongGuidedPreview from "@/components/studio/WorkTheSongGuidedPreview";
+import { getGuidedSongPreview } from "@/lib/studio/guided-song";
 
 export default async function EditSongPage({
   params,
@@ -23,6 +25,8 @@ export default async function EditSongPage({
     muse?: string;
     question?: string;
     workspace?: string;
+    view?: string;
+    transcript?: string;
   }>;
 }) {
   const { slug } = await params;
@@ -30,6 +34,16 @@ export default async function EditSongPage({
   const isFreshlyCaptured = query.capture === "saved";
   const showFreshCaptureHandoff =
     isFreshlyCaptured && query.workspace !== "open";
+
+  const showFullWorkspace =
+    query.view === "full" ||
+    query.workspace === "open" ||
+    Boolean(
+      query.analysis ||
+      query.muse ||
+      query.question ||
+      query.transcript
+    );
   const { user, profile, supabase } = await getServerAuthContext();
 
   if (!user) {
@@ -38,6 +52,22 @@ export default async function EditSongPage({
 
   if (!supabase) {
     return <SongUnavailable isSignedIn />;
+  }
+
+  if (!showFreshCaptureHandoff && !showFullWorkspace) {
+    const guidedSong = await getGuidedSongPreview(user.id, slug);
+
+    if (!guidedSong) {
+      return <SongUnavailable isSignedIn />;
+    }
+
+    return (
+      <section className="section">
+        <div className="container">
+          <WorkTheSongGuidedPreview song={guidedSong} />
+        </div>
+      </section>
+    );
   }
 
   const { data: song, error: songError } = await (supabase as any)
@@ -317,6 +347,12 @@ export default async function EditSongPage({
   return (
     <section className="section">
       <div className="container pageStack">
+        <div className="button-row" style={{ justifyContent: "flex-end" }}>
+          <Link className="button" href={`/studio/songs/${slug}/edit`}>
+            Back to Guided View
+          </Link>
+        </div>
+
         <section
           id="overview"
           className="card"

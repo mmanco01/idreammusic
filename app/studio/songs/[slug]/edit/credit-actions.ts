@@ -82,5 +82,5 @@ export async function saveProductionCredits(
   revalidatePath("/listen");
   revalidatePath("/studio");
 
-  redirect(`/studio/songs/${slug}/edit#credits`);
+  redirect(`/studio/songs/${slug}/edit?view=full#credits`);
 }
