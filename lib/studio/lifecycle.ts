@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -106,6 +106,8 @@ async function getAllOwnedSongs(userId: string): Promise<SongRow[]> {
         "id, owner_user_id, slug, title_working, title_final, current_stage, status, summary, muse_id, published_at, updated_at",
       )
       .eq("owner_user_id", userId)
+      .is("deleted_at", null)
+      .is("deleted_at", null)
       .order("updated_at", { ascending: false })
       .range(start, start + pageSize - 1);
 
