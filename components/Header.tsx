@@ -18,18 +18,29 @@ export async function Header() {
           <span>{siteMeta.tagline}</span>
         </Link>
 
-        <nav className="nav" aria-label="Primary">
+        {/* Existing desktop / tablet navigation */}
+        <nav
+          className="nav desktopNav"
+          aria-label="Primary"
+        >
           {mainNav.map((item) => (
-            <Link key={item.href} href={item.href}>
+            <Link
+              key={item.href}
+              href={item.href}
+              scroll
+            >
               {item.label}
             </Link>
           ))}
+
           {canManage ? (
-            <Link href="/admin">Manager</Link>
+            <Link href="/admin" scroll>
+              Manager
+            </Link>
           ) : null}
         </nav>
 
-        <div className="authBar">
+        <div className="authBar desktopAuth">
           {user ? (
             <>
               <span className="authName">
@@ -37,6 +48,7 @@ export async function Header() {
                   user.email ||
                   'Signed in'}
               </span>
+
               <form
                 action="/auth/sign-out"
                 method="post"
@@ -53,11 +65,80 @@ export async function Header() {
             <Link
               className="button button-small"
               href="/auth/sign-in"
+              scroll
             >
               Sign in
             </Link>
           )}
         </div>
+
+        {/* Phone-only navigation */}
+        <details className="mobileMenu">
+          <summary
+            className="mobileMenuButton"
+            aria-label="Open navigation menu"
+          >
+            <span aria-hidden="true">☰</span>
+            <span className="mobileMenuLabel">
+              Menu
+            </span>
+          </summary>
+
+          <div className="mobileMenuPanel">
+            <nav
+              className="mobileNav"
+              aria-label="Mobile primary navigation"
+            >
+              {mainNav.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  scroll
+                >
+                  {item.label}
+                </Link>
+              ))}
+
+              {canManage ? (
+                <Link href="/admin" scroll>
+                  Manager
+                </Link>
+              ) : null}
+            </nav>
+
+            <div className="mobileMenuAuth">
+              {user ? (
+                <>
+                  <span className="authName">
+                    {profile?.display_name ||
+                      user.email ||
+                      'Signed in'}
+                  </span>
+
+                  <form
+                    action="/auth/sign-out"
+                    method="post"
+                  >
+                    <button
+                      className="button button-small"
+                      type="submit"
+                    >
+                      Sign out
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <Link
+                  className="button button-small"
+                  href="/auth/sign-in"
+                  scroll
+                >
+                  Sign in
+                </Link>
+              )}
+            </div>
+          </div>
+        </details>
       </div>
     </header>
   );

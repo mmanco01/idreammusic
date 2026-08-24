@@ -609,3 +609,110 @@ button.button.tertiary {
     grid-template-columns: 1fr;
   }
 }
+/* Public Launch QA — compact phone navigation */
+
+.mobileMenu {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .header-inner {
+    min-height: 58px;
+    padding: 0.55rem 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand strong {
+    font-size: 1.05rem;
+  }
+
+  .brand span {
+    display: none;
+  }
+
+  .desktopNav,
+  .desktopAuth {
+    display: none;
+  }
+
+  .mobileMenu {
+    display: block;
+    position: relative;
+    margin-left: auto;
+  }
+
+  .mobileMenu summary {
+    list-style: none;
+  }
+
+  .mobileMenu summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobileMenuButton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255,255,255,.06);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.92rem;
+  }
+
+  .mobileMenuButton > span:first-child {
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+
+  .mobileMenuPanel {
+    position: absolute;
+    top: calc(100% + 0.65rem);
+    right: 0;
+    width: min(280px, calc(100vw - 2rem));
+    padding: 0.8rem;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(7,14,25,.98);
+    box-shadow: var(--shadow);
+  }
+
+  .mobileNav {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .mobileNav a {
+    display: block;
+    padding: 0.75rem 0.85rem;
+    border-radius: 12px;
+    color: var(--muted);
+  }
+
+  .mobileNav a:hover,
+  .mobileNav a:focus-visible {
+    background: rgba(255,255,255,.06);
+    color: var(--text);
+  }
+
+  .mobileMenuAuth {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 0.65rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .mobileMenuAuth .button {
+    width: 100%;
+  }
+}
