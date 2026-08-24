@@ -1199,6 +1199,7 @@ export function MuseChatPanel({
       {isSongConversation && songId ? (
         <MuseCouncilOverview
           leadMuse={safeDefaultMuse ?? selectedMuse}
+          activeMuse={selectedMuse}
           entries={councilEntries}
           status={councilStatus}
           onOpenMuse={openMuseFromCouncil}

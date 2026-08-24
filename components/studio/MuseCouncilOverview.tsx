@@ -27,6 +27,7 @@ type MuseOption = {
 
 type Props = {
   leadMuse: MuseOption;
+  activeMuse?: MuseOption;
   entries: MuseCouncilEntry[];
   status: "idle" | "loading" | "error";
   onOpenMuse: (museSlug: string) => void;
@@ -331,6 +332,7 @@ function findDifference(entries: MuseCouncilEntry[]) {
 
 export function MuseCouncilOverview({
   leadMuse,
+  activeMuse,
   entries,
   status,
   onOpenMuse,
@@ -341,7 +343,20 @@ export function MuseCouncilOverview({
     return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
   });
 
-  const leadEntry = orderedEntries.find((entry) => entry.museSlug === leadMuse.slug);
+  const currentMuse = activeMuse ?? leadMuse;
+
+  const leadEntry = orderedEntries.find(
+    (entry) => entry.museSlug === leadMuse.slug,
+  );
+
+  const activeEntry = orderedEntries.find(
+    (entry) => entry.museSlug === currentMuse.slug,
+  );
+
+  const invitedMuseNeedsFirstTurn =
+    currentMuse.slug !== leadMuse.slug &&
+    !activeEntry;
+
   const leadRecommendation = recommendationForEntry(leadEntry);
   const fallbackRecommendation = orderedEntries
     .map((entry) => recommendationForEntry(entry))
@@ -351,8 +366,9 @@ export function MuseCouncilOverview({
   const alignment = findAlignment(orderedEntries);
   const difference = findDifference(orderedEntries);
 
-  const headline =
-    orderedEntries.length === 0
+  const headline = invitedMuseNeedsFirstTurn
+    ? `${currentMuse.name} is joining as a specialist for this next creative move. ${leadMuse.name} remains the song's lead Muse.`
+    : orderedEntries.length === 0
       ? `${leadMuse.name} is ready to help reveal what this song wants to become.`
       : orderedEntries.length === 1
         ? truncate(entryInsight(leadEntry ?? orderedEntries[0]), 220)
@@ -361,17 +377,19 @@ export function MuseCouncilOverview({
             185,
           )}`;
 
-  const nextTitle =
-    nextRecommendation?.title ||
-    (orderedEntries.length === 0
-      ? `Ask ${leadMuse.name} the first focused question`
-      : `Continue with ${leadMuse.name}`);
+  const nextTitle = invitedMuseNeedsFirstTurn
+    ? `Ask ${currentMuse.name} the first focused question`
+    : nextRecommendation?.title ||
+      (orderedEntries.length === 0
+        ? `Ask ${leadMuse.name} the first focused question`
+        : `Continue with ${leadMuse.name}`);
 
-  const nextDescription =
-    nextRecommendation?.reasoning ||
-    (orderedEntries.length === 0
-      ? `Start with the lead Muse. The Council will summarize the strongest insight and next move after the first response.`
-      : `Use the Council summary as your guide, then ask ${leadMuse.name} one focused follow-up question.`);
+  const nextDescription = invitedMuseNeedsFirstTurn
+    ? `Follow the invited perspective first. ${currentMuse.name} is the current specialist; ${leadMuse.name} remains the song's lead Muse.`
+    : nextRecommendation?.reasoning ||
+      (orderedEntries.length === 0
+        ? `Start with the lead Muse. The Council will summarize the strongest insight and next move after the first response.`
+        : `Use the Council summary as your guide, then ask ${leadMuse.name} one focused follow-up question.`);
 
   return (
     <section className="council-overview" id="muse-council-summary">
@@ -379,7 +397,11 @@ export function MuseCouncilOverview({
         <div className="council-overview__headline">
           <div className="eyebrow">Council direction</div>
           <h3 className="h3">
-            {orderedEntries.length ? "What the Council hears" : "Begin with the lead Muse"}
+            {invitedMuseNeedsFirstTurn
+              ? "Explore with the invited Muse"
+              : orderedEntries.length
+                ? "What the Council hears"
+                : "Begin with the lead Muse"}
           </h3>
           <p className="copy">{headline}</p>
         </div>
@@ -416,9 +438,17 @@ export function MuseCouncilOverview({
             <button
               type="button"
               className="button primary"
-              onClick={() => onOpenMuse(leadMuse.slug)}
+              onClick={() =>
+                onOpenMuse(
+                  invitedMuseNeedsFirstTurn ? currentMuse.slug : leadMuse.slug,
+                )
+              }
             >
-              {orderedEntries.length ? `Continue with ${leadMuse.name}` : `Ask ${leadMuse.name}`}
+              {invitedMuseNeedsFirstTurn
+                ? `Ask ${currentMuse.name}`
+                : orderedEntries.length
+                  ? `Continue with ${leadMuse.name}`
+                  : `Ask ${leadMuse.name}`}
             </button>
           </div>
         </div>

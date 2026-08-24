@@ -162,6 +162,14 @@ export default async function EditSongPage({
   )
     ? query.muse
     : undefined;
+  const requestedMuse = requestedMuseSlug
+    ? MUSE_OPTIONS.find((option) => option.slug === requestedMuseSlug)
+    : undefined;
+
+  const hasInvitedMuse = Boolean(
+    requestedMuse && requestedMuse.slug !== assignedMuseSlug,
+  );
+
   const initialMuseQuestion = query.question?.trim() || undefined;
 
   const { data: engagementSummary } = await (supabase as any)
@@ -1043,9 +1051,11 @@ export default async function EditSongPage({
             <div className="eyebrow">Collaborate</div>
             <h2 className="h2">Your Creative Council</h2>
             <p className="copy">
-              {hasAssignedMuse
-                ? `Start with ${assignedMuse?.name ?? "the assigned Muse"}. The Council shows the clearest direction, most useful insights, and one recommended next move before the full responses.`
-                : "Song Intelligence can recommend the strongest lead Muse for this Spark. The Council will keep the guidance summary-first once you begin."}
+              {hasInvitedMuse && requestedMuse
+                ? `You're exploring this song with ${requestedMuse.name} as an invited specialist. ${assignedMuse?.name ?? "The assigned Muse"} remains the lead Muse. Start with ${requestedMuse.name}'s focused question, then let the Council bring the perspectives back together.`
+                : hasAssignedMuse
+                  ? `Start with ${assignedMuse?.name ?? "the assigned Muse"}. The Council shows the clearest direction, most useful insights, and one recommended next move before the full responses.`
+                  : "Song Intelligence can recommend the strongest lead Muse for this Spark. The Council will keep the guidance summary-first once you begin."}
             </p>
           </div>
 
