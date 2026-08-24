@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { mainNav, siteMeta } from '@/content/site';
 import { getServerAuthContext } from '@/lib/auth';
 
+import { MobileMenu } from '@/components/MobileMenu';
+
 export async function Header() {
   const { user, profile } = await getServerAuthContext();
 
@@ -73,18 +75,7 @@ export async function Header() {
         </div>
 
         {/* Phone-only navigation */}
-        <details className="mobileMenu">
-          <summary
-            className="mobileMenuButton"
-            aria-label="Open navigation menu"
-          >
-            <span aria-hidden="true">☰</span>
-            <span className="mobileMenuLabel">
-              Menu
-            </span>
-          </summary>
-
-          <div className="mobileMenuPanel">
+<MobileMenu>
             <nav
               className="mobileNav"
               aria-label="Mobile primary navigation"
@@ -137,8 +128,7 @@ export async function Header() {
                 </Link>
               )}
             </div>
-          </div>
-        </details>
+</MobileMenu>
       </div>
     </header>
   );
