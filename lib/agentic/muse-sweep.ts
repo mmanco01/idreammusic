@@ -35,6 +35,9 @@ const SWEEP_KEY =
 const ORCHESTRATOR_NAME =
   "muse-sweep-orchestrator-v1";
 
+export const GAP_ANALYSIS_DYNAMIC_SWEEP_KEY =
+  "gap-analysis-depth-03";
+
 const TARGETS =
   SWEEP_DEFINITION.targets;
 
@@ -55,6 +58,69 @@ function isRecord(
     value &&
       typeof value === "object" &&
       !Array.isArray(value),
+  );
+}
+
+
+function isDynamicGapAnalysisSweep(
+  sweepKey: string,
+) {
+  return (
+    sweepKey ===
+    GAP_ANALYSIS_DYNAMIC_SWEEP_KEY
+  );
+}
+
+function isGovernedGapAnalysisJob(
+  job: any,
+) {
+  const input =
+    isRecord(job.input)
+      ? job.input
+      : {};
+
+  const policy =
+    isRecord(
+      job.autonomy_policy,
+    )
+      ? job.autonomy_policy
+      : {};
+
+  return (
+    input.sweep_key ===
+      GAP_ANALYSIS_DYNAMIC_SWEEP_KEY &&
+    input.sweep_version === 3 &&
+    input.human_release_required ===
+      true &&
+    input.stop_at ===
+      "AWAITING_APPROVAL" &&
+    typeof input.gap_analysis_run_id ===
+      "string" &&
+    input.gap_analysis_run_id.trim()
+      .length > 0 &&
+    typeof input.gap_recommendation_id ===
+      "string" &&
+    input.gap_recommendation_id.trim()
+      .length > 0 &&
+    Array.isArray(
+      input.target_capabilities,
+    ) &&
+    input.target_capabilities.length >
+      0 &&
+    policy.gap_analysis_required ===
+      true &&
+    policy.human_release_required ===
+      true &&
+    typeof job.candidate_version ===
+      "string" &&
+    job.candidate_version.endsWith(
+      "-depth-agent-03",
+    ) &&
+    typeof job.baseline_version ===
+      "string" &&
+    job.baseline_version.endsWith(
+      "-depth-agent-02",
+    )
   );
 }
 
@@ -134,6 +200,7 @@ async function loadSweepJobs({
           status,
           current_agent,
           last_error,
+          autonomy_policy,
           input,
           result_summary,
           created_at,
@@ -2094,16 +2161,27 @@ export async function runMuseSweepWorkerStep({
   authorization: string;
   sweepKey?: string;
 }) {
-  const definition =
-    getMuseSweepDefinition(
+  const dynamicGapAnalysisSweep =
+    isDynamicGapAnalysisSweep(
       sweepKey,
     );
 
-  const resolvedSweepKey =
-    definition.sweepKey;
+  const definition =
+    dynamicGapAnalysisSweep
+      ? null
+      : getMuseSweepDefinition(
+          sweepKey,
+        );
 
-  const targets =
-    definition.targets;
+  const resolvedSweepKey =
+    dynamicGapAnalysisSweep
+      ? GAP_ANALYSIS_DYNAMIC_SWEEP_KEY
+      : definition!.sweepKey;
+
+  const expectedTargetCount =
+    definition
+      ? definition.targets.length
+      : null;
 
   const jobs =
     await loadSweepJobs({
@@ -2113,12 +2191,34 @@ export async function runMuseSweepWorkerStep({
     });
 
   if (
+    expectedTargetCount !== null &&
     jobs.length !==
-      targets.length
+      expectedTargetCount
   ) {
     throw new Error(
-      `Muse Sweep worker expected ${targets.length} jobs but found ${jobs.length}.`,
+      `Muse Sweep worker expected ${expectedTargetCount} jobs but found ${jobs.length}.`,
     );
+  }
+
+  if (
+    dynamicGapAnalysisSweep
+  ) {
+    const ungovernedJobs =
+      jobs.filter(
+        (job: any) =>
+          !isGovernedGapAnalysisJob(
+            job,
+          ),
+      );
+
+    if (
+      ungovernedJobs.length >
+      0
+    ) {
+      throw new Error(
+        `Gap Analysis worker queue contains ${ungovernedJobs.length} job(s) without the required human-governance metadata.`,
+      );
+    }
   }
 
   const actionable =

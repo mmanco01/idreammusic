@@ -182,6 +182,7 @@ export function MuseSweepControls() {
           <div className="button-row" style={{ marginTop: ".8rem", flexWrap: "wrap", gap: ".55rem" }}>
             <button className="button" type="button" disabled={Boolean(busy)} onClick={refreshStatus}>{busy === "status" ? "Refreshing…" : "Refresh Status"}</button>
             <Link className="button" href="/admin/review">Review Center</Link>
+            <Link className="button" href="/admin/gaps">Gap Analysis</Link>
           </div>
         </div>
       </div>
