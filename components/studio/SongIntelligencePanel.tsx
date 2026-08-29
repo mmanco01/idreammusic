@@ -1841,6 +1841,8 @@ export function SongIntelligencePanel({
     const transcriptId = transcriptIdOverride || selectedTranscript?.id || '';
     const transcriptReviewed =
       reviewedOverride || selectedTranscript?.is_reviewed || false;
+    const previousRunId = analyticsState.runId;
+    const requestStartedAt = Date.now();
 
     if (audioAttachments.length && (!transcriptId || !transcriptReviewed)) {
       setAnalyticsState({
@@ -1912,12 +1914,78 @@ export function SongIntelligencePanel({
       });
       setTaskCreateState({});
     } catch (error) {
+      const transportMessage =
+        error instanceof Error ? error.message : 'AI Song Intelligence failed.';
+
+      // A dropped browser connection can happen after the server has already
+      // finished and saved a new analysis. Before suggesting another paid run,
+      // check the saved-analysis endpoint for a newly completed run.
+      const recoveryDelaysMs = [0, 2500, 5000, 7500];
+
+      for (const delayMs of recoveryDelaysMs) {
+        if (delayMs) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+
+        try {
+          const query = new URLSearchParams({ song_id: songId });
+          if (transcriptId) query.set('transcript_id', transcriptId);
+
+          const recoveryResponse = await fetch(
+            `/api/song-analytics/generate?${query.toString()}`,
+            {
+              method: 'GET',
+              cache: 'no-store',
+            }
+          );
+
+          const recovery = (await recoveryResponse.json().catch(() => null)) as
+            | {
+                status?: string;
+                result?: SongIntelligenceResult;
+                run_id?: string;
+                completed_at?: string;
+              }
+            | null;
+
+          const completedAt = recovery?.completed_at
+            ? Date.parse(recovery.completed_at)
+            : Number.NaN;
+          const isNewlyCompletedRun =
+            Boolean(recovery?.run_id) &&
+            recovery?.run_id !== previousRunId &&
+            Number.isFinite(completedAt) &&
+            completedAt >= requestStartedAt - 5000;
+
+          if (
+            recoveryResponse.ok &&
+            recovery?.status === 'success' &&
+            recovery.result &&
+            recovery.run_id &&
+            isNewlyCompletedRun
+          ) {
+            setAnalyticsState({
+              status: 'success',
+              message:
+                'Song Intelligence completed and was recovered after the connection was interrupted.',
+              result: recovery.result,
+              runId: recovery.run_id,
+            });
+            setTaskCreateState({});
+            return;
+          }
+        } catch {
+          // Keep checking. A temporary mobile/network interruption can also
+          // affect the first recovery lookup.
+        }
+      }
+
       setAnalyticsState({
         status: 'error',
         message:
-          error instanceof Error
-            ? error.message
-            : 'AI Song Intelligence failed.',
+          transportMessage === 'Failed to fetch'
+            ? 'The connection ended before Song Intelligence could confirm completion. Do not run it again yet. Wait a moment, then refresh this song to check for a saved result.'
+            : transportMessage,
         result: null,
         runId: null,
       });
