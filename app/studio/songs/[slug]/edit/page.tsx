@@ -167,7 +167,9 @@ export default async function EditSongPage({
     : undefined;
 
   const hasInvitedMuse = Boolean(
-    requestedMuse && requestedMuse.slug !== assignedMuseSlug,
+    hasAssignedMuse &&
+      requestedMuse &&
+      requestedMuse.slug !== assignedMuseSlug,
   );
 
   const initialMuseQuestion = query.question?.trim() || undefined;
@@ -367,6 +369,7 @@ export default async function EditSongPage({
           style={{
             position: "relative",
             overflow: "hidden",
+            scrollMarginTop: "9rem",
             border: "1px solid rgba(220, 182, 92, 0.5)",
             background:
               "radial-gradient(circle at top right, rgba(151, 106, 40, 0.16), transparent 34%), linear-gradient(145deg, rgba(255,255,255,0.035), rgba(0,0,0,0.08))",
@@ -488,13 +491,25 @@ export default async function EditSongPage({
             border: "1px solid rgba(220, 182, 92, 0.32)",
             background: "rgba(9, 19, 35, 0.94)",
             backdropFilter: "blur(12px)",
+            minWidth: 0,
+            maxWidth: "100%",
+            boxSizing: "border-box",
+            overflow: "hidden",
           }}
         >
           <div
             style={{
               display: "flex",
-              flexWrap: "wrap",
+              flexWrap: "nowrap",
               gap: "0.5rem",
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
+              overflowX: "auto",
+              overflowY: "hidden",
+              overscrollBehaviorX: "contain",
+              WebkitOverflowScrolling: "touch",
+              paddingBottom: "0.15rem",
             }}
           >
             {[
@@ -505,7 +520,15 @@ export default async function EditSongPage({
               ["Share", "#share"],
               ["Credits", "#credits"],
             ].map(([label, href]) => (
-              <a key={href} href={href} className="button tertiary">
+              <a
+                key={href}
+                href={href}
+                className="button tertiary"
+                style={{
+                  flex: "0 0 auto",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {label}
               </a>
             ))}
@@ -526,7 +549,7 @@ export default async function EditSongPage({
             }}
           >
             {[
-              ["Assigned Muse", assignedMuse?.name ?? "Unassigned"],
+              ["Assigned Muse", hasAssignedMuse ? assignedMuse?.name ?? "Muse" : "Not assigned"],
               ["Origin", song.song_origin ?? "Not recorded"],
               ["Stage", song.current_stage ?? "spark"],
               ["Versions", versions.length],
@@ -560,7 +583,11 @@ export default async function EditSongPage({
           </div>
         </section>
 
-        <section id="song-details" className="card">
+        <section
+          id="song-details"
+          className="card"
+          style={{ scrollMarginTop: "9rem" }}
+        >
           <div className="eyebrow">Song details</div>
           <h2 className="h2">Words, versions, notes, and status</h2>
 
@@ -1006,7 +1033,7 @@ export default async function EditSongPage({
           </div>
         </section>
 
-        <section id="intelligence">
+        <section id="intelligence" style={{ scrollMarginTop: "9rem" }}>
           <div
             className="card"
             style={{
@@ -1046,16 +1073,18 @@ export default async function EditSongPage({
           />
         </section>
 
-        <section id="muses">
+        <section id="muses" style={{ scrollMarginTop: "9rem" }}>
           <div className="council-section-intro">
             <div className="eyebrow">Collaborate</div>
             <h2 className="h2">Your Creative Council</h2>
             <p className="copy">
               {hasInvitedMuse && requestedMuse
                 ? `You're exploring this song with ${requestedMuse.name} as an invited specialist. ${assignedMuse?.name ?? "The assigned Muse"} remains the lead Muse. Start with ${requestedMuse.name}'s focused question, then let the Council bring the perspectives back together.`
-                : hasAssignedMuse
-                  ? `Start with ${assignedMuse?.name ?? "the assigned Muse"}. The Council shows the clearest direction, most useful insights, and one recommended next move before the full responses.`
-                  : "Song Intelligence can recommend the strongest lead Muse for this Spark. The Council will keep the guidance summary-first once you begin."}
+                : !hasAssignedMuse && requestedMuse
+                  ? `You're exploring this song with ${requestedMuse.name} as the current recommended creative partner. No lead Muse is assigned yet. Start with ${requestedMuse.name}'s focused question; you can assign a lead Muse later if that becomes useful.`
+                  : hasAssignedMuse
+                    ? `Start with ${assignedMuse?.name ?? "the assigned Muse"}. The Council shows the clearest direction, most useful insights, and one recommended next move before the full responses.`
+                    : "No lead Muse is assigned yet. Choose a Muse when a focused perspective would help; Song Intelligence can also recommend one from the material you have captured."}
             </p>
           </div>
 
@@ -1063,6 +1092,7 @@ export default async function EditSongPage({
             songId={song.id}
             songTitle={songTitle}
             defaultMuseSlug={assignedMuseSlug}
+            hasAssignedMuse={hasAssignedMuse}
             initialMuseSlug={requestedMuseSlug}
             initialQuestion={initialMuseQuestion}
             museOptions={MUSE_OPTIONS}
@@ -1073,6 +1103,7 @@ export default async function EditSongPage({
           id="share"
           className="card"
           style={{
+            scrollMarginTop: "9rem",
             border: "1px solid rgba(220, 182, 92, 0.42)",
             background:
               "linear-gradient(145deg, rgba(151, 106, 40, 0.12), rgba(255,255,255,0.025))",
@@ -1157,7 +1188,11 @@ export default async function EditSongPage({
             }
           />
         ) : (
-          <section id="credits" className="card">
+          <section
+            id="credits"
+            className="card"
+            style={{ scrollMarginTop: "9rem" }}
+          >
             <div className="eyebrow">Production credits</div>
             <h2 className="h2">
               Add a song version before adding credits

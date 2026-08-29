@@ -197,3 +197,83 @@
     align-items: flex-start;
   }
 }
+
+/* Studio UX v1.0.1 - Navigation clarity */
+
+.navigationHint {
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: baseline;
+
+  gap: 0.25rem 0.7rem;
+
+  padding: 0.62rem 0.8rem;
+
+  border: 1px solid rgba(255, 211, 106, 0.22);
+
+  border-radius: 12px;
+
+  background: rgba(255, 211, 106, 0.035);
+
+  font-size: 0.84rem;
+
+  line-height: 1.4;
+
+  opacity: 0.86;
+
+}
+
+
+
+.navigationHint strong {
+
+  font-size: 0.72rem;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.08em;
+
+  white-space: nowrap;
+
+}
+
+
+
+.recommendedActionLabel {
+
+  margin-top: 0.2rem;
+
+  color: rgba(255, 211, 106, 0.94);
+
+}
+
+
+
+.atAGlance summary {
+
+  width: 100%;
+
+}
+
+
+
+@media (max-width: 700px) {
+
+  .navigationHint {
+
+    align-items: flex-start;
+
+  }
+
+
+
+  .navigationHint strong {
+
+    width: 100%;
+
+  }
+
+}

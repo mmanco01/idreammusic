@@ -1089,30 +1089,32 @@ function IntelligenceResults({
         ) : null}
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '0.75rem',
-        }}
-      >
-        <IntelligenceScore label="Overall song strength" value={result.overall_score} />
-        <IntelligenceScore
-          label="Ready for release"
-          value={result.ready_for_release_score}
-          detail={`Suggested phase: ${result.suggested_phase.replaceAll('_', ' ')}`}
-        />
-        <IntelligenceScore
-          label="Audience rank"
-          value={result.audience.audience_rank_score}
-          detail={`Audience tier ${result.audience_tier}`}
-        />
-        <IntelligenceScore
-          label="Singability"
-          value={result.metrics.singability_score}
-          detail={`AI confidence ${percent(result.metrics.ai_confidence)}`}
-        />
-      </div>
+      {!isSparkAssessment ? (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '0.75rem',
+          }}
+        >
+          <IntelligenceScore label="Overall song strength" value={result.overall_score} />
+          <IntelligenceScore
+            label="Ready for release"
+            value={result.ready_for_release_score}
+            detail={`Suggested phase: ${result.suggested_phase.replaceAll('_', ' ')}`}
+          />
+          <IntelligenceScore
+            label="Audience rank"
+            value={result.audience.audience_rank_score}
+            detail={`Audience tier ${result.audience_tier}`}
+          />
+          <IntelligenceScore
+            label="Singability"
+            value={result.metrics.singability_score}
+            detail={`AI confidence ${percent(result.metrics.ai_confidence)}`}
+          />
+        </div>
+      ) : null}
 
       <RecommendedNextAction
         eyebrow="Recommended creative partner"
@@ -1191,6 +1193,47 @@ function IntelligenceResults({
           )}
         </div>
       </div>
+
+      {isSparkAssessment ? (
+        <div
+          style={{
+            display: 'grid',
+            gap: '0.6rem',
+          }}
+        >
+          <div>
+            <div className="eyebrow">Provisional scores</div>
+            <p className="copy" style={{ margin: '0.25rem 0 0', maxWidth: 860 }}>
+              These are early signals, not a verdict. Use them after the creative
+              direction and next moves above.
+            </p>
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '0.75rem',
+            }}
+          >
+            <IntelligenceScore label="Overall song strength" value={result.overall_score} />
+            <IntelligenceScore
+              label="Ready for release"
+              value={result.ready_for_release_score}
+              detail={`Suggested phase: ${result.suggested_phase.replaceAll('_', ' ')}`}
+            />
+            <IntelligenceScore
+              label="Audience rank"
+              value={result.audience.audience_rank_score}
+              detail={`Audience tier ${result.audience_tier}`}
+            />
+            <IntelligenceScore
+              label="Singability"
+              value={result.metrics.singability_score}
+              detail={`AI confidence ${percent(result.metrics.ai_confidence)}`}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {result.rights_caution.flag ? (
         <div
@@ -1538,6 +1581,38 @@ export function SongIntelligencePanel({
   );
   const [isTranscriptReviewed, setIsTranscriptReviewed] = useState(false);
   const handledSaveTokenRef = useRef('');
+  const completionNoticeRef = useRef<HTMLDivElement | null>(null);
+  const previousAnalyticsStatusRef = useRef<AnalyticsState['status']>('idle');
+
+  useEffect(() => {
+    const previousStatus = previousAnalyticsStatusRef.current;
+    previousAnalyticsStatusRef.current = analyticsState.status;
+
+    if (
+      previousStatus !== 'loading' ||
+      analyticsState.status !== 'success' ||
+      !analyticsState.result
+    ) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const notice = completionNoticeRef.current;
+      if (!notice) return;
+
+      const prefersReducedMotion = window.matchMedia(
+        '(prefers-reduced-motion: reduce)'
+      ).matches;
+
+      notice.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'center',
+      });
+      notice.focus({ preventScroll: true });
+    }, 80);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [analyticsState.status, analyticsState.result]);
 
   const selectedAttachment = useMemo(
     () =>
@@ -2038,10 +2113,13 @@ export function SongIntelligencePanel({
 
         {analyticsState.message ? (
           <div
+            ref={completionNoticeRef}
             role="status"
+            aria-live="polite"
+            tabIndex={-1}
             style={{
               marginTop: '1rem',
-              padding: '0.85rem 1rem',
+              padding: '1rem',
               borderRadius: 14,
               border: '1px solid var(--line)',
               color:
@@ -2050,9 +2128,43 @@ export function SongIntelligencePanel({
                 analyticsState.status === 'error'
                   ? 'rgba(160, 40, 40, 0.18)'
                   : 'rgba(40, 130, 60, 0.18)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '1rem',
+              flexWrap: 'wrap',
+              scrollMarginTop: '6rem',
+              outline: 'none',
             }}
           >
-            {analyticsState.message}
+            <div>
+              {analyticsState.status === 'success' ? (
+                <div className="eyebrow" style={{ color: '#d9f7d6' }}>
+                  Song Intelligence complete
+                </div>
+              ) : null}
+              <strong style={{ display: 'block', marginTop: '0.2rem' }}>
+                {analyticsState.message}
+              </strong>
+              {analyticsState.status === 'success' ? (
+                <div className="copy" style={{ marginTop: '0.25rem' }}>
+                  Your results are ready below.
+                </div>
+              ) : null}
+            </div>
+            {analyticsState.status === 'success' ? (
+              <span
+                className="pill"
+                style={{
+                  borderColor: 'rgba(140, 225, 150, 0.55)',
+                  color: '#d9f7d6',
+                  background: 'rgba(40, 130, 60, 0.22)',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Saved automatically
+              </span>
+            ) : null}
           </div>
         ) : null}
 
@@ -2377,10 +2489,13 @@ export function SongIntelligencePanel({
 
       {analyticsState.message ? (
         <div
+          ref={completionNoticeRef}
           role="status"
+          aria-live="polite"
+          tabIndex={-1}
           style={{
             marginTop: '1rem',
-            padding: '0.85rem 1rem',
+            padding: '1rem',
             borderRadius: 14,
             border: '1px solid var(--line)',
             color:
@@ -2394,9 +2509,25 @@ export function SongIntelligencePanel({
             justifyContent: 'space-between',
             gap: '1rem',
             flexWrap: 'wrap',
+            scrollMarginTop: '6rem',
+            outline: 'none',
           }}
         >
-          <span>{analyticsState.message}</span>
+          <div>
+            {analyticsState.status === 'success' ? (
+              <div className="eyebrow" style={{ color: '#d9f7d6' }}>
+                Song Intelligence complete
+              </div>
+            ) : null}
+            <strong style={{ display: 'block', marginTop: '0.2rem' }}>
+              {analyticsState.message}
+            </strong>
+            {analyticsState.status === 'success' ? (
+              <div className="copy" style={{ marginTop: '0.25rem' }}>
+                Your results are ready below.
+              </div>
+            ) : null}
+          </div>
           {analyticsState.status === 'success' ? (
             <span
               className="pill"

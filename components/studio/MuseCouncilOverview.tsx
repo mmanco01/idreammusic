@@ -28,6 +28,8 @@ type MuseOption = {
 type Props = {
   leadMuse: MuseOption;
   activeMuse?: MuseOption;
+  hasAssignedMuse?: boolean;
+  hasRecommendedMuse?: boolean;
   entries: MuseCouncilEntry[];
   status: "idle" | "loading" | "error";
   onOpenMuse: (museSlug: string) => void;
@@ -333,6 +335,8 @@ function findDifference(entries: MuseCouncilEntry[]) {
 export function MuseCouncilOverview({
   leadMuse,
   activeMuse,
+  hasAssignedMuse = true,
+  hasRecommendedMuse = false,
   entries,
   status,
   onOpenMuse,
@@ -366,30 +370,44 @@ export function MuseCouncilOverview({
   const alignment = findAlignment(orderedEntries);
   const difference = findDifference(orderedEntries);
 
-  const headline = invitedMuseNeedsFirstTurn
-    ? `${currentMuse.name} is joining as a specialist for this next creative move. ${leadMuse.name} remains the song's lead Muse.`
-    : orderedEntries.length === 0
-      ? `${leadMuse.name} is ready to help reveal what this song wants to become.`
-      : orderedEntries.length === 1
+  const headline = !hasAssignedMuse
+    ? hasRecommendedMuse
+      ? `${currentMuse.name} is the current recommended creative partner. No lead Muse is assigned yet.`
+      : "No lead Muse is assigned yet. Use the current Muse as a perspective, or choose another one that fits the question you want to explore."
+    : invitedMuseNeedsFirstTurn
+      ? `${currentMuse.name} is joining as a specialist for this next creative move. ${leadMuse.name} remains the song's lead Muse.`
+      : orderedEntries.length === 0
+        ? `${leadMuse.name} is ready to help reveal what this song wants to become.`
+        : orderedEntries.length === 1
         ? truncate(entryInsight(leadEntry ?? orderedEntries[0]), 220)
         : `${orderedEntries.length} Muses have contributed. The clearest current direction is ${truncate(
             entryInsight(leadEntry ?? orderedEntries[0]),
             185,
           )}`;
 
-  const nextTitle = invitedMuseNeedsFirstTurn
-    ? `Ask ${currentMuse.name} the first focused question`
-    : nextRecommendation?.title ||
+  const nextTitle = !hasAssignedMuse
+    ? nextRecommendation?.title ||
       (orderedEntries.length === 0
-        ? `Ask ${leadMuse.name} the first focused question`
-        : `Continue with ${leadMuse.name}`);
+        ? `Ask ${currentMuse.name} a focused question`
+        : `Continue with ${currentMuse.name}`)
+    : invitedMuseNeedsFirstTurn
+      ? `Ask ${currentMuse.name} the first focused question`
+      : nextRecommendation?.title ||
+        (orderedEntries.length === 0
+          ? `Ask ${leadMuse.name} the first focused question`
+          : `Continue with ${leadMuse.name}`);
 
-  const nextDescription = invitedMuseNeedsFirstTurn
-    ? `Follow the invited perspective first. ${currentMuse.name} is the current specialist; ${leadMuse.name} remains the song's lead Muse.`
-    : nextRecommendation?.reasoning ||
-      (orderedEntries.length === 0
-        ? `Start with the lead Muse. The Council will summarize the strongest insight and next move after the first response.`
-        : `Use the Council summary as your guide, then ask ${leadMuse.name} one focused follow-up question.`);
+  const nextDescription = !hasAssignedMuse
+    ? nextRecommendation?.reasoning ||
+      (hasRecommendedMuse
+        ? `Follow ${currentMuse.name}'s recommended perspective first. No lead Muse is assigned yet.`
+        : `Use ${currentMuse.name} as the current perspective, or choose another Muse before asking your focused question.`)
+    : invitedMuseNeedsFirstTurn
+      ? `Follow the invited perspective first. ${currentMuse.name} is the current specialist; ${leadMuse.name} remains the song's lead Muse.`
+      : nextRecommendation?.reasoning ||
+        (orderedEntries.length === 0
+          ? `Start with the lead Muse. The Council will summarize the strongest insight and next move after the first response.`
+          : `Use the Council summary as your guide, then ask ${leadMuse.name} one focused follow-up question.`);
 
   return (
     <section className="council-overview" id="muse-council-summary">
@@ -397,19 +415,35 @@ export function MuseCouncilOverview({
         <div className="council-overview__headline">
           <div className="eyebrow">Council direction</div>
           <h3 className="h3">
-            {invitedMuseNeedsFirstTurn
-              ? "Explore with the invited Muse"
-              : orderedEntries.length
-                ? "What the Council hears"
-                : "Begin with the lead Muse"}
+            {!hasAssignedMuse
+              ? hasRecommendedMuse
+                ? "Explore with the recommended Muse"
+                : "Choose a Muse perspective"
+              : invitedMuseNeedsFirstTurn
+                ? "Explore with the invited Muse"
+                : orderedEntries.length
+                  ? "What the Council hears"
+                  : "Begin with the lead Muse"}
           </h3>
           <p className="copy">{headline}</p>
         </div>
 
         <div className="council-lead-muse">
-          <div className="eyebrow">Lead Muse</div>
-          <strong>{leadMuse.name} — {leadMuse.domain}</strong>
-          <span className="info-badge">Primary creative partner</span>
+          <div className="eyebrow">
+            {hasAssignedMuse ? "Lead Muse" : "Muse assignment"}
+          </div>
+          <strong>
+            {hasAssignedMuse
+              ? <>{leadMuse.name} &mdash; {leadMuse.domain}</>
+              : "No lead Muse assigned yet"}
+          </strong>
+          <span className="info-badge">
+            {hasAssignedMuse
+              ? "Primary creative partner"
+              : hasRecommendedMuse
+                ? `Current recommendation: ${currentMuse.name}`
+                : "Choose a lead Muse only when it is useful"}
+          </span>
         </div>
       </div>
 
@@ -427,7 +461,8 @@ export function MuseCouncilOverview({
         </div>
       ) : null}
 
-      {status !== "loading" ? (
+      {status !== "loading" &&
+      (hasAssignedMuse || hasRecommendedMuse || orderedEntries.length > 0) ? (
         <div className="recommended-action council-recommended-action">
           <div className="recommended-action__eyebrow">Recommended next move</div>
           <h4 className="recommended-action__title">{nextTitle}</h4>
@@ -440,15 +475,21 @@ export function MuseCouncilOverview({
               className="button primary"
               onClick={() =>
                 onOpenMuse(
-                  invitedMuseNeedsFirstTurn ? currentMuse.slug : leadMuse.slug,
+                  !hasAssignedMuse || invitedMuseNeedsFirstTurn
+                    ? currentMuse.slug
+                    : leadMuse.slug,
                 )
               }
             >
-              {invitedMuseNeedsFirstTurn
-                ? `Ask ${currentMuse.name}`
-                : orderedEntries.length
-                  ? `Continue with ${leadMuse.name}`
-                  : `Ask ${leadMuse.name}`}
+              {!hasAssignedMuse
+                ? orderedEntries.length
+                  ? `Continue with ${currentMuse.name}`
+                  : `Ask ${currentMuse.name}`
+                : invitedMuseNeedsFirstTurn
+                  ? `Ask ${currentMuse.name}`
+                  : orderedEntries.length
+                    ? `Continue with ${leadMuse.name}`
+                    : `Ask ${leadMuse.name}`}
             </button>
           </div>
         </div>
