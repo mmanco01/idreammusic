@@ -460,7 +460,6 @@ export const MUSE_INTELLIGENCE_TEXT_FORMAT = {
                         "transcript",
                         "existing_lyric",
                         "writer_note",
-                        "muse_suggestion",
                       ],
                     },
                     reason: { type: "string" },
