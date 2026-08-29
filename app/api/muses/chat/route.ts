@@ -1146,9 +1146,13 @@ Guidance for the structured fields:
 - proposedTask: include only when one concrete task would clearly help.
 - suggestedCollaborator: include only when another Muse has a specific,
   distinct contribution tied to a detected need.
-- lyricWork: include only when lyrics, transcription, reconstruction, or
-  lyric alternatives are central. Mark newly proposed language as
-  muse_suggestion.
+- lyricWork: include only when analyzing existing lyrics, transcription, or
+  comparing songwriter-provided lyric alternatives. likelyLyric must be exact
+  language already present in supplied lyrics, transcript, or writer notes;
+  otherwise use null. suggestedLines may quote only songwriter-provided
+  language and must use transcript, existing_lyric, or writer_note as the
+  source. Never generate new lyric language or use muse_suggestion for a new
+  response.
 - formWork: include only when structure is central to the question or finding.
 - knowledgeCitations: include every supplied knowledge citation key actually
   used in the reply or structured findings, with a brief supportedClaim.
