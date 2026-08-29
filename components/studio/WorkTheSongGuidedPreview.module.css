@@ -265,3 +265,75 @@
   font-size: 0.88rem;
   line-height: 1.4;
 }
+
+/* Studio UX v1.0.1 - Navigation clarity */
+
+.navigationHint {
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  align-items: baseline;
+
+  gap: 0.25rem 0.7rem;
+
+  padding: 0.62rem 0.8rem;
+
+  border: 1px solid rgba(220, 182, 92, 0.24);
+
+  border-radius: 12px;
+
+  background: rgba(151, 106, 40, 0.055);
+
+  font-size: 0.84rem;
+
+  line-height: 1.4;
+
+  opacity: 0.86;
+
+}
+
+
+
+.navigationHint strong {
+
+  font-size: 0.72rem;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.08em;
+
+  white-space: nowrap;
+
+}
+
+
+
+.recommendedActionLabel {
+
+  margin-top: 1rem;
+
+  color: var(--gold);
+
+}
+
+
+
+@media (max-width: 720px) {
+
+  .navigationHint {
+
+    align-items: flex-start;
+
+  }
+
+
+
+  .navigationHint strong {
+
+    width: 100%;
+
+  }
+
+}

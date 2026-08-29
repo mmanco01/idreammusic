@@ -296,6 +296,12 @@ function StudioSongCard({
         </div>
       </details>
 
+      <div className={`eyebrow ${styles.recommendedActionLabel}`}>
+
+        Recommended next action
+
+      </div>
+
       <div className={`button-row ${styles.cardActions}`}>
         {song.lifecycle_phase === "capture" ? (
           <>
@@ -415,6 +421,18 @@ export default function StudioLifecycleV1({ initialSongs }: Props) {
 
   return (
     <div className="pageStack" style={{ marginTop: "1rem" }}>
+
+      <aside className={styles.navigationHint} aria-label="Studio navigation help">
+
+        <strong>How to navigate</strong>
+
+        <span>
+
+          In each song card, the gold button is the recommended next action. Use &#9656; to open more detail and &#9662; to close it.
+
+        </span>
+
+      </aside>
       <section className="card" style={{ padding: "1rem" }}>
         <div className={styles.lifecycleHeading}>
           <div className="eyebrow">Your song lifecycle</div>

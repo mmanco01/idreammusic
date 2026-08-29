@@ -130,6 +130,18 @@ export default function WorkTheSongGuidedPreview({
 
   return (
     <div className={styles.stack}>
+
+      <aside className={styles.navigationHint} aria-label="Guided view navigation help">
+
+        <strong>How to navigate</strong>
+
+        <span>
+
+          The gold button under NEXT is the recommended next action. Use &#9656; to open more detail and &#9662; to close it.
+
+        </span>
+
+      </aside>
       <header className={styles.hero}>
         <div className={styles.heroTop}>
           <div>
@@ -279,7 +291,13 @@ export default function WorkTheSongGuidedPreview({
           </>
         ) : null}
 
-        <div className="button-row" style={{ marginTop: "1rem" }}>
+        <div className={`eyebrow ${styles.recommendedActionLabel}`}>
+
+          Recommended next action
+
+        </div>
+
+        <div className="button-row" style={{ marginTop: "0.45rem" }}>
           {song.lifecyclePhase === "capture" ? (
             <button
               className="button primary"

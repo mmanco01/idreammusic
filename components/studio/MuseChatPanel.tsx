@@ -36,6 +36,7 @@ export type MuseChatOption = {
 
 type Props = {
   defaultMuseSlug: string;
+  hasAssignedMuse?: boolean;
   initialMuseSlug?: string;
   initialQuestion?: string;
   museOptions: readonly MuseChatOption[];
@@ -220,6 +221,7 @@ function messageRecommendedMove(message: ChatMessage) {
 
 export function MuseChatPanel({
   defaultMuseSlug,
+  hasAssignedMuse = true,
   initialMuseSlug,
   initialQuestion,
   museOptions,
@@ -240,6 +242,9 @@ export function MuseChatPanel({
     useState(
       safeInitialMuse?.slug ?? "calliope",
     );
+  const [hasExplicitMuseSelection, setHasExplicitMuseSelection] = useState(
+    Boolean(hasAssignedMuse || initialMuseSlug),
+  );
   const [conversationId, setConversationId] =
     useState<string | null>(null);
   const [messages, setMessages] =
@@ -282,7 +287,11 @@ export function MuseChatPanel({
       (option) => option.slug === initialMuseSlug,
     );
 
-    if (!nextMuse || nextMuse.slug === selectedMuseSlug) return;
+    if (!nextMuse) return;
+
+    setHasExplicitMuseSelection(true);
+
+    if (nextMuse.slug === selectedMuseSlug) return;
 
     setSelectedMuseSlug(nextMuse.slug);
     setMessages([]);
@@ -302,6 +311,10 @@ export function MuseChatPanel({
       (option) => option.slug === selectedMuseSlug,
     ) ?? safeDefaultMuse;
 
+  const isInitialRecommendedMuse = Boolean(
+    initialMuseSlug && selectedMuse?.slug === initialMuseSlug,
+  );
+
   const museNameBySlug = useMemo(
     () =>
       new Map(
@@ -314,6 +327,9 @@ export function MuseChatPanel({
   );
 
   const isSongConversation = Boolean(songId);
+  const needsMuseChoice = Boolean(
+    isSongConversation && !hasAssignedMuse && !hasExplicitMuseSelection,
+  );
   const isPrimaryMuse =
     selectedMuse?.slug === safeDefaultMuse?.slug;
   const isBusy =
@@ -557,6 +573,7 @@ export function MuseChatPanel({
 
   function changeMuse(nextMuseSlug: string) {
     clearInteractionState();
+    setHasExplicitMuseSelection(true);
     setSelectedMuseSlug(nextMuseSlug);
     setMessages([]);
     setConversationId(null);
@@ -1163,16 +1180,26 @@ export function MuseChatPanel({
         <div>
           <div className="eyebrow">
             {isSongConversation
-              ? isPrimaryMuse
-                ? "Lead Muse conversation"
-                : "Invited Muse perspective"
+              ? !hasAssignedMuse
+                ? isInitialRecommendedMuse
+                  ? "Recommended Muse perspective"
+                  : "Muse perspective"
+                : isPrimaryMuse
+                  ? "Lead Muse conversation"
+                  : "Invited Muse perspective"
               : `Conversation with the Muse of ${selectedMuse.domain}`}
           </div>
           <h2 className="h2" style={{ marginBottom: "0.35rem" }}>
-            Ask {selectedMuse.name}
+            {needsMuseChoice ? "Choose a Muse perspective" : <>Ask {selectedMuse.name}</>}
           </h2>
           <p className="copy" style={{ maxWidth: 760, marginBottom: 0 }}>
-            {isSongConversation ? (
+            {needsMuseChoice ? (
+              <>
+                No lead Muse is assigned yet. Choose a Muse when a particular creative
+                perspective would help; choosing one here does not assign it as the
+                song&apos;s lead Muse.
+              </>
+            ) : isSongConversation ? (
               <>
                 <strong>{selectedMuse.name}</strong> listens through the lens of{" "}
                 <strong>{selectedMuse.domain}</strong>. Ask one focused question; the
@@ -1189,17 +1216,25 @@ export function MuseChatPanel({
 
         {isSongConversation ? (
           <span className="info-badge">
-            {isPrimaryMuse
-              ? `${selectedMuse.name} is the lead Muse`
-              : `${selectedMuse.name} is joining as a specialist`}
+            {!hasAssignedMuse
+              ? isInitialRecommendedMuse
+                ? `${selectedMuse.name} is the current recommended creative partner`
+                : "No lead Muse assigned"
+              : isPrimaryMuse
+                ? `${selectedMuse.name} is the lead Muse`
+                : `${selectedMuse.name} is joining as a specialist`}
           </span>
         ) : null}
       </div>
 
       {isSongConversation && songId ? (
         <MuseCouncilOverview
-          leadMuse={safeDefaultMuse ?? selectedMuse}
+          leadMuse={
+            hasAssignedMuse ? (safeDefaultMuse ?? selectedMuse) : selectedMuse
+          }
           activeMuse={selectedMuse}
+          hasAssignedMuse={hasAssignedMuse}
+          hasRecommendedMuse={isInitialRecommendedMuse}
           entries={councilEntries}
           status={councilStatus}
           onOpenMuse={openMuseFromCouncil}
@@ -1214,8 +1249,13 @@ export function MuseChatPanel({
       ) : null}
 
       {!lockedMuse ? (
-        <details className="council-disclosure council-tool-disclosure">
-          <summary>Switch or invite a different Muse</summary>
+        <details
+          className="council-disclosure council-tool-disclosure"
+          open={needsMuseChoice || undefined}
+        >
+          <summary>
+            {needsMuseChoice ? "Choose a Muse perspective" : "Switch or invite a different Muse"}
+          </summary>
           <div className="council-selector-panel">
             <label className="copy" htmlFor="muse-selector">
               Creative partner
@@ -1223,20 +1263,29 @@ export function MuseChatPanel({
             <select
               id="muse-selector"
               className="input"
-              value={selectedMuse.slug}
+              value={needsMuseChoice ? "" : selectedMuse.slug}
               disabled={isBusy}
-              onChange={(event) => changeMuse(event.target.value)}
+              onChange={(event) => {
+                if (event.target.value) changeMuse(event.target.value);
+              }}
               style={{ marginTop: "0.35rem" }}
             >
+              {needsMuseChoice ? (
+                <option value="" disabled>
+                  Choose a Muse...
+                </option>
+              ) : null}
               {museOptions.map((option) => (
                 <option key={option.slug} value={option.slug}>
                   {option.name} — {option.domain}
-                  {option.slug === safeDefaultMuse?.slug ? " (Lead Muse)" : ""}
+                  {hasAssignedMuse && option.slug === safeDefaultMuse?.slug
+                    ? " (Lead Muse)"
+                    : ""}
                 </option>
               ))}
             </select>
 
-            {!isPrimaryMuse && isSongConversation ? (
+            {hasAssignedMuse && !isPrimaryMuse && isSongConversation ? (
               <p className="copy" style={{ margin: "0.45rem 0 0", fontSize: "0.86rem" }}>
                 {selectedMuse.name} is joining as a specialist. The song remains assigned
                 to {safeDefaultMuse?.name}.
@@ -1253,6 +1302,20 @@ export function MuseChatPanel({
           messages={["Bringing the saved questions, responses, and Muse guidance back into view."]}
         />
       ) : messages.length === 0 ? (
+        needsMuseChoice ? (
+          <div className="muse-first-question">
+            <div className="recommended-action">
+              <div className="recommended-action__eyebrow">Choose a creative perspective</div>
+              <h3 className="recommended-action__title">Select a Muse to begin</h3>
+              <div className="recommended-action__description">
+                <p>
+                  Use the Muse selector above. Once you choose a perspective, the
+                  focused starter question for that Muse will appear here.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="muse-first-question">
           <p className="copy" style={{ fontStyle: "italic", marginBottom: 0 }}>
             “{selectedMuse.greeting}”
@@ -1301,6 +1364,7 @@ export function MuseChatPanel({
             </details>
           ) : null}
         </div>
+        )
       ) : (
         <div
           aria-live="polite"
