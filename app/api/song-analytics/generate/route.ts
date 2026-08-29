@@ -3,7 +3,9 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { recordAIUsage } from '@/lib/ai/usage';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+// Song Intelligence waits on a structured model response and then persists
+// several related records. Give the request enough headroom to finish cleanly.
+export const maxDuration = 120;
 
 const MODEL_NAME = process.env.OPENAI_ANALYTICS_MODEL || 'gpt-5.6-terra';
 const ANALYSIS_VERSION = '2.2';
