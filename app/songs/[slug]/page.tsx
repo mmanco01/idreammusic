@@ -385,11 +385,10 @@ export default async function SongDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const song = await getSongBySlug(slug);
+  const { supabase, user } = await getServerAuthContext();
+  const song = await getSongBySlug(slug, user?.id ?? null);
 
   if (!song) {
-    const { supabase, user } = await getServerAuthContext();
-
     if (supabase && user) {
       const { data: ownedSong } = await supabase
         .from('songs')

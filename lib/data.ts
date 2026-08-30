@@ -209,7 +209,11 @@ export const getPublicSongsByMuse = cache(async (museSlug: string): Promise<Song
   return attachPublicEngagementMetrics(songs, engagementRows, ratingRows);
 });
 
-export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | null> => {
+export const getSongBySlug = cache(
+  async (
+    slug: string,
+    viewerUserId: string | null = null,
+  ): Promise<SongDetail | null> => {
   const supabase = await createServerSupabaseClient();
 
   if (!supabase) return slug === sampleSongDetail.slug ? sampleSongDetail : null;
@@ -222,22 +226,36 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
 
   if (error || !song) return null;
 
+  const { data: songMeta } = await supabase
+    .from('songs')
+    .select('id, song_origin, owner_user_id')
+    .eq('id', song.id)
+    .maybeSingle();
+
+  const canViewPrivateHistory =
+    Boolean(viewerUserId) && songMeta?.owner_user_id === viewerUserId;
+
+  const versionsQueryBase = supabase
+    .from('song_versions')
+    .select(
+      'id, version_number, stage, title, lyrics, arrangement_notes, story_behind_song, visibility, is_stage_primary, created_at'
+    )
+    .eq('song_id', song.id);
+
+  const versionsQuery = canViewPrivateHistory
+    ? versionsQueryBase.order('version_number', { ascending: true })
+    : versionsQueryBase
+        .eq('visibility', 'public')
+        .order('version_number', { ascending: true });
+
   const [
     { data: versions },
     { data: notes },
     { data: posts },
     { data: attachments },
-    { data: songMeta },
     { data: links },
   ] = await Promise.all([
-    supabase
-      .from('song_versions')
-      .select(
-        'id, version_number, stage, title, lyrics, arrangement_notes, story_behind_song, visibility, is_stage_primary, created_at'
-      )
-      .eq('song_id', song.id)
-      .eq('visibility', 'public')
-      .order('version_number', { ascending: true }),
+    versionsQuery,
     supabase
       .from('writer_notes')
       .select('id, title, body, visibility, created_at')
@@ -256,11 +274,7 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
       .eq('song_id', song.id)
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true }),
-    supabase
-      .from('songs')
-      .select('id, song_origin')
-      .eq('id', song.id)
-      .maybeSingle(),
+
     (supabase as any)
       .from('public_song_video_links')
       .select('id, song_version_id, title, url, link_type, sort_order, created_at')
@@ -269,10 +283,10 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
       .order('created_at', { ascending: false }),
   ]);
 
-  const publicVersionIds = new Set((versions ?? []).map((version: any) => version.id));
+  const visibleVersionIds = new Set((versions ?? []).map((version: any) => version.id));
 
   const attachmentRows = (attachments ?? []).filter(
-    (row: any) => !row.song_version_id || publicVersionIds.has(row.song_version_id)
+    (row: any) => !row.song_version_id || visibleVersionIds.has(row.song_version_id)
   );
 
   const attachmentsWithUrls = attachmentRows.map((row: any) => ({
@@ -343,7 +357,8 @@ export const getSongBySlug = cache(async (slug: string): Promise<SongDetail | nu
       created_at: row.created_at,
     })),
   } as SongDetail;
-});
+  },
+);
 
 export type MySongStats = {
   totalSongCount: number;
