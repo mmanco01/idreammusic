@@ -420,7 +420,7 @@ export default function StudioLifecycleV1({ initialSongs }: Props) {
   }
 
   return (
-    <div className="pageStack" style={{ marginTop: "1rem" }}>
+    <div className={`pageStack ${styles.lifecycleShell}`} style={{ marginTop: "1rem" }}>
 
       <aside className={styles.navigationHint} aria-label="Studio navigation help">
 

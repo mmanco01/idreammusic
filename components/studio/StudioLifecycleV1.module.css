@@ -277,3 +277,29 @@
   }
 
 }
+
+/* LAUNCH-QA-001 mobile Studio containment */
+.lifecycleShell,
+.lifecycleHeading,
+.lifecycleGrid,
+.focusScroller,
+.controls,
+.songList,
+.navigationHint {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lifecycleButton {
+  min-width: 0;
+}
+
+.lifecycleShell > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lifecycleShell > * {
+  min-width: 0;
+  max-width: 100%;
+}
